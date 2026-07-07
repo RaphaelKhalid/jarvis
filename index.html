@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SelfBalance Lab — Robot Assembly Simulator</title>
+<link rel="stylesheet" href="css/style.css">
+<!-- CodeMirror (Arduino code editor) -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/material-darker.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/clike/clike.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/selection/active-line.min.js"></script>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<div id="app">
+
+  <!-- LEFT: parts tray + checklist -->
+  <aside id="left-panel">
+    <header class="panel-header">
+      <span class="dot"></span> PARTS TRAY
+    </header>
+    <div id="parts-tray"></div>
+    <header class="panel-header">
+      <span class="dot dot-yellow"></span> CONNECTIONS
+    </header>
+    <div id="checklist">
+      <p class="hint">Place all parts, then wire them in Phase&nbsp;2.</p>
+    </div>
+  </aside>
+
+  <!-- CENTER: 3D workspace -->
+  <main id="workspace">
+    <div id="workspace-hud">
+      <span id="hud-status">Drag parts from the tray onto the chassis</span>
+    </div>
+    <canvas id="three-canvas"></canvas>
+  </main>
+
+  <!-- RIGHT: code editor (Phase 3) -->
+  <aside id="right-panel">
+    <header class="panel-header">
+      <span class="dot dot-green"></span> FIRMWARE — balance_bot.ino
+    </header>
+    <div id="editor-container">
+      <p class="hint" style="padding:12px">Code editor arrives in Phase&nbsp;3.</p>
+    </div>
+    <button id="upload-btn" disabled>⬆ UPLOAD</button>
+  </aside>
+
+</div>
+<div id="tooltip" class="hidden"></div>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

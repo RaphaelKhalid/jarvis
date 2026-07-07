@@ -206,4 +206,8 @@ export class WiringManager {
   wireMeshes() {
     return this.wires.map(w => w.mesh);
   }
+
+  setVisible(v) {
+    for (const w of this.wires) w.mesh.visible = v;
+  }
 }

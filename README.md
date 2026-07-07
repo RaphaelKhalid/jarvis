@@ -18,10 +18,17 @@ Built as a proof-of-concept MVP — no build step, no backend.
   ticks off the 13 required connections.
 - **Firmware editor** (CodeMirror) — a realistic MPU6050 + L298N + PID sketch.
   Edit the `Kp` / `Ki` / `Kd` gains and they are parsed live into the simulation.
+- **Auto-wire** — skip the manual step: **⚡ instant** places every part and
+  draws all 13 connections at once, or **▶ step-by-step** drops the parts and
+  adds each wire one at a time so you can watch the assembly come together.
 - **Physics** (Rapier) — once wiring is complete, Upload spawns an inverted
-  pendulum on two wheels. A JS PID loop reads your gains and drives wheel torque.
-  Well-tuned gains (≈ `Kp 15`, `Ki 140`, `Kd 0.9`) balance it; poor gains fall
-  over. Live tilt readout, angle sparkline, and a **Nudge** disturbance button.
+  pendulum on two wheels over **hilly terrain**. A JS PID loop (inner angle loop
+  + outer velocity loop) reads your gains and drives wheel torque. Well-tuned
+  gains (≈ `Kp 15`, `Ki 140`, `Kd 0.9`) keep it upright. Live tilt readout,
+  angle sparkline, and a **Nudge** disturbance button.
+- **Drive it** — steer the balancing robot around the hills with **W/A/S/D**
+  (W/S drive, A/D steer). A follow-cam keeps it in frame; it holds station when
+  you let go.
 
 ## Run locally
 

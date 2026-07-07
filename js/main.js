@@ -14,6 +14,7 @@ scene.add(assembly);
 
 const wiring = new WiringManager(scene, camera, renderer, refreshChecklist);
 const sim = new BalanceSim(scene);
+window.__sim = sim;   // debug/testing hook
 
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
@@ -156,6 +157,62 @@ function placePart(def) {
   refreshChecklist();
 }
 
+// ── auto-assemble + auto-wire ───────────────────────────────────
+import { REQUIRED } from './wiring.js';
+
+let autoBusy = false;
+
+function autoAssemble() {
+  for (const def of PART_DEFS) {
+    let guard = 0;
+    while (remainingFor(def.type) > 0 && guard++ < 4) placePart(def);
+  }
+}
+
+function wireAllInstant() {
+  for (const r of REQUIRED) {
+    const exists = wiring.wires.some(w => w.req && w.req.label === r.label);
+    if (!exists) wiring.tryConnect(r.a, r.b);
+  }
+}
+
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+async function autoWire(stepByStep) {
+  if (autoBusy || mode !== 'assembly') return;
+  autoBusy = true;
+  autoInstant.disabled = autoStep.disabled = true;
+
+  if (stepByStep) {
+    // place parts one-by-one, then draw wires with a beat between each
+    for (const def of PART_DEFS) {
+      let guard = 0;
+      while (remainingFor(def.type) > 0 && guard++ < 4) {
+        placePart(def);
+        await sleep(320);
+      }
+    }
+    await sleep(300);
+    for (const r of REQUIRED) {
+      const exists = wiring.wires.some(w => w.req && w.req.label === r.label);
+      if (!exists) { wiring.tryConnect(r.a, r.b); flash(`✓ ${r.label}`, 'ok'); }
+      await sleep(260);
+    }
+  } else {
+    autoAssemble();
+    wireAllInstant();
+  }
+
+  autoBusy = false;
+  autoInstant.disabled = autoStep.disabled = false;
+  refreshChecklist();
+}
+
+const autoInstant = document.getElementById('auto-instant');
+const autoStep = document.getElementById('auto-step');
+autoInstant.addEventListener('click', () => autoWire(false));
+autoStep.addEventListener('click', () => autoWire(true));
+
 // ── raycasting: pins & wires ────────────────────────────────────
 function updatePointer(e) {
   const r = canvas.getBoundingClientRect();
@@ -272,19 +329,44 @@ uploadBtn.addEventListener('click', async () => {
 function enterSim() {
   mode = 'sim';
   assembly.visible = false;
+  wiring.setVisible(false);
   document.querySelector('#three-canvas').style.cursor = 'default';
   sim.setGains(currentGains);
   sim.start();
-  controls.target.set(0, 6, 0);
-  camera.position.set(0, 12, 34);
+  const p = sim.chassisPos();
+  controls.target.copy(p);
+  camera.position.set(p.x, p.y + 8, p.z + 30);
   simHud.classList.remove('hidden');
+  hudStatus.textContent = 'Drive with W/A/S/D — the robot balances as it moves';
   graphData.length = 0;
+  keys.clear();
+}
+
+// ── WASD driving ────────────────────────────────────────────────
+const keys = new Set();
+const DRIVE_KEYS = { w: 1, a: 1, s: 1, d: 1, arrowup: 1, arrowdown: 1, arrowleft: 1, arrowright: 1 };
+window.addEventListener('keydown', (e) => {
+  const k = e.key.toLowerCase();
+  if (mode !== 'sim' || !DRIVE_KEYS[k]) return;
+  keys.add(k); updateDriveInput(); e.preventDefault();
+});
+window.addEventListener('keyup', (e) => {
+  const k = e.key.toLowerCase();
+  if (!DRIVE_KEYS[k]) return;
+  keys.delete(k); updateDriveInput();
+});
+function updateDriveInput() {
+  const fwd = (keys.has('w') || keys.has('arrowup') ? 1 : 0) - (keys.has('s') || keys.has('arrowdown') ? 1 : 0);
+  const turn = (keys.has('d') || keys.has('arrowright') ? 1 : 0) - (keys.has('a') || keys.has('arrowleft') ? 1 : 0);
+  sim.input.fwd = fwd;
+  sim.input.turn = turn;
 }
 
 function exitSim() {
   mode = 'assembly';
   sim.hide();
   assembly.visible = true;
+  wiring.setVisible(true);
   controls.target.set(0, 2, 1);
   camera.position.set(18, 20, 26);
   simHud.classList.add('hidden');
@@ -305,7 +387,8 @@ simHud.innerHTML = `
     <button id="reset-btn">↻ Reset</button>
     <button id="back-btn">← Assembly</button>
   </div>
-  <div class="sim-gains" id="gains-readout">Kp 15  Ki 140  Kd 0.9</div>`;
+  <div class="sim-gains" id="gains-readout">Kp 15  Ki 140  Kd 0.9</div>
+  <div class="sim-drive">W/S drive · A/D steer · over the hills</div>`;
 document.getElementById('workspace').appendChild(simHud);
 document.getElementById('nudge-btn').addEventListener('click', () => sim.nudge());
 document.getElementById('reset-btn').addEventListener('click', () => { sim.setGains(currentGains); sim.reset(); graphData.length = 0; });
@@ -375,6 +458,13 @@ function animate() {
 
   if (mode === 'sim') {
     sim.step(dt);
+    // follow-cam: keep the robot centered while preserving the user's orbit
+    if (sim.bodies.chassis) {
+      const p = sim.chassisPos();
+      const delta = p.clone().sub(controls.target);
+      controls.target.add(delta);
+      camera.position.add(delta);
+    }
     const el = tiltReadout();
     if (el) el.textContent = `Tilt: ${sim.tiltDeg.toFixed(1)}°`;
     const st = simState();

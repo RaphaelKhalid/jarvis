@@ -21,14 +21,15 @@ Built as a proof-of-concept MVP — no build step, no backend.
 - **Auto-wire** — skip the manual step: **⚡ instant** places every part and
   draws all 13 connections at once, or **▶ step-by-step** drops the parts and
   adds each wire one at a time so you can watch the assembly come together.
-- **Physics** (Rapier) — once wiring is complete, Upload spawns an inverted
-  pendulum on two wheels over **hilly terrain**. A JS PID loop (inner angle loop
-  + outer velocity loop) reads your gains and drives wheel torque. Well-tuned
-  gains (≈ `Kp 15`, `Ki 140`, `Kd 0.9`) keep it upright. Live tilt readout,
-  angle sparkline, and a **Nudge** disturbance button.
-- **Drive it** — steer the balancing robot around the hills with **W/A/S/D**
-  (W/S drive, A/D steer). A follow-cam keeps it in frame; it holds station when
-  you let go.
+- **Physics** (Rapier) — once wiring is complete, Upload spawns a chrome
+  sphere-bot (camera dome, gripper arms, fat treaded wheels) balancing on two
+  wheels in a bright, walled **arena** with rolling hills. A JS PID loop reads
+  your gains and keeps it upright; well-tuned gains (≈ `Kp 15`, `Ki 140`,
+  `Kd 0.9`) hold it steady. Live tilt readout, angle sparkline, **Nudge**.
+- **Drive it (W/A/S/D)** — driving is the primary control: W/S drive, A/D
+  steer. A wheel-speed servo moves the bot while the PID keeps it balanced, and
+  a heading-hold keeps it straight. A follow-cam tracks it; perimeter walls keep
+  it in the arena; it holds station when you let go.
 
 ## Run locally
 

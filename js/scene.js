@@ -1,6 +1,7 @@
 // Three.js scene setup: renderer, camera, lights, chassis plate, slots.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { SLOTS } from './parts.js';
 
 export function createScene(canvas) {
@@ -8,12 +9,19 @@ export function createScene(canvas) {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.15;
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0b0e13);
-  scene.fog = new THREE.Fog(0x0b0e13, 45, 90);
+  // bright open sky
+  scene.background = new THREE.Color(0xbfe0ff);
+  scene.fog = new THREE.Fog(0xbfe0ff, 120, 320);
 
-  const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 500);
+  // environment map for realistic metal/chrome reflections
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
   camera.position.set(18, 20, 26);
 
   const controls = new OrbitControls(camera, renderer.domElement);
@@ -21,27 +29,30 @@ export function createScene(canvas) {
   controls.dampingFactor = 0.08;
   controls.target.set(0, 2, 1);
   controls.maxPolarAngle = Math.PI * 0.49;
-  controls.minDistance = 10;
-  controls.maxDistance = 70;
+  controls.minDistance = 8;
+  controls.maxDistance = 140;
 
-  // ── lights ──
-  scene.add(new THREE.AmbientLight(0x8899bb, 0.6));
-  const key = new THREE.DirectionalLight(0xffffff, 1.4);
-  key.position.set(14, 28, 18);
+  // ── lights: bright, sunny, open ──
+  scene.add(new THREE.HemisphereLight(0xdcefff, 0x8a9a6a, 1.15));
+  scene.add(new THREE.AmbientLight(0xffffff, 0.35));
+  const key = new THREE.DirectionalLight(0xfff6e6, 2.0);
+  key.position.set(40, 70, 35);
   key.castShadow = true;
   key.shadow.mapSize.set(2048, 2048);
-  const s = 30;
+  const s = 90;
   key.shadow.camera.left = -s; key.shadow.camera.right = s;
   key.shadow.camera.top = s; key.shadow.camera.bottom = -s;
-  key.shadow.camera.far = 90;
+  key.shadow.camera.far = 240;
   key.shadow.bias = -0.0004;
   scene.add(key);
-  const fill = new THREE.DirectionalLight(0x4da3ff, 0.5);
-  fill.position.set(-16, 12, -10);
+  const fill = new THREE.DirectionalLight(0xbfe0ff, 0.6);
+  fill.position.set(-30, 20, -20);
   scene.add(fill);
 
-  // ── grid floor ──
-  const grid = new THREE.GridHelper(120, 60, 0x2a3446, 0x161c28);
+  // ── grid floor (subtle, light) ──
+  const grid = new THREE.GridHelper(300, 100, 0xffffff, 0xa9c6d8);
+  grid.material.opacity = 0.25;
+  grid.material.transparent = true;
   grid.position.y = -0.02;
   scene.add(grid);
 

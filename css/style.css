@@ -1,0 +1,181 @@
+/* ── SelfBalance Lab — dark engineering theme ─────────────────── */
+:root {
+  --bg: #0b0e13;
+  --panel: #10141c;
+  --panel-2: #151a24;
+  --border: #232b3a;
+  --text: #c8d3e0;
+  --text-dim: #6b7789;
+  --accent: #4da3ff;
+  --green: #3ddc84;
+  --yellow: #ffd166;
+  --red: #ff5d5d;
+  --mono: "Cascadia Code", "JetBrains Mono", "Fira Code", Consolas, monospace;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+  overflow: hidden;
+}
+
+#app {
+  display: grid;
+  grid-template-columns: 240px 1fr 380px;
+  height: 100vh;
+  gap: 1px;
+  background: var(--border);
+}
+
+aside, main { background: var(--panel); overflow: hidden; display: flex; flex-direction: column; }
+#workspace { position: relative; background: var(--bg); }
+#three-canvas { width: 100%; height: 100%; display: block; touch-action: none; }
+
+.panel-header {
+  padding: 10px 12px;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+.dot-yellow { background: var(--yellow); box-shadow: 0 0 6px var(--yellow); }
+.dot-green { background: var(--green); box-shadow: 0 0 6px var(--green); }
+
+.hint { color: var(--text-dim); font-size: 12px; padding: 10px 12px; line-height: 1.5; }
+
+/* ── parts tray ── */
+#parts-tray { padding: 8px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
+.part-card {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  cursor: grab;
+  user-select: none;
+  transition: border-color 0.15s, transform 0.1s;
+  position: relative;
+}
+.part-card:hover { border-color: var(--accent); }
+.part-card:active { cursor: grabbing; }
+.part-card.depleted { opacity: 0.35; pointer-events: none; }
+.part-card .part-name { font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 6px; }
+.part-card .part-swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.part-card .part-desc { color: var(--text-dim); font-size: 11px; margin-top: 4px; line-height: 1.4; }
+.part-card .count-badge {
+  position: absolute; top: 8px; right: 10px;
+  font-size: 11px; color: var(--accent);
+}
+.part-card .help-icon {
+  position: absolute; bottom: 8px; right: 10px;
+  width: 15px; height: 15px; border-radius: 50%;
+  border: 1px solid var(--text-dim); color: var(--text-dim);
+  font-size: 10px; display: flex; align-items: center; justify-content: center;
+  cursor: help;
+}
+.part-card .help-icon:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── checklist ── */
+#checklist { padding: 8px 12px; overflow-y: auto; flex: 1; }
+.check-item { display: flex; gap: 8px; padding: 3px 0; font-size: 11.5px; color: var(--text-dim); }
+.check-item.done { color: var(--green); }
+.check-item .box { flex-shrink: 0; }
+
+/* ── workspace HUD ── */
+#workspace-hud {
+  position: absolute; top: 10px; left: 12px; z-index: 5;
+  background: rgba(11,14,19,0.75);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 11.5px;
+  color: var(--text-dim);
+  backdrop-filter: blur(4px);
+  pointer-events: none;
+}
+
+/* ── right panel ── */
+#editor-container { flex: 1; overflow: hidden; }
+#upload-btn {
+  margin: 10px 12px;
+  padding: 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  border-radius: 6px;
+  cursor: not-allowed;
+}
+#upload-btn:not(:disabled) {
+  background: #123524;
+  border-color: var(--green);
+  color: var(--green);
+  cursor: pointer;
+}
+#upload-btn:not(:disabled):hover { background: #1a4a32; }
+
+/* ── tooltip ── */
+#tooltip {
+  position: fixed; z-index: 100;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 11.5px;
+  max-width: 260px;
+  line-height: 1.45;
+  pointer-events: none;
+  color: var(--text);
+}
+#tooltip .unit { color: var(--accent); display: block; margin-top: 4px; font-size: 10.5px; }
+#tooltip.error { border-color: var(--red); color: var(--red); }
+.hidden { display: none; }
+
+/* ── CodeMirror sizing ── */
+#editor-container { position: relative; }
+.CodeMirror { height: 100% !important; font-size: 12px; font-family: var(--mono); }
+
+/* ── sim HUD overlay ── */
+#sim-hud {
+  position: absolute; top: 10px; right: 12px; z-index: 8;
+  background: rgba(16,20,28,0.92);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  width: 324px;
+  backdrop-filter: blur(6px);
+}
+.sim-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+#tilt-readout { font-size: 15px; color: var(--text); }
+#sim-state { font-size: 11px; letter-spacing: 0.08em; padding: 2px 8px; border-radius: 4px; }
+.sim-ok { color: var(--green); background: #123524; }
+.sim-warn { color: var(--yellow); background: #3a3016; }
+.sim-bad { color: var(--red); background: #3a1616; }
+#sparkline { width: 100%; height: 70px; background: #0b0e13; border: 1px solid var(--border); border-radius: 4px; display: block; }
+.sim-buttons { display: flex; gap: 6px; margin-top: 10px; }
+.sim-buttons button {
+  flex: 1; padding: 8px 4px; background: var(--panel-2); border: 1px solid var(--border);
+  color: var(--text); font-family: var(--mono); font-size: 11px; border-radius: 5px; cursor: pointer;
+}
+.sim-buttons button:hover { border-color: var(--accent); color: var(--accent); }
+.sim-gains { margin-top: 8px; font-size: 11px; color: var(--text-dim); text-align: center; }
+
+/* ── mobile: stack vertically ── */
+@media (max-width: 900px) {
+  #app {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 55vh auto;
+    height: auto;
+  }
+  body { overflow-y: auto; }
+  #workspace { height: 55vh; }
+}

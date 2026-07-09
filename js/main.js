@@ -578,6 +578,7 @@ function exitSim() {
   controls.enabled = true;
   controls.target.set(0, 2, 1);
   camera.position.set(18, 20, 26);
+  camera.fov = 45; camera.updateProjectionMatrix();
   simHud.classList.add('hidden');
   updateStepper();
 }
@@ -749,17 +750,24 @@ function animate() {
 
   if (mode === 'sim') {
     sim.step(dt);
-    // cinematic chase-cam: smoothly swing behind the robot's heading so turns
-    // read naturally (a fixed orbit that only translates felt disorienting).
+    // racing chase-cam: trails behind the heading, pulls back + widens FOV with
+    // speed, and looks ahead along the direction of travel.
     if (sim.bodies.chassis) {
       const p = sim.chassisPos();
       const h = sim.heading;
+      const spd = sim.driveSpeed || 0;
       const back = new THREE.Vector3(-Math.sin(h), 0, -Math.cos(h)); // behind heading
-      const desired = new THREE.Vector3(
-        p.x + back.x * 46, p.y + 18, p.z + back.z * 46);
-      const k = 1 - Math.pow(0.0015, dt);   // frame-rate-independent smoothing
+      const fwd = new THREE.Vector3(Math.sin(h), 0, Math.cos(h));
+      const dist = 40 + spd * 0.55;
+      const height = 15 + spd * 0.22;
+      const desired = new THREE.Vector3(p.x + back.x * dist, p.y + height, p.z + back.z * dist);
+      const k = 1 - Math.pow(0.002, dt);   // frame-rate-independent smoothing
       camera.position.lerp(desired, k);
-      camera.lookAt(p.x, p.y + 4, p.z);
+      // look slightly ahead of the bot so fast driving reads forward
+      const look = new THREE.Vector3(p.x + fwd.x * spd * 0.35, p.y + 4, p.z + fwd.z * spd * 0.35);
+      camera.lookAt(look);
+      const targetFov = 46 + Math.min(14, spd * 0.4);
+      if (Math.abs(camera.fov - targetFov) > 0.1) { camera.fov += (targetFov - camera.fov) * 0.1; camera.updateProjectionMatrix(); }
     }
     const el = tiltReadout();
     if (el) el.textContent = `Tilt: ${sim.tiltDeg.toFixed(1)}°`;

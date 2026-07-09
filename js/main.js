@@ -4,7 +4,7 @@ import { createScene } from './scene.js';
 import { PART_DEFS, SLOTS, makeMotor } from './parts.js';
 import { WiringManager, suggestFor } from './wiring.js';
 import { initEditor } from './editor.js';
-import { BalanceSim, loadRapier } from './sim.js';
+import { BalanceSim, loadRapier, loadRobotModel } from './sim.js';
 import { pinInfo, connectionBlurb } from './glossary.js';
 
 const KIND_LABEL = { power: 'POWER', ground: 'GROUND', data: 'SIGNAL' };
@@ -402,7 +402,8 @@ uploadBtn.addEventListener('click', async () => {
   if (uploadBtn.disabled) return;
   uploadBtn.textContent = '⏳ COMPILING…';
   try {
-    await loadRapier();
+    // physics engine is required; the robot model is best-effort (falls back)
+    await Promise.all([loadRapier(), loadRobotModel()]);
   } catch (err) {
     flash('Failed to load physics engine', 'bad');
     uploadBtn.textContent = '⬆ UPLOAD';

@@ -1,6 +1,7 @@
 // Rapier physics: self-balancing robot on hilly terrain, drivable with WASD.
 // A JS PID loop keeps it upright; WASD shifts the lean setpoint / yaws it.
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 let RAPIER = null;
 
@@ -10,6 +11,25 @@ export async function loadRapier() {
   await mod.init();
   RAPIER = mod;
   return RAPIER;
+}
+
+// Real CC0 robot model (RobotExpressive by Tomás Laulhé / Quaternius, via three.js
+// examples). Loaded from our own /assets so it's same-origin. Falls back to the
+// procedural sphere-bot if it fails to load.
+let ROBOT = null, ROBOT_SIZE = null, ROBOT_MINY = 0, robotTried = false;
+export async function loadRobotModel() {
+  if (ROBOT || robotTried) return ROBOT;
+  robotTried = true;
+  try {
+    const gltf = await new GLTFLoader().loadAsync('assets/models/robot.glb');
+    const m = gltf.scene;
+    m.traverse(o => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } });
+    const bb = new THREE.Box3().setFromObject(m);
+    ROBOT_SIZE = bb.getSize(new THREE.Vector3());
+    ROBOT_MINY = bb.min.y;
+    ROBOT = m;
+  } catch (e) { ROBOT = null; }
+  return ROBOT;
 }
 
 // Tunables chosen so Kp~15, Ki~140, Kd~0.9 balances.
@@ -345,6 +365,18 @@ function makeRobotVisual(chassisH) {
   const g = new THREE.Group();
   const bottom = -chassisH / 2;   // axle line in local coords
 
+  // ── real GLB robot (preferred) ──
+  if (ROBOT && ROBOT_SIZE) {
+    const targetH = chassisH * 1.12;
+    const s = targetH / ROBOT_SIZE.y;
+    ROBOT.scale.setScalar(s);
+    ROBOT.position.set(0, bottom - ROBOT_MINY * s, 0);   // feet on the axle line
+    ROBOT.rotation.y = 0;                                // faces +Z (drive forward)
+    g.add(ROBOT);
+    return g;
+  }
+
+  // ── procedural sphere-bot fallback ──
   // neck from axle up to the body
   const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 1.15, 4.2, 20), CHROME);
   neck.position.y = bottom + 2.1;

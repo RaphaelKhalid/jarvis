@@ -76,6 +76,7 @@ export class WiringManager {
     // remove wires touching this comp + its endpoints
     this.wires = this.wires.filter(w => {
       if (w.idA.startsWith(compType + '.') || w.idB.startsWith(compType + '.')) {
+        this._disposeCharges(w);
         this.scene.remove(w.mesh);
         w.mesh.geometry.dispose();
         return false;
@@ -147,6 +148,7 @@ export class WiringManager {
     const c2 = pB.clone().lerp(mid, 0.5); c2.y += lift * 0.3;
     const curve = new THREE.CubicBezierCurve3(pA, c1, c2, pB);
     const geo = new THREE.TubeGeometry(curve, 32, 0.14, 8, false);
+    geo.userData = { curve };
     const baseColor = valid ? KIND_COLOR[kind] : HOVER_BAD;
     const mat = new THREE.MeshStandardMaterial({
       color: baseColor,
@@ -156,7 +158,39 @@ export class WiringManager {
     const mesh = new THREE.Mesh(geo, mat);
     mesh.castShadow = true;
     mesh.userData.baseColor = baseColor;
+    mesh.userData.curve = curve;
     return mesh;
+  }
+
+  // ── animated current flow: glowing charges travel along completed wires ──
+  ensureCharges(w) {
+    if (w.charges) return;
+    w.charges = [];
+    const color = w.valid ? (KIND_COLOR[w.kind] ?? 0xffffff) : 0x888888;
+    for (let i = 0; i < 3; i++) {
+      const c = new THREE.Mesh(
+        new THREE.SphereGeometry(0.24, 10, 10),
+        new THREE.MeshBasicMaterial({ color }));
+      c.visible = false;
+      this.scene.add(c);
+      w.charges.push(c);
+    }
+  }
+  animateFlow(dt, on) {
+    this._flowT = ((this._flowT || 0) + dt * 0.5) % 1;
+    for (const w of this.wires) {
+      this.ensureCharges(w);
+      const curve = w.mesh.userData.curve;
+      const show = on && w.valid && w.mesh.visible && !!curve;
+      w.charges.forEach((c, i) => {
+        c.visible = show;
+        if (show) c.position.copy(curve.getPointAt((this._flowT + i / w.charges.length) % 1));
+      });
+    }
+  }
+  _disposeCharges(w) {
+    for (const c of w.charges || []) { this.scene.remove(c); c.geometry.dispose(); }
+    w.charges = null;
   }
 
   highlightPin(id, on) {
@@ -189,6 +223,7 @@ export class WiringManager {
   removeWire(mesh) {
     const i = this.wires.findIndex(w => w.mesh === mesh);
     if (i < 0) return;
+    this._disposeCharges(this.wires[i]);
     this.scene.remove(mesh);
     mesh.geometry.dispose();
     this.wires.splice(i, 1);
@@ -213,6 +248,9 @@ export class WiringManager {
   }
 
   setVisible(v) {
-    for (const w of this.wires) w.mesh.visible = v;
+    for (const w of this.wires) {
+      w.mesh.visible = v;
+      if (!v) for (const c of w.charges || []) c.visible = false;
+    }
   }
 }

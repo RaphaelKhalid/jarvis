@@ -7,9 +7,22 @@ import { initEditor } from './editor.js';
 import { BalanceSim, loadRapier, loadRobotModel } from './sim.js';
 import { pinInfo, connectionBlurb } from './glossary.js';
 import { Serial } from './serial.js';
+import { audio } from './audio.js';
 
 const serial = new Serial(document.getElementById('serial-log'));
 let booting = false;
+
+// unlock audio on first interaction (browser autoplay policy)
+window.addEventListener('pointerdown', () => audio.resume(), { once: false });
+// sound toggle
+const soundBtn = document.getElementById('sound-btn');
+function renderSoundBtn() {
+  soundBtn.classList.toggle('muted', !audio.enabled);
+  soundBtn.innerHTML = `<i data-lucide="${audio.enabled ? 'volume-2' : 'volume-x'}"></i>`;
+  try { window.lucide?.createIcons(); } catch {}
+}
+soundBtn.addEventListener('click', () => { audio.resume(); audio.setEnabled(!audio.enabled); renderSoundBtn(); });
+renderSoundBtn();
 
 const KIND_LABEL = { power: 'POWER', ground: 'GROUND', data: 'SIGNAL' };
 function pinTooltipHtml(id) {
@@ -176,6 +189,7 @@ function placePart(def) {
     if (k < 1) requestAnimationFrame(fall);
   })();
 
+  audio.place();
   placed[freeSlot.id] = { group, compType };
   placedCount[def.type] = (placedCount[def.type] || 0) + 1;
   usedTypes.add(compType);
@@ -309,6 +323,7 @@ canvas.addEventListener('pointerdown', (e) => {
   if (e.button === 2 && hoveredWire) {         // right-click deletes a wire
     wiring.removeWire(hoveredWire);
     hoveredWire = null;
+    audio.ui();
     e.preventDefault();
     return;
   }
@@ -321,12 +336,12 @@ canvas.addEventListener('click', (e) => {
   if (!pin) return;
   const id = pin.userData.endpointId;
   const res = wiring.handlePinClick(id);
-  if (res.state === 'armed') hudStatus.textContent = `Selected ${id} — now click its target`;
-  else if (res.state === 'valid') flash(`✓ ${res.label}`, 'ok');
+  if (res.state === 'armed') { hudStatus.textContent = `Selected ${id} — now click its target`; audio.ui(); }
+  else if (res.state === 'valid') { flash(`✓ ${res.label}`, 'ok'); audio.connect(); }
   else if (res.state === 'invalid') {
     const want = res.suggestion ? ` — ${res.idA.split('.')[1]} should go to ${res.suggestion}` : '';
-    flash(`✗ wrong pin${want}`, 'bad');
-  } else if (res.state === 'duplicate') flash('already wired', 'bad');
+    flash(`✗ wrong pin${want}`, 'bad'); audio.error();
+  } else if (res.state === 'duplicate') { flash('already wired', 'bad'); audio.error(); }
 });
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
@@ -452,6 +467,8 @@ function enterSim() {
   keys.clear();
   // power-on bring-up: robot balances while it "boots", driving unlocks after
   booting = true;
+  audio.boot();
+  audio.startMotor();
   serial.boot(currentGains, () => {
     booting = false;
     hudStatus.textContent = 'Drive with W/A/S/D — the robot balances as it moves';
@@ -484,6 +501,7 @@ function exitSim() {
   mode = 'assembly';
   booting = false;
   serial.cancel();
+  audio.stopMotor();
   sim.hide();
   assembly.visible = true;
   wiring.setVisible(true);
@@ -530,7 +548,7 @@ simHud.innerHTML = `
   <div class="sim-gains" id="gains-readout">Kp 15  Ki 140  Kd 0.9</div>
   <div class="sim-drive">W/S drive · A/D steer</div>`;
 document.getElementById('workspace').appendChild(simHud);
-document.getElementById('nudge-btn').addEventListener('click', () => sim.nudge());
+document.getElementById('nudge-btn').addEventListener('click', () => { sim.nudge(); audio.nudge(); });
 document.getElementById('reset-btn').addEventListener('click', () => { sim.setGains(currentGains); sim.reset(); graphData.length = 0; });
 document.getElementById('back-btn').addEventListener('click', exitSim);
 
@@ -623,6 +641,7 @@ function animate() {
     }
     drawSpark();
     if (!booting) serial.telemetry(sim, now);
+    audio.setMotor(sim.speed || 0);
   }
 
   composer.render();

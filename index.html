@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SelfBalance Lab — Robot Assembly Simulator</title>
+<!-- modern typography: Inter for UI chrome, JetBrains Mono for code/data -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<!-- Lucide icons (state-of-the-art SVG icon set) -->
+<script src="https://unpkg.com/lucide@0.462.0" defer></script>
 <link rel="stylesheet" href="css/style.css">
 <!-- CodeMirror (Arduino code editor) -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
@@ -29,16 +35,16 @@
       <span class="dot"></span> PARTS TRAY
     </header>
     <div id="auto-bar">
-      <button id="auto-instant" class="auto-btn">⚡ Auto-wire (instant)</button>
-      <button id="auto-step" class="auto-btn">▶ Auto-wire (step-by-step)</button>
+      <button id="auto-instant" class="auto-btn"><i data-lucide="zap"></i><span>Auto-wire (instant)</span></button>
+      <button id="auto-step" class="auto-btn"><i data-lucide="list-ordered"></i><span>Auto-wire (step-by-step)</span></button>
     </div>
-    <button id="clear-btn" disabled>↺ Clear board</button>
+    <button id="clear-btn" disabled><i data-lucide="rotate-ccw"></i><span>Clear board</span></button>
     <div id="parts-tray"></div>
     <header class="panel-header">
       <span class="dot dot-yellow"></span> CONNECTIONS
     </header>
     <div id="checklist">
-      <p class="hint">Place all parts, then wire them in Phase&nbsp;2.</p>
+      <p class="hint">Place all parts, then wire them together.</p>
     </div>
   </aside>
 
@@ -66,15 +72,13 @@
     <canvas id="three-canvas"></canvas>
   </main>
 
-  <!-- RIGHT: code editor (Phase 3) -->
+  <!-- RIGHT: code editor -->
   <aside id="right-panel">
     <header class="panel-header">
       <span class="dot dot-green"></span> FIRMWARE — balance_bot.ino
     </header>
-    <div id="editor-container">
-      <p class="hint" style="padding:12px">Code editor arrives in Phase&nbsp;3.</p>
-    </div>
-    <button id="upload-btn" disabled>⬆ UPLOAD</button>
+    <div id="editor-container"></div>
+    <button id="upload-btn" disabled><i data-lucide="cpu"></i><span>UPLOAD</span></button>
   </aside>
 
 </div>

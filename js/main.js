@@ -404,18 +404,22 @@ initEditor(document.getElementById('editor-container'), (g) => {
 
 // ── upload / simulation ─────────────────────────────────────────
 const uploadBtn = document.getElementById('upload-btn');
+const uploadLabel = uploadBtn.querySelector('span');
 uploadBtn.addEventListener('click', async () => {
   if (uploadBtn.disabled) return;
-  uploadBtn.textContent = '⏳ COMPILING…';
+  uploadBtn.classList.add('loading');
+  uploadLabel.textContent = 'COMPILING…';
   try {
     // physics engine is required; the robot model is best-effort (falls back)
     await Promise.all([loadRapier(), loadRobotModel()]);
   } catch (err) {
     flash('Failed to load physics engine', 'bad');
-    uploadBtn.textContent = '⬆ UPLOAD';
+    uploadBtn.classList.remove('loading');
+    uploadLabel.textContent = 'UPLOAD';
     return;
   }
-  uploadBtn.textContent = '⬆ UPLOAD';
+  uploadBtn.classList.remove('loading');
+  uploadLabel.textContent = 'UPLOAD';
   enterSim();
 });
 
@@ -506,16 +510,19 @@ simHud.innerHTML = `
   </div>
   <canvas id="sparkline" width="300" height="70"></canvas>
   <div class="sim-buttons">
-    <button id="nudge-btn">⚡ Nudge</button>
-    <button id="reset-btn">↻ Reset</button>
-    <button id="back-btn">← Assembly</button>
+    <button id="nudge-btn"><i data-lucide="zap"></i><span>Nudge</span></button>
+    <button id="reset-btn"><i data-lucide="rotate-ccw"></i><span>Reset</span></button>
+    <button id="back-btn"><i data-lucide="arrow-left"></i><span>Assembly</span></button>
   </div>
   <div class="sim-gains" id="gains-readout">Kp 15  Ki 140  Kd 0.9</div>
-  <div class="sim-drive">W/S drive · A/D steer · over the hills</div>`;
+  <div class="sim-drive">W/S drive · A/D steer</div>`;
 document.getElementById('workspace').appendChild(simHud);
 document.getElementById('nudge-btn').addEventListener('click', () => sim.nudge());
 document.getElementById('reset-btn').addEventListener('click', () => { sim.setGains(currentGains); sim.reset(); graphData.length = 0; });
 document.getElementById('back-btn').addEventListener('click', exitSim);
+
+// render all Lucide icons now that the static + dynamic markup exists
+try { window.lucide?.createIcons(); } catch {}
 
 const tiltReadout = () => document.getElementById('tilt-readout');
 const simState = () => document.getElementById('sim-state');

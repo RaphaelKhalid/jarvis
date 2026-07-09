@@ -8,6 +8,7 @@ import { BalanceSim, loadRapier, loadRobotModel } from './sim.js';
 import { pinInfo, connectionBlurb } from './glossary.js';
 import { Serial } from './serial.js';
 import { audio } from './audio.js';
+import { makeMissions } from './missions.js';
 
 const serial = new Serial(document.getElementById('serial-log'));
 let booting = false;
@@ -473,6 +474,9 @@ function enterSim() {
     booting = false;
     hudStatus.textContent = 'Drive with W/A/S/D — the robot balances as it moves';
   });
+  missionRunning = false; missionCtx = null;
+  missionHud.classList.remove('hidden');
+  renderMissionCard();
   updateStepper();
 }
 
@@ -502,6 +506,8 @@ function exitSim() {
   booting = false;
   serial.cancel();
   audio.stopMotor();
+  missionRunning = false; missionCtx = null;
+  missionHud.classList.add('hidden');
   sim.hide();
   assembly.visible = true;
   wiring.setVisible(true);
@@ -551,6 +557,68 @@ document.getElementById('workspace').appendChild(simHud);
 document.getElementById('nudge-btn').addEventListener('click', () => { sim.nudge(); audio.nudge(); });
 document.getElementById('reset-btn').addEventListener('click', () => { sim.setGains(currentGains); sim.reset(); graphData.length = 0; });
 document.getElementById('back-btn').addEventListener('click', exitSim);
+
+// ── mission mode HUD (built dynamically) ───────────────────────
+const missions = makeMissions();
+let curMission = 0, missionCtx = null, missionRunning = false;
+const missionHud = document.createElement('div');
+missionHud.id = 'mission-hud';
+missionHud.className = 'hidden';
+missionHud.innerHTML = `
+  <div class="m-top"><span class="m-title"></span><span class="m-medal"></span></div>
+  <div class="m-brief"></div>
+  <div class="m-bar"><div class="m-fill"></div></div>
+  <div class="m-status"></div>
+  <div class="m-btns">
+    <button id="m-prev" title="Previous mission"><i data-lucide="chevron-left"></i></button>
+    <button id="m-start">Start</button>
+    <button id="m-next" title="Next mission"><i data-lucide="chevron-right"></i></button>
+  </div>`;
+document.getElementById('workspace').appendChild(missionHud);
+const mTitle = missionHud.querySelector('.m-title');
+const mBrief = missionHud.querySelector('.m-brief');
+const mMedal = missionHud.querySelector('.m-medal');
+const mFill = missionHud.querySelector('.m-fill');
+const mStatus = missionHud.querySelector('.m-status');
+const mStart = document.getElementById('m-start');
+
+function renderMissionCard() {
+  const m = missions[curMission];
+  mTitle.textContent = m.title;
+  mBrief.textContent = m.brief;
+  mMedal.textContent = '';
+  mStatus.textContent = ''; mStatus.className = 'm-status';
+  mFill.style.width = '0%';
+  mStart.textContent = m.id === 'free' ? 'Reset' : 'Start';
+  mStart.classList.remove('running');
+}
+function startMission() {
+  missionCtx = { onShove: () => audio.nudge() };
+  missionRunning = true;
+  sim.setGains(currentGains); sim.reset(); graphData.length = 0;
+  mMedal.textContent = ''; mStatus.textContent = ''; mStatus.className = 'm-status';
+  mStart.textContent = 'Stop'; mStart.classList.add('running');
+}
+function stopMission() {
+  missionRunning = false; missionCtx = null;
+  mStart.textContent = 'Start'; mStart.classList.remove('running');
+  mFill.style.width = '0%';
+}
+function endMission(r) {
+  missionRunning = false; missionCtx = null;
+  mStart.textContent = 'Retry'; mStart.classList.remove('running');
+  mStatus.textContent = r.label;
+  mStatus.className = 'm-status ' + (r.status === 'success' ? 'ok' : 'bad');
+  mMedal.textContent = r.status === 'success' ? '🏅' : '💥';
+  if (r.status === 'success') audio.boot(); else audio.error();
+}
+mStart.addEventListener('click', () => {
+  const m = missions[curMission];
+  if (m.id === 'free') { sim.setGains(currentGains); sim.reset(); graphData.length = 0; return; }
+  missionRunning ? stopMission() : startMission();
+});
+document.getElementById('m-prev').addEventListener('click', () => { if (missionRunning) return; curMission = (curMission + missions.length - 1) % missions.length; renderMissionCard(); audio.ui(); });
+document.getElementById('m-next').addEventListener('click', () => { if (missionRunning) return; curMission = (curMission + 1) % missions.length; renderMissionCard(); audio.ui(); });
 
 // render all Lucide icons now that the static + dynamic markup exists
 try { window.lucide?.createIcons(); } catch {}
@@ -642,6 +710,12 @@ function animate() {
     drawSpark();
     if (!booting) serial.telemetry(sim, now);
     audio.setMotor(sim.speed || 0);
+    if (missionRunning && !booting) {
+      const r = missions[curMission].update(sim, dt, missionCtx);
+      mFill.style.width = (r.progress * 100).toFixed(0) + '%';
+      if (r.status === 'active') { mStatus.textContent = r.label; mStatus.className = 'm-status'; }
+      else if (r.status === 'success' || r.status === 'fail') endMission(r);
+    }
   }
 
   composer.render();

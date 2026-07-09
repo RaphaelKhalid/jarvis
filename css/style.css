@@ -322,6 +322,32 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
 .sim-gains { margin-top: 8px; font-size: 11px; color: var(--text-dim); text-align: center; font-family: var(--mono); }
 .sim-drive { margin-top: 4px; font-size: 10.5px; color: var(--accent); text-align: center; letter-spacing: 0.03em; }
 
+/* ── mission HUD (top-left in sim) ── */
+#mission-hud {
+  position: absolute; bottom: 52px; left: 12px; z-index: 8; width: 250px;
+  background: rgba(16,20,28,0.92); border: 1px solid var(--border);
+  border-radius: 10px; padding: 12px; backdrop-filter: blur(6px);
+}
+.m-top { display: flex; justify-content: space-between; align-items: center; }
+.m-title { font-weight: 600; font-size: 13px; color: var(--text); }
+.m-medal { font-size: 15px; }
+.m-brief { color: var(--text-dim); font-size: 11px; line-height: 1.45; margin: 5px 0 9px; }
+.m-bar { height: 6px; background: #0b0e13; border-radius: 999px; overflow: hidden; border: 1px solid var(--border); }
+.m-fill { height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--green)); transition: width 0.2s; }
+.m-status { font-family: var(--mono); font-size: 11px; color: var(--text-dim); margin-top: 7px; min-height: 15px; }
+.m-status.ok { color: var(--green); }
+.m-status.bad { color: var(--red); }
+.m-btns { display: flex; gap: 6px; margin-top: 10px; }
+.m-btns button {
+  padding: 7px 8px; background: var(--panel-3); border: 1px solid var(--border);
+  color: var(--text); font-family: var(--ui); font-size: 11px; border-radius: var(--r); cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.m-btns button:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+#m-start { flex: 1; font-weight: 600; }
+#m-start.running { border-color: var(--red); color: var(--red); }
+#m-start.running:hover { background: rgba(255,107,107,0.12); }
+
 /* ── mobile: stack vertically ── */
 @media (max-width: 900px) {
   #app {

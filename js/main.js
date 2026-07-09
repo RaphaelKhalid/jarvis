@@ -300,6 +300,8 @@ canvas.addEventListener('pointermove', (e) => {
 
   // pin hover: explain what the pin means (works as soon as parts are placed)
   const pinHit = pickPin();
+  // disable orbit over a pin (or mid-drag) so a press starts a wire, not a rotate
+  controls.enabled = !pinHit && !(wireDrag && wireDrag.moved);
   if (pinHit) {
     const id = pinHit.userData.endpointId;
     if (id !== hoveredPinId) { hoveredPinId = id; showTooltip(e, pinTooltipHtml(id)); }
@@ -317,6 +319,7 @@ canvas.addEventListener('pointerleave', () => {
   if (hoveredWire) { wiring.setWireHover(hoveredWire, false); hoveredWire = null; }
   hoveredPinId = null;
   hideTooltip();
+  if (mode === 'assembly' && !wireDrag) controls.enabled = true;
 });
 
 canvas.addEventListener('pointerdown', (e) => {
@@ -331,6 +334,7 @@ canvas.addEventListener('pointerdown', (e) => {
 });
 canvas.addEventListener('click', (e) => {
   if (mode !== 'assembly' || !wiring.enabled) return;
+  if (suppressClick) { suppressClick = false; return; }   // handled by a drag-connect
   updatePointer(e);
   raycaster.setFromCamera(pointer, camera);
   const pin = pickPin();
@@ -338,13 +342,67 @@ canvas.addEventListener('click', (e) => {
   const id = pin.userData.endpointId;
   const res = wiring.handlePinClick(id);
   if (res.state === 'armed') { hudStatus.textContent = `Selected ${id} — now click its target`; audio.ui(); }
-  else if (res.state === 'valid') { flash(`✓ ${res.label}`, 'ok'); audio.connect(); }
+  else connectFeedback(res);
+});
+canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+// shared connect feedback (used by click-to-wire and drag-to-wire)
+function connectFeedback(res) {
+  if (res.state === 'valid') { flash(`✓ ${res.label}`, 'ok'); audio.connect(); }
   else if (res.state === 'invalid') {
     const want = res.suggestion ? ` — ${res.idA.split('.')[1]} should go to ${res.suggestion}` : '';
     flash(`✗ wrong pin${want}`, 'bad'); audio.error();
   } else if (res.state === 'duplicate') { flash('already wired', 'bad'); audio.error(); }
+}
+
+// ── drag-to-wire: press a pin, drag to its target, release ──
+let wireDrag = null;          // { fromId, sx, sy, moved, line }
+let suppressClick = false;
+canvas.addEventListener('pointerdown', (e) => {
+  if (mode !== 'assembly' || e.button !== 0 || !wiring.enabled) return;
+  updatePointer(e);
+  raycaster.setFromCamera(pointer, camera);
+  const pin = pickPin();
+  if (!pin) return;
+  wireDrag = { fromId: pin.userData.endpointId, sx: e.clientX, sy: e.clientY, moved: false, line: null };
 });
-canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+canvas.addEventListener('pointermove', (e) => {
+  if (!wireDrag) return;
+  if (!wireDrag.moved && Math.hypot(e.clientX - wireDrag.sx, e.clientY - wireDrag.sy) > 5) wireDrag.moved = true;
+  if (wireDrag.moved) updateWirePreview(e);
+});
+window.addEventListener('pointerup', (e) => {
+  if (!wireDrag) return;
+  const wd = wireDrag; wireDrag = null;
+  if (wd.line) { scene.remove(wd.line); wd.line.geometry.dispose(); }
+  if (wd.moved) {
+    updatePointer(e);
+    raycaster.setFromCamera(pointer, camera);
+    const pin = pickPin();
+    if (pin && pin.userData.endpointId !== wd.fromId) {
+      wiring.highlightPin(wd.fromId, false);
+      connectFeedback(wiring.tryConnect(wd.fromId, pin.userData.endpointId));
+    }
+    suppressClick = true;   // don't let the ensuing click arm a pin
+  }
+});
+function updateWirePreview(e) {
+  const from = wiring.worldPosOf(wireDrag.fromId);
+  if (!from) return;
+  updatePointer(e);
+  raycaster.setFromCamera(pointer, camera);
+  const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -from.y);
+  const end = new THREE.Vector3();
+  if (!raycaster.ray.intersectPlane(plane, end)) raycaster.ray.at(30, end);
+  if (!wireDrag.line) {
+    const g = new THREE.BufferGeometry().setFromPoints([from, end]);
+    wireDrag.line = new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0x56a8ff }));
+    scene.add(wireDrag.line);
+    wiring.highlightPin(wireDrag.fromId, true);
+  } else {
+    wireDrag.line.geometry.setFromPoints([from, end]);
+  }
+}
 
 function pickPin() {
   const pinMeshes = [];
@@ -683,7 +741,11 @@ function animate() {
   const dt = (now - last) / 1000;
   last = now;
 
-  if (mode === 'assembly') { controls.update(); floorUniforms.uTime.value += dt; }
+  if (mode === 'assembly') {
+    controls.update();
+    floorUniforms.uTime.value += dt;
+    wiring.animateFlow(dt, wiring.allRequiredDone());
+  }
 
   if (mode === 'sim') {
     sim.step(dt);

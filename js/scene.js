@@ -116,25 +116,59 @@ export function createScene(canvas) {
   floor.position.y = -0.02;
   scene.add(floor);
 
-  // ── chassis plate ──
+  // ── mounting deck the robot is built on (layered, product-looking) ──
   const chassis = new THREE.Group();
-  const plateGeo = new THREE.BoxGeometry(16, 0.5, 26);
-  const plateMat = new THREE.MeshStandardMaterial({
-    color: 0x2b2622, roughness: 0.55, metalness: 0.35,
-  });
-  const plate = new THREE.Mesh(plateGeo, plateMat);
-  plate.position.y = -0.25;
-  plate.receiveShadow = true;
-  plate.castShadow = true;
-  chassis.add(plate);
-  // deck edge accent — warm brass trim
-  const edge = new THREE.Mesh(
-    new THREE.BoxGeometry(16.4, 0.12, 26.4),
-    new THREE.MeshStandardMaterial({ color: 0xc98a3a, emissive: 0x1c0f03, roughness: 0.35, metalness: 0.7 })
-  );
-  edge.position.y = 0.02;
-  chassis.add(edge);
+  // wooden base board (slightly larger, gives a warm border)
+  const board = new THREE.Mesh(
+    new THREE.BoxGeometry(18, 0.6, 28),
+    new THREE.MeshStandardMaterial({ color: 0x3a2414, roughness: 0.78, metalness: 0.04 }));
+  board.position.y = -0.55;
+  board.receiveShadow = true; board.castShadow = true;
+  chassis.add(board);
+  // brushed dark-metal deck the parts actually sit on (top at y≈0)
+  const deck = new THREE.Mesh(
+    new THREE.BoxGeometry(16, 0.4, 26),
+    new THREE.MeshStandardMaterial({ color: 0x26282c, roughness: 0.42, metalness: 0.82 }));
+  deck.position.y = -0.2;
+  deck.receiveShadow = true; deck.castShadow = true;
+  chassis.add(deck);
+  // brass edge trim (a frame, so it doesn't cover the mounting surface)
+  const brass = new THREE.MeshStandardMaterial({ color: 0xc0902f, roughness: 0.33, metalness: 0.88 });
+  for (const [w, d, x, z] of [[16.5, 0.4, 0, 13], [16.5, 0.4, 0, -13], [0.4, 26.5, 8, 0], [0.4, 26.5, -8, 0]]) {
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(w, 0.18, d), brass);
+    bar.position.set(x, 0.0, z);
+    chassis.add(bar);
+  }
+  // brass corner bolts
+  for (const bx of [-7.4, 7.4]) for (const bz of [-12.4, 12.4]) {
+    const bolt = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.5, 12), brass);
+    bolt.position.set(bx, 0.06, bz);
+    chassis.add(bolt);
+  }
   scene.add(chassis);
+
+  // ── gradient backdrop dome (warm, gives the void depth) ──
+  const sky = new THREE.Mesh(
+    new THREE.SphereGeometry(420, 32, 16),
+    new THREE.ShaderMaterial({
+      side: THREE.BackSide, depthWrite: false,
+      uniforms: {
+        uTop: { value: new THREE.Color(0x2a1c12) },
+        uBot: { value: new THREE.Color(0x080503) },
+      },
+      vertexShader: /* glsl */`
+        varying vec3 vPos;
+        void main() { vPos = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+      fragmentShader: /* glsl */`
+        precision highp float;
+        varying vec3 vPos;
+        uniform vec3 uTop; uniform vec3 uBot;
+        void main() {
+          float h = normalize(vPos).y * 0.5 + 0.5;
+          gl_FragColor = vec4(mix(uBot, uTop, smoothstep(0.0, 0.75, h)), 1.0);
+        }`,
+    }));
+  scene.add(sky);
 
   // ── slot ghosts (highlighted during drag) ──
   const slotMeshes = {};
@@ -153,7 +187,7 @@ export function createScene(canvas) {
   }
 
   // assembly-only scenery — hidden while the sim's arena is on screen
-  const assemblyDecor = [floor, chassis];
+  const assemblyDecor = [floor, chassis, sky];
 
   // ── post-processing: bloom makes the emissive accents glow (big fidelity win) ──
   const composer = new EffectComposer(renderer);

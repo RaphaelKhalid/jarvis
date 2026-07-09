@@ -12,7 +12,7 @@ const mat = (color, opts = {}) =>
 
 const goldMat = new THREE.MeshStandardMaterial({ color: 0xd4af37, roughness: 0.35, metalness: 0.8 });
 const blackMat = mat(0x1a1a1a);
-const silverMat = new THREE.MeshStandardMaterial({ color: 0xb8bcc4, roughness: 0.3, metalness: 0.85 });
+const silverMat = new THREE.MeshStandardMaterial({ color: 0xb0b4bc, roughness: 0.45, metalness: 0.7 });
 
 function addPin(group, name, x, y, z, labelSide = 1) {
   const pin = new THREE.Mesh(

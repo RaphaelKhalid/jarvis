@@ -1,7 +1,6 @@
 // Three.js scene setup: renderer, camera, lights, chassis plate, slots.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
@@ -14,16 +13,30 @@ export function createScene(canvas) {
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  renderer.toneMappingExposure = 0.95;
 
   const scene = new THREE.Scene();
-  // deep tech-studio backdrop (premium, lets the neon accents & bloom read)
-  scene.background = new THREE.Color(0x0e151c);
-  scene.fog = new THREE.Fog(0x0e151c, 90, 300);
+  // cozy wood-workshop backdrop — warm, dim, natural
+  scene.background = new THREE.Color(0x140d07);
+  scene.fog = new THREE.Fog(0x140d07, 70, 260);
 
-  // environment map for realistic metal reflections
+  // Warm, dim environment for reflections: a dark room lit by a single warm
+  // ceiling lamp — metals pick up a soft amber sheen instead of a blown-out
+  // studio highlight. Built procedurally so we fully control its brightness.
+  const envScene = new THREE.Scene();
+  envScene.background = new THREE.Color(0x0d0805);
+  const envRoom = new THREE.Mesh(
+    new THREE.BoxGeometry(40, 26, 40),
+    new THREE.MeshBasicMaterial({ color: 0x241609, side: THREE.BackSide }));
+  envScene.add(envRoom);
+  const envLamp = new THREE.Mesh(
+    new THREE.PlaneGeometry(9, 9),
+    new THREE.MeshBasicMaterial({ color: 0xffca7a }));
+  envLamp.position.set(0, 12.8, 0);
+  envLamp.rotation.x = Math.PI / 2;
+  envScene.add(envLamp);
   const pmrem = new THREE.PMREMGenerator(renderer);
-  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  scene.environment = pmrem.fromScene(envScene, 0.5).texture;
 
   const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
   camera.position.set(18, 20, 26);
@@ -36,11 +49,13 @@ export function createScene(canvas) {
   controls.minDistance = 8;
   controls.maxDistance = 140;
 
-  // ── lights: cool studio key + soft fill, dark enough that emissives glow ──
-  scene.add(new THREE.HemisphereLight(0x9fc0e8, 0x0a0f14, 0.55));
-  scene.add(new THREE.AmbientLight(0xffffff, 0.18));
-  const key = new THREE.DirectionalLight(0xfff2df, 2.2);
-  key.position.set(40, 70, 35);
+  // ── lights: warm workshop lamp key + dim amber fill ──
+  // hemisphere: warm light from above, wood-brown bounce from the bench below
+  scene.add(new THREE.HemisphereLight(0xffdca8, 0x1a0f06, 0.45));
+  scene.add(new THREE.AmbientLight(0xffe4c0, 0.12));
+  // key = a hanging workshop lamp: warm orange, angled like an overhead bulb
+  const key = new THREE.DirectionalLight(0xffb060, 2.4);
+  key.position.set(24, 60, 30);
   key.castShadow = true;
   key.shadow.mapSize.set(2048, 2048);
   const s = 90;
@@ -49,25 +64,22 @@ export function createScene(canvas) {
   key.shadow.camera.far = 240;
   key.shadow.bias = -0.0004;
   scene.add(key);
-  const fill = new THREE.DirectionalLight(0x4da3ff, 0.7);
-  fill.position.set(-30, 20, -20);
+  // soft warm fill from the other side so shadows aren't black
+  const fill = new THREE.DirectionalLight(0xffa866, 0.5);
+  fill.position.set(-30, 22, -18);
   scene.add(fill);
+  // a warm point light for a pool of lamplight over the bench
+  const lamp = new THREE.PointLight(0xffb673, 90, 120, 2.0);
+  lamp.position.set(0, 26, 6);
+  scene.add(lamp);
 
-  // ── grid floor (cyan neon lines on dark) ──
-  const grid = new THREE.GridHelper(300, 100, 0x3aa0ff, 0x18465f);
-  grid.material.opacity = 0.18;
-  grid.material.transparent = true;
-  grid.position.y = -0.02;
-  scene.add(grid);
-
-  // ── custom shader floor: analytic grid + expanding energy rings ──
-  // A GLSL ShaderMaterial (no derivatives, so it runs on WebGL1/2 alike).
+  // ── custom shader floor: a dark-wood workbench surface ──
+  // GLSL ShaderMaterial (no derivatives, so it runs on WebGL1/2 alike):
+  // repeating planks with darker seams + procedural grain streaks, warm-lit and
+  // fading to darkness at the edges so it feels like a bench in a dim workshop.
   const floorUniforms = { uTime: { value: 0 } };
   const floorMat = new THREE.ShaderMaterial({
     uniforms: floorUniforms,
-    transparent: true,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
     vertexShader: /* glsl */`
       varying vec2 vWorld;
       void main() {
@@ -78,39 +90,47 @@ export function createScene(canvas) {
       precision highp float;
       varying vec2 vWorld;
       uniform float uTime;
+      float hash(float n) { return fract(sin(n) * 43758.5453); }
       void main() {
+        // planks run along X, 26 units wide along Z
+        float plankW = 26.0;
+        float row = floor(vWorld.y / plankW);
+        float rj = hash(row) - 0.5;                 // per-plank tone variation
+        // wood grain: stretched noise streaks along the plank length
+        float grain = sin(vWorld.x * 0.5 + row * 10.0
+                     + sin(vWorld.x * 0.07 + row) * 6.0) * 0.5 + 0.5;
+        grain = mix(grain, hash(floor(vWorld.x * 0.5) + row * 3.0), 0.35);
+        // seam lines between planks
+        float seam = smoothstep(0.5, 0.46, abs(fract(vWorld.y / plankW) - 0.5));
+        vec3 dark = vec3(0.10, 0.055, 0.028);
+        vec3 light = vec3(0.26, 0.15, 0.075);
+        vec3 col = mix(dark, light, grain * 0.7 + 0.15 + rj * 0.12);
+        col *= mix(1.0, 0.35, seam);                // darken seams
         float d = length(vWorld);
-        // analytic grid lines every 12 units (no fwidth needed)
-        vec2 gr = abs(fract(vWorld / 12.0) - 0.5);
-        float line = smoothstep(0.46, 0.5, max(gr.x, gr.y));
-        // slow expanding rings radiating from the build platform
-        float ring = smoothstep(0.10, 0.0, abs(sin(d * 0.05 - uTime * 1.1))) * 0.6;
-        float fade = smoothstep(150.0, 18.0, d);
-        vec3 col = mix(vec3(0.11, 0.34, 0.58), vec3(0.35, 0.78, 1.0), ring);
-        float a = (line * 0.30 + ring * 0.55) * fade;
-        gl_FragColor = vec4(col, a);
+        col *= smoothstep(230.0, 20.0, d) * 0.9 + 0.1;   // fade into the dark
+        gl_FragColor = vec4(col, 1.0);
       }`,
   });
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(300, 300), floorMat);
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(500, 500), floorMat);
   floor.rotation.x = -Math.PI / 2;
-  floor.position.y = -0.015;
+  floor.position.y = -0.02;
   scene.add(floor);
 
   // ── chassis plate ──
   const chassis = new THREE.Group();
   const plateGeo = new THREE.BoxGeometry(16, 0.5, 26);
   const plateMat = new THREE.MeshStandardMaterial({
-    color: 0x2a2f3a, roughness: 0.5, metalness: 0.4,
+    color: 0x2b2622, roughness: 0.55, metalness: 0.35,
   });
   const plate = new THREE.Mesh(plateGeo, plateMat);
   plate.position.y = -0.25;
   plate.receiveShadow = true;
   plate.castShadow = true;
   chassis.add(plate);
-  // deck edge accent
+  // deck edge accent — warm brass trim
   const edge = new THREE.Mesh(
     new THREE.BoxGeometry(16.4, 0.12, 26.4),
-    new THREE.MeshStandardMaterial({ color: 0x4da3ff, emissive: 0x123049, roughness: 0.4 })
+    new THREE.MeshStandardMaterial({ color: 0xc98a3a, emissive: 0x1c0f03, roughness: 0.35, metalness: 0.7 })
   );
   edge.position.y = 0.02;
   chassis.add(edge);
@@ -122,7 +142,7 @@ export function createScene(canvas) {
     const g = new THREE.Mesh(
       new THREE.PlaneGeometry(slot.w, slot.d),
       new THREE.MeshBasicMaterial({
-        color: 0x4da3ff, transparent: true, opacity: 0, side: THREE.DoubleSide,
+        color: 0xffb257, transparent: true, opacity: 0, side: THREE.DoubleSide,
       })
     );
     g.rotation.x = -Math.PI / 2;
@@ -133,12 +153,14 @@ export function createScene(canvas) {
   }
 
   // assembly-only scenery — hidden while the sim's arena is on screen
-  const assemblyDecor = [grid, floor, chassis];
+  const assemblyDecor = [floor, chassis];
 
   // ── post-processing: bloom makes the emissive accents glow (big fidelity win) ──
   const composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, camera));
-  const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.7, 0.5, 0.82);
+  // higher threshold so only genuinely bright emissives glow — lit metal and
+  // wood no longer bloom into white hotspots.
+  const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.5, 0.6, 0.92);
   composer.addPass(bloom);
   composer.addPass(new OutputPass());
 

@@ -37,7 +37,7 @@ const FIXED_DT = 1 / 60;
 const GRAVITY = 9.81;
 const CHASSIS_DENSITY = 0.06;
 const WHEEL_DENSITY = 0.08;
-const ARENA_HALF = 72;      // arena inner half-extent (walls at this distance)
+const ARENA_HALF = 150;     // arena inner half-extent (walls at this distance)
 
 // ── arcade driving model: kinematic velocity + heading, PID keeps pitch upright ──
 const MAX_SPEED = 34;         // units/s top speed at full throttle
@@ -51,16 +51,39 @@ const LEAN_ACCEL_STYLE = 0.02;// rad of stylistic pitch lean per (units/s²) of 
 const MAX_DRIVE_LEAN = 0.22;  // cap on the stylistic lean
 const LEAN_SLEW = 1.4;        // rad/s max change of the lean setpoint
 
-// Terrain height field — gentle rolling hills, flat near the spawn, flat at walls.
+// Terrain height field — big rolling hills, flat spawn pad, flat at the walls.
 function terrainHeight(x, z) {
   const r = Math.sqrt(x * x + z * z);
-  const flat = THREE.MathUtils.clamp((r - 26) / 26, 0, 1);   // flat within r<26
-  const edge = THREE.MathUtils.clamp((ARENA_HALF - 4 - Math.max(Math.abs(x), Math.abs(z))) / 14, 0, 1);
+  const flat = THREE.MathUtils.clamp((r - 18) / 24, 0, 1);   // flat pad within r<18
+  const edge = THREE.MathUtils.clamp((ARENA_HALF - 6 - Math.max(Math.abs(x), Math.abs(z))) / 22, 0, 1);
   const h =
-    1.6 * Math.sin(x * 0.045) * Math.cos(z * 0.04) +
-    1.1 * Math.sin(x * 0.02 + z * 0.03) +
-    0.8 * Math.cos(z * 0.06 - x * 0.015);
+    4.0 * Math.sin(x * 0.028) * Math.cos(z * 0.026) +
+    2.6 * Math.sin(x * 0.013 + z * 0.019) +
+    1.8 * Math.cos(z * 0.038 - x * 0.011) +
+    1.1 * Math.sin(x * 0.06) * Math.sin(z * 0.055);
   return h * flat * edge;
+}
+
+// ── ground-material sandbox: circular zones with different physics + look ──
+const MATERIALS = {
+  normal: { speed: 1.0, accel: 1.0, brake: 1.0, turn: 1.0 },
+  mud:    { speed: 0.4, accel: 0.5, brake: 1.6, turn: 0.7, color: 0x4a3218, rough: 1.0, alpha: 0.95 },   // sticky, slow
+  ice:    { speed: 1.1, accel: 0.22, brake: 0.18, turn: 0.4, color: 0xbfe8ff, rough: 0.05, alpha: 0.8 },  // slippery, glides
+  boost:  { speed: 1.8, accel: 2.2, brake: 1.0, turn: 1.0, color: 0xff9a3c, rough: 0.4, alpha: 0.85, glow: 0x662200 }, // speed pad
+  water:  { speed: 0.55, accel: 0.6, brake: 1.3, turn: 0.85, color: 0x1f6f9c, rough: 0.15, alpha: 0.7 },  // wet, draggy
+};
+const ZONES = [
+  { x: 55, z: 40, r: 26, type: 'mud' },
+  { x: -70, z: 30, r: 32, type: 'ice' },
+  { x: 30, z: -80, r: 24, type: 'boost' },
+  { x: -45, z: -60, r: 28, type: 'water' },
+  { x: 90, z: -35, r: 30, type: 'ice' },
+  { x: -100, z: -95, r: 34, type: 'mud' },
+  { x: 100, z: 90, r: 30, type: 'boost' },
+];
+function terrainZone(x, z) {
+  for (const zn of ZONES) if (Math.hypot(x - zn.x, z - zn.z) < zn.r) return zn.type;
+  return 'normal';
 }
 
 export class BalanceSim {
@@ -87,7 +110,7 @@ export class BalanceSim {
 
   buildArena() {
     const RB = RAPIER.RigidBodyDesc, CO = RAPIER.ColliderDesc;
-    const size = (ARENA_HALF + 8) * 2, seg = 100;
+    const size = (ARENA_HALF + 8) * 2, seg = 180;
 
     // ── dusk sky dome (gradient: deep blue → warm horizon) ──
     const sky = new THREE.Mesh(
@@ -128,6 +151,28 @@ export class BalanceSim {
     );
     mesh.receiveShadow = true;
     this.group.add(mesh);
+
+    // ── material zone discs (mud / ice / boost / water), draped over the terrain ──
+    for (const zn of ZONES) {
+      const m = MATERIALS[zn.type];
+      const zg = new THREE.CircleGeometry(zn.r, 56);
+      zg.rotateX(-Math.PI / 2);
+      const zp = zg.attributes.position;
+      for (let i = 0; i < zp.count; i++) {
+        const wx = zp.getX(i) + zn.x, wz = zp.getZ(i) + zn.z;
+        zp.setY(i, terrainHeight(wx, wz) + 0.12 - terrainHeight(zn.x, zn.z));
+      }
+      zg.computeVertexNormals();
+      const zmat = new THREE.MeshStandardMaterial({
+        color: m.color, roughness: m.rough, metalness: zn.type === 'ice' ? 0.3 : 0.0,
+        transparent: true, opacity: m.alpha,
+        emissive: m.glow || 0x000000, emissiveIntensity: m.glow ? 2.0 : 0,
+      });
+      const disc = new THREE.Mesh(zg, zmat);
+      disc.position.set(zn.x, terrainHeight(zn.x, zn.z), zn.z);
+      disc.receiveShadow = true;
+      this.group.add(disc);
+    }
 
     const groundBody = this.world.createRigidBody(RB.fixed());
     this.world.createCollider(
@@ -242,7 +287,7 @@ export class BalanceSim {
     if (!this.bodies.chassis) return;
     // a poke it has to *recover* from: kick the lean setpoint (the PID must catch
     // it) plus a real angular impulse so the body physically lurches.
-    this._wobble = (this._wobble || 0) + (Math.random() < 0.5 ? -1 : 1) * 0.3;
+    this._wobble = (this._wobble || 0) + (Math.random() < 0.5 ? -1 : 1) * 0.45;
     const f = this.forwardDir().multiplyScalar(14);
     const c = this.bodies.chassis.translation();
     this.bodies.chassis.applyImpulseAtPoint(
@@ -300,8 +345,14 @@ export class BalanceSim {
     // A wheel-torque inverted pendulum is non-minimum-phase (it drifts and is
     // twitchy to drive), so translation is kinematic for crisp racing feel while
     // the PID below keeps the *pitch* upright — the robot still balances & wobbles.
-    const targetSpeed = throttle * MAX_SPEED;
-    const rate = Math.abs(targetSpeed) >= Math.abs(this.vel) ? ACCEL : BRAKE;
+    // ground material under the bot modulates speed / accel / brake / grip
+    const cpos = chassis.translation();
+    const matName = terrainZone(cpos.x, cpos.z);
+    const mat = MATERIALS[matName];
+    this.material = matName;
+
+    const targetSpeed = throttle * MAX_SPEED * mat.speed;
+    const rate = (Math.abs(targetSpeed) >= Math.abs(this.vel) ? ACCEL * mat.accel : BRAKE * mat.brake);
     this.vel += THREE.MathUtils.clamp(targetSpeed - this.vel, -rate * FIXED_DT, rate * FIXED_DT);
     const accel = (this.vel - (this._prevVel || 0)) / FIXED_DT;
     this._prevVel = this.vel;
@@ -310,18 +361,18 @@ export class BalanceSim {
 
     if (Math.abs(steer) > 0.01 && !this.fallen) {
       const frac = TURN_ASSIST + (1 - TURN_ASSIST) * Math.min(1, Math.abs(this.vel) / 10);
-      this.heading -= steer * TURN_RATE * frac * FIXED_DT;
+      this.heading -= steer * TURN_RATE * mat.turn * frac * FIXED_DT;
     }
     const headDir = new THREE.Vector3(Math.sin(this.heading), 0, Math.cos(this.heading));
     const rightDir = new THREE.Vector3(Math.cos(this.heading), 0, -Math.sin(this.heading));
 
-    // ── stylistic lean: pitch into acceleration, plus a decaying nudge wobble ──
-    let targetLean = THREE.MathUtils.clamp(LEAN_ACCEL_STYLE * accel, -MAX_DRIVE_LEAN, MAX_DRIVE_LEAN);
-    targetLean += (this._wobble || 0);
-    this._wobble = (this._wobble || 0) * 0.90;
+    // ── stylistic lean: slew-limited pitch into acceleration, plus a decaying
+    //     nudge wobble applied directly on top (so a shove reads immediately) ──
+    const targetLean = THREE.MathUtils.clamp(LEAN_ACCEL_STYLE * accel, -MAX_DRIVE_LEAN, MAX_DRIVE_LEAN);
     const prevLean = this._lean || 0;
-    const desiredLean = prevLean + THREE.MathUtils.clamp(targetLean - prevLean, -LEAN_SLEW * FIXED_DT, LEAN_SLEW * FIXED_DT);
-    this._lean = desiredLean;
+    this._lean = prevLean + THREE.MathUtils.clamp(targetLean - prevLean, -LEAN_SLEW * FIXED_DT, LEAN_SLEW * FIXED_DT);
+    const desiredLean = this._lean + (this._wobble || 0);
+    this._wobble = (this._wobble || 0) * 0.94;
 
     if (!this.fallen) {
       // Kinematic pose: pin the bot to the terrain surface (no launch off walls),

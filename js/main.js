@@ -234,30 +234,32 @@ async function autoWire(stepByStep) {
   if (autoBusy || mode !== 'assembly') return;
   autoBusy = true;
   autoInstant.disabled = autoStep.disabled = true;
-
-  if (stepByStep) {
-    // place parts one-by-one, then draw wires with a beat between each
-    for (const def of PART_DEFS) {
-      let guard = 0;
-      while (remainingFor(def.type) > 0 && guard++ < 4) {
-        placePart(def);
-        await sleep(320);
+  try {
+    if (stepByStep) {
+      // place parts one-by-one, then draw wires with a beat between each
+      for (const def of PART_DEFS) {
+        let guard = 0;
+        while (remainingFor(def.type) > 0 && guard++ < 4) {
+          placePart(def);
+          await sleep(320);
+        }
       }
+      await sleep(300);
+      for (const r of REQUIRED) {
+        const exists = wiring.wires.some(w => w.req && w.req.label === r.label);
+        if (!exists) { wiring.tryConnect(r.a, r.b); flash(`✓ ${r.label}`, 'ok'); }
+        await sleep(260);
+      }
+    } else {
+      autoAssemble();
+      wireAllInstant();
     }
-    await sleep(300);
-    for (const r of REQUIRED) {
-      const exists = wiring.wires.some(w => w.req && w.req.label === r.label);
-      if (!exists) { wiring.tryConnect(r.a, r.b); flash(`✓ ${r.label}`, 'ok'); }
-      await sleep(260);
-    }
-  } else {
-    autoAssemble();
-    wireAllInstant();
+  } finally {
+    // always re-enable, even if placing/wiring threw (e.g. board cleared mid-run)
+    autoBusy = false;
+    autoInstant.disabled = autoStep.disabled = false;
+    refreshChecklist();
   }
-
-  autoBusy = false;
-  autoInstant.disabled = autoStep.disabled = false;
-  refreshChecklist();
 }
 
 const autoInstant = document.getElementById('auto-instant');
@@ -466,6 +468,9 @@ function clearBoard() {
     const badge = card.querySelector('[data-remaining]');
     if (badge) badge.textContent = `×${def.count}`;
   }
+  // defensively un-stick the auto-wire buttons
+  autoBusy = false;
+  autoInstant.disabled = autoStep.disabled = false;
   hudStatus.textContent = 'Drag parts from the tray onto the chassis';
   refreshChecklist();
 }
@@ -538,26 +543,44 @@ function enterSim() {
   updateStepper();
 }
 
-// ── WASD driving ────────────────────────────────────────────────
+// ── WASD driving · arrows + mouse orbit the camera ─────────────
 const keys = new Set();
-const DRIVE_KEYS = { w: 1, a: 1, s: 1, d: 1, arrowup: 1, arrowdown: 1, arrowleft: 1, arrowright: 1 };
+const DRIVE_KEYS = { w: 1, a: 1, s: 1, d: 1 };
+const CAM_KEYS = { arrowup: 1, arrowdown: 1, arrowleft: 1, arrowright: 1 };
+const camKeys = new Set();
+// camera orbit state (offset from the auto chase behind the heading)
+let camYaw = 0, camElev = 0.36, camZoom = 1, camDragging = false;
 window.addEventListener('keydown', (e) => {
   const k = e.key.toLowerCase();
-  if (mode !== 'sim' || !DRIVE_KEYS[k]) return;
-  keys.add(k); updateDriveInput(); e.preventDefault();
+  if (mode !== 'sim') return;
+  if (DRIVE_KEYS[k]) { keys.add(k); updateDriveInput(); e.preventDefault(); }
+  else if (CAM_KEYS[k]) { camKeys.add(k); e.preventDefault(); }
 });
 window.addEventListener('keyup', (e) => {
   const k = e.key.toLowerCase();
-  if (!DRIVE_KEYS[k]) return;
-  keys.delete(k); updateDriveInput();
+  if (DRIVE_KEYS[k]) { keys.delete(k); updateDriveInput(); }
+  else if (CAM_KEYS[k]) camKeys.delete(k);
 });
 function updateDriveInput() {
   if (booting) { sim.input.fwd = 0; sim.input.turn = 0; return; }   // locked during boot
-  const fwd = (keys.has('w') || keys.has('arrowup') ? 1 : 0) - (keys.has('s') || keys.has('arrowdown') ? 1 : 0);
-  const turn = (keys.has('d') || keys.has('arrowright') ? 1 : 0) - (keys.has('a') || keys.has('arrowleft') ? 1 : 0);
+  const fwd = (keys.has('w') ? 1 : 0) - (keys.has('s') ? 1 : 0);
+  const turn = (keys.has('d') ? 1 : 0) - (keys.has('a') ? 1 : 0);
   sim.input.fwd = fwd;
   sim.input.turn = turn;
 }
+// mouse-drag to orbit the camera while driving
+canvas.addEventListener('pointerdown', (e) => { if (mode === 'sim' && e.button === 0) camDragging = true; });
+window.addEventListener('pointerup', () => { camDragging = false; });
+canvas.addEventListener('pointermove', (e) => {
+  if (mode !== 'sim' || !camDragging) return;
+  camYaw -= e.movementX * 0.005;
+  camElev = THREE.MathUtils.clamp(camElev + e.movementY * 0.004, 0.06, 1.35);
+});
+canvas.addEventListener('wheel', (e) => {
+  if (mode !== 'sim') return;
+  camZoom = THREE.MathUtils.clamp(camZoom * (1 + e.deltaY * 0.001), 0.5, 2.4);
+  e.preventDefault();
+}, { passive: false });
 
 function exitSim() {
   mode = 'assembly';
@@ -684,6 +707,7 @@ try { window.lucide?.createIcons(); } catch {}
 
 const tiltReadout = () => document.getElementById('tilt-readout');
 const simState = () => document.getElementById('sim-state');
+const simDrive = simHud.querySelector('.sim-drive');
 
 // ── sparkline ───────────────────────────────────────────────────
 const graphData = [];
@@ -750,33 +774,46 @@ function animate() {
 
   if (mode === 'sim') {
     sim.step(dt);
-    // racing chase-cam: trails behind the heading, pulls back + widens FOV with
-    // speed, and looks ahead along the direction of travel.
+    // racing chase-cam: trails behind the heading, orbitable with mouse/arrows,
+    // pulls back + widens FOV with speed, and looks ahead along travel.
     if (sim.bodies.chassis) {
       const p = sim.chassisPos();
-      const h = sim.heading;
       const spd = sim.driveSpeed || 0;
-      const back = new THREE.Vector3(-Math.sin(h), 0, -Math.cos(h)); // behind heading
-      const fwd = new THREE.Vector3(Math.sin(h), 0, Math.cos(h));
-      const dist = 40 + spd * 0.55;
-      const height = 15 + spd * 0.22;
-      const desired = new THREE.Vector3(p.x + back.x * dist, p.y + height, p.z + back.z * dist);
-      const k = 1 - Math.pow(0.002, dt);   // frame-rate-independent smoothing
+      // arrow-key orbit
+      if (camKeys.size) {
+        if (camKeys.has('arrowleft')) camYaw += 1.6 * dt;
+        if (camKeys.has('arrowright')) camYaw -= 1.6 * dt;
+        if (camKeys.has('arrowup')) camElev = THREE.MathUtils.clamp(camElev + 1.2 * dt, 0.06, 1.35);
+        if (camKeys.has('arrowdown')) camElev = THREE.MathUtils.clamp(camElev - 1.2 * dt, 0.06, 1.35);
+      }
+      // gently re-center the yaw behind the bot when not actively looking around
+      if (!camDragging && !camKeys.size) camYaw *= (1 - Math.min(1, 0.6 * dt));
+      const a = sim.heading + camYaw;
+      const fwd = new THREE.Vector3(Math.sin(a), 0, Math.cos(a));
+      const dist = (40 + spd * 0.55) * camZoom;
+      const elev = THREE.MathUtils.clamp(camElev, 0.06, 1.35);
+      const desired = new THREE.Vector3(
+        p.x - fwd.x * dist * Math.cos(elev),
+        p.y + dist * Math.sin(elev) + 3,
+        p.z - fwd.z * dist * Math.cos(elev));
+      const k = 1 - Math.pow(0.002, dt);
       camera.position.lerp(desired, k);
-      // look slightly ahead of the bot so fast driving reads forward
-      const look = new THREE.Vector3(p.x + fwd.x * spd * 0.35, p.y + 4, p.z + fwd.z * spd * 0.35);
+      const head = new THREE.Vector3(Math.sin(sim.heading), 0, Math.cos(sim.heading));
+      const look = new THREE.Vector3(p.x + head.x * spd * 0.35, p.y + 4, p.z + head.z * spd * 0.35);
       camera.lookAt(look);
       const targetFov = 46 + Math.min(14, spd * 0.4);
       if (Math.abs(camera.fov - targetFov) > 0.1) { camera.fov += (targetFov - camera.fov) * 0.1; camera.updateProjectionMatrix(); }
     }
     const el = tiltReadout();
-    if (el) el.textContent = `Tilt: ${sim.tiltDeg.toFixed(1)}°`;
+    if (el) el.textContent = `${(sim.driveSpeed || 0).toFixed(0)} u/s`;
     const st = simState();
     if (st) {
-      if (sim.fallen) { st.textContent = 'FALLEN'; st.className = 'sim-bad'; }
-      else if (Math.abs(sim.tiltDeg) < 4) { st.textContent = 'BALANCING'; st.className = 'sim-ok'; }
-      else { st.textContent = 'CORRECTING'; st.className = 'sim-warn'; }
+      const m = sim.material;
+      if (m && m !== 'normal') { st.textContent = m.toUpperCase(); st.className = 'sim-warn'; }
+      else if (sim.fallen) { st.textContent = 'FALLEN'; st.className = 'sim-bad'; }
+      else { st.textContent = 'DRIVING'; st.className = 'sim-ok'; }
     }
+    if (simDrive) simDrive.textContent = 'W/S drive · A/D steer · drag / ↑↓←→ to look';
     drawSpark();
     if (!booting) serial.telemetry(sim, now);
     audio.setMotor(sim.speed || 0);

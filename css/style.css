@@ -265,6 +265,22 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
 }
 #overlay .start:hover { background: #1a4a32; }
 
+/* ── serial monitor ── */
+#serial { flex-shrink: 0; height: 150px; display: flex; flex-direction: column; border-top: 1px solid var(--border); background: #070a0e; }
+#serial-head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 6px 12px; font-size: 10px; font-weight: 600; letter-spacing: 0.12em;
+  color: var(--text-dim); border-bottom: 1px solid var(--border);
+}
+#serial-head span { display: flex; align-items: center; gap: 6px; }
+#serial-head .baud { font-family: var(--mono); letter-spacing: 0; font-weight: 400; }
+#serial-log { flex: 1; overflow-y: auto; padding: 6px 12px; font-family: var(--mono); font-size: 11px; line-height: 1.55; }
+.ser-line { white-space: pre; color: #9fb0c4; }
+.ser-line.dim { color: var(--text-dim); }
+.ser-line.ok { color: var(--green); }
+.ser-line.bad { color: var(--red); }
+.ser-line.accent { color: var(--accent); }
+
 /* ── CodeMirror sizing ── */
 #editor-container { position: relative; }
 .CodeMirror { height: 100% !important; font-size: 12px; font-family: var(--mono); }

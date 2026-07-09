@@ -32,6 +32,7 @@
       <button id="auto-instant" class="auto-btn">⚡ Auto-wire (instant)</button>
       <button id="auto-step" class="auto-btn">▶ Auto-wire (step-by-step)</button>
     </div>
+    <button id="clear-btn" disabled>↺ Clear board</button>
     <div id="parts-tray"></div>
     <header class="panel-header">
       <span class="dot dot-yellow"></span> CONNECTIONS
@@ -43,9 +44,19 @@
 
   <!-- CENTER: 3D workspace -->
   <main id="workspace">
+    <div id="stepper">
+      <div class="step" data-step="assemble"><span class="num">1</span>Assemble</div>
+      <span class="step-sep"></span>
+      <div class="step" data-step="wire"><span class="num">2</span>Wire</div>
+      <span class="step-sep"></span>
+      <div class="step" data-step="program"><span class="num">3</span>Program</div>
+      <span class="step-sep"></span>
+      <div class="step" data-step="run"><span class="num">4</span>Run</div>
+    </div>
     <div id="workspace-hud">
       <span id="hud-status">Drag parts from the tray onto the chassis</span>
     </div>
+    <button id="help-btn" title="How it works">?</button>
     <canvas id="three-canvas"></canvas>
   </main>
 
@@ -62,6 +73,23 @@
 
 </div>
 <div id="tooltip" class="hidden"></div>
+
+<!-- onboarding -->
+<div id="overlay">
+  <div class="card">
+    <h1>SelfBalance Lab</h1>
+    <div class="tagline">Build a self-balancing robot — from bare board to driving it.</div>
+    <ol>
+      <li><span class="n">1</span><div><b>Assemble</b><p>Drag the six parts from the tray onto the chassis. Hover any part’s <b>?</b> to learn what it does.</p></div></li>
+      <li><span class="n">2</span><div><b>Wire</b><p>Click a pin, then click its target to connect them. Hover a pin to see what it is (what’s <i>IN2</i>?), or hit <b>Auto-wire</b> to skip ahead.</p></div></li>
+      <li><span class="n">3</span><div><b>Program</b><p>Tune the PID gains (Kp / Ki / Kd) in the Arduino sketch on the right.</p></div></li>
+      <li><span class="n">4</span><div><b>Run</b><p>Hit <b>Upload</b> and drive with <b>W A S D</b> — the robot balances as it moves.</p></div></li>
+    </ol>
+    <button class="start" id="overlay-start">Start building →</button>
+    <button class="skip" id="overlay-skip">Skip intro</button>
+  </div>
+</div>
+
 <script type="module" src="js/main.js"></script>
 </body>
 </html>

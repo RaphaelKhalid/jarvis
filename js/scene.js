@@ -55,10 +55,46 @@ export function createScene(canvas) {
 
   // ── grid floor (cyan neon lines on dark) ──
   const grid = new THREE.GridHelper(300, 100, 0x3aa0ff, 0x18465f);
-  grid.material.opacity = 0.35;
+  grid.material.opacity = 0.18;
   grid.material.transparent = true;
   grid.position.y = -0.02;
   scene.add(grid);
+
+  // ── custom shader floor: analytic grid + expanding energy rings ──
+  // A GLSL ShaderMaterial (no derivatives, so it runs on WebGL1/2 alike).
+  const floorUniforms = { uTime: { value: 0 } };
+  const floorMat = new THREE.ShaderMaterial({
+    uniforms: floorUniforms,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    vertexShader: /* glsl */`
+      varying vec2 vWorld;
+      void main() {
+        vWorld = position.xy;                 // plane is XY before rotation
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }`,
+    fragmentShader: /* glsl */`
+      precision highp float;
+      varying vec2 vWorld;
+      uniform float uTime;
+      void main() {
+        float d = length(vWorld);
+        // analytic grid lines every 12 units (no fwidth needed)
+        vec2 gr = abs(fract(vWorld / 12.0) - 0.5);
+        float line = smoothstep(0.46, 0.5, max(gr.x, gr.y));
+        // slow expanding rings radiating from the build platform
+        float ring = smoothstep(0.10, 0.0, abs(sin(d * 0.05 - uTime * 1.1))) * 0.6;
+        float fade = smoothstep(150.0, 18.0, d);
+        vec3 col = mix(vec3(0.11, 0.34, 0.58), vec3(0.35, 0.78, 1.0), ring);
+        float a = (line * 0.30 + ring * 0.55) * fade;
+        gl_FragColor = vec4(col, a);
+      }`,
+  });
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(300, 300), floorMat);
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.y = -0.015;
+  scene.add(floor);
 
   // ── chassis plate ──
   const chassis = new THREE.Group();
@@ -96,6 +132,9 @@ export function createScene(canvas) {
     slotMeshes[slot.id] = g;
   }
 
+  // assembly-only scenery — hidden while the sim's arena is on screen
+  const assemblyDecor = [grid, floor, chassis];
+
   // ── post-processing: bloom makes the emissive accents glow (big fidelity win) ──
   const composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, camera));
@@ -114,5 +153,5 @@ export function createScene(canvas) {
   window.addEventListener('resize', resize);
   resize();
 
-  return { renderer, scene, camera, controls, slotMeshes, resize, composer };
+  return { renderer, scene, camera, controls, slotMeshes, resize, composer, floorUniforms, assemblyDecor };
 }

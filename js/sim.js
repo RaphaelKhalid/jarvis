@@ -16,7 +16,11 @@ export async function loadRapier() {
 // Real CC0 robot model (RobotExpressive by Tomás Laulhé / Quaternius, via three.js
 // examples). Loaded from our own /assets so it's same-origin. Falls back to the
 // procedural sphere-bot if it fails to load.
-let ROBOT = null, ROBOT_SIZE = null, ROBOT_MINY = 0, robotTried = false;
+// RobotExpressive is ~1.8 units tall with its origin at the feet. Box3 on a
+// skinned mesh is unreliable, so we use a fixed scale tuned to the chassis.
+const ROBOT_SCALE = 6.2;   // model height ≈ chassisH
+const ROBOT_Y = 0.2;       // lift so feet clear the axle line
+let ROBOT = null, robotTried = false;
 export async function loadRobotModel() {
   if (ROBOT || robotTried) return ROBOT;
   robotTried = true;
@@ -24,9 +28,6 @@ export async function loadRobotModel() {
     const gltf = await new GLTFLoader().loadAsync('assets/models/robot.glb');
     const m = gltf.scene;
     m.traverse(o => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } });
-    const bb = new THREE.Box3().setFromObject(m);
-    ROBOT_SIZE = bb.getSize(new THREE.Vector3());
-    ROBOT_MINY = bb.min.y;
     ROBOT = m;
   } catch (e) { ROBOT = null; }
   return ROBOT;
@@ -86,7 +87,32 @@ export class BalanceSim {
     const RB = RAPIER.RigidBodyDesc, CO = RAPIER.ColliderDesc;
     const size = (ARENA_HALF + 8) * 2, seg = 100;
 
-    // ── ground: bright rolling grass ──
+    // ── dusk sky dome (gradient: deep blue → warm horizon) ──
+    const sky = new THREE.Mesh(
+      new THREE.SphereGeometry(600, 40, 20),
+      new THREE.ShaderMaterial({
+        side: THREE.BackSide, depthWrite: false, fog: false,
+        uniforms: {
+          uTop: { value: new THREE.Color(0x1c3566) },
+          uMid: { value: new THREE.Color(0x6f9ac4) },
+          uHor: { value: new THREE.Color(0xe7ad6e) },
+        },
+        vertexShader: /* glsl */`
+          varying vec3 vP;
+          void main() { vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+        fragmentShader: /* glsl */`
+          precision highp float; varying vec3 vP;
+          uniform vec3 uTop, uMid, uHor;
+          void main() {
+            float h = normalize(vP).y;
+            vec3 c = mix(uMid, uTop, smoothstep(0.02, 0.55, h));
+            c = mix(c, uHor, smoothstep(0.16, -0.06, h));   // warm horizon band
+            gl_FragColor = vec4(c, 1.0);
+          }`,
+      }));
+    this.group.add(sky);
+
+    // ── ground: rolling grass ──
     const geo = new THREE.PlaneGeometry(size, size, seg, seg);
     geo.rotateX(-Math.PI / 2);
     const pos = geo.attributes.position;
@@ -96,7 +122,7 @@ export class BalanceSim {
     geo.computeVertexNormals();
     const mesh = new THREE.Mesh(
       geo,
-      new THREE.MeshStandardMaterial({ color: 0x1c2a33, roughness: 0.72, metalness: 0.15 })
+      new THREE.MeshStandardMaterial({ color: 0x4a6b3a, roughness: 0.95, metalness: 0.0 })
     );
     mesh.receiveShadow = true;
     this.group.add(mesh);
@@ -366,12 +392,10 @@ function makeRobotVisual(chassisH) {
   const bottom = -chassisH / 2;   // axle line in local coords
 
   // ── real GLB robot (preferred) ──
-  if (ROBOT && ROBOT_SIZE) {
-    const targetH = chassisH * 1.12;
-    const s = targetH / ROBOT_SIZE.y;
-    ROBOT.scale.setScalar(s);
-    ROBOT.position.set(0, bottom - ROBOT_MINY * s, 0);   // feet on the axle line
-    ROBOT.rotation.y = 0;                                // faces +Z (drive forward)
+  if (ROBOT) {
+    ROBOT.scale.setScalar(ROBOT_SCALE);
+    ROBOT.position.set(0, bottom + ROBOT_Y, 0);   // feet on the axle line
+    ROBOT.rotation.y = 0;                          // faces +Z = drive direction
     g.add(ROBOT);
     return g;
   }

@@ -6,6 +6,10 @@ import { WiringManager, suggestFor } from './wiring.js';
 import { initEditor } from './editor.js';
 import { BalanceSim, loadRapier, loadRobotModel } from './sim.js';
 import { pinInfo, connectionBlurb } from './glossary.js';
+import { Serial } from './serial.js';
+
+const serial = new Serial(document.getElementById('serial-log'));
+let booting = false;
 
 const KIND_LABEL = { power: 'POWER', ground: 'GROUND', data: 'SIGNAL' };
 function pinTooltipHtml(id) {
@@ -443,9 +447,15 @@ function enterSim() {
   camera.position.set(p.x, p.y + 18, p.z - 46);
   camera.lookAt(p.x, p.y + 4, p.z);
   simHud.classList.remove('hidden');
-  hudStatus.textContent = 'Drive with W/A/S/D — the robot balances as it moves';
+  hudStatus.textContent = 'Booting robot…';
   graphData.length = 0;
   keys.clear();
+  // power-on bring-up: robot balances while it "boots", driving unlocks after
+  booting = true;
+  serial.boot(currentGains, () => {
+    booting = false;
+    hudStatus.textContent = 'Drive with W/A/S/D — the robot balances as it moves';
+  });
   updateStepper();
 }
 
@@ -463,6 +473,7 @@ window.addEventListener('keyup', (e) => {
   keys.delete(k); updateDriveInput();
 });
 function updateDriveInput() {
+  if (booting) { sim.input.fwd = 0; sim.input.turn = 0; return; }   // locked during boot
   const fwd = (keys.has('w') || keys.has('arrowup') ? 1 : 0) - (keys.has('s') || keys.has('arrowdown') ? 1 : 0);
   const turn = (keys.has('d') || keys.has('arrowright') ? 1 : 0) - (keys.has('a') || keys.has('arrowleft') ? 1 : 0);
   sim.input.fwd = fwd;
@@ -471,6 +482,8 @@ function updateDriveInput() {
 
 function exitSim() {
   mode = 'assembly';
+  booting = false;
+  serial.cancel();
   sim.hide();
   assembly.visible = true;
   wiring.setVisible(true);
@@ -609,6 +622,7 @@ function animate() {
       else { st.textContent = 'CORRECTING'; st.className = 'sim-warn'; }
     }
     drawSpark();
+    if (!booting) serial.telemetry(sim, now);
   }
 
   composer.render();

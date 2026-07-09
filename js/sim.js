@@ -316,8 +316,12 @@ export class BalanceSim {
     }
     const deriv = (error - this.prevError) / FIXED_DT;
     this.prevError = error;
-    const output = Kp * error + Ki * 0.02 * this.integral + Kd * deriv;
+    const pTerm = Kp * error, iTerm = Ki * 0.02 * this.integral, dTerm = Kd * deriv;
+    const output = pTerm + iTerm + dTerm;
     const magBal = THREE.MathUtils.clamp(output * TORQUE_SCALE, -MAX_TORQUE, MAX_TORQUE);
+    // exposed for the serial monitor / telemetry
+    this.pidTerms = { p: pTerm, i: iTerm, d: dTerm, out: output, pwm: Math.round(THREE.MathUtils.clamp(Math.abs(output) * 17, 0, 255)) };
+    this.speed = baseVel;
 
     // ── wheel-speed servo: WASD drives the wheels directly to a target speed ──
     let magDrive = 0;

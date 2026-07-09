@@ -228,6 +228,15 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
 }
 #help-btn:hover { border-color: var(--accent); color: var(--accent); }
 
+#sound-btn {
+  position: absolute; bottom: 14px; left: 50px; z-index: 6;
+  width: 30px; height: 30px; border-radius: 50%;
+  background: rgba(11,14,19,0.8); border: 1px solid var(--border); color: var(--text-dim);
+  display: flex; align-items: center; justify-content: center; cursor: pointer; backdrop-filter: blur(4px);
+}
+#sound-btn:hover { border-color: var(--accent); color: var(--accent); }
+#sound-btn.muted { color: var(--text-dim); opacity: 0.7; }
+
 /* ── clear-all button ── */
 #clear-btn {
   display: flex; align-items: center; justify-content: center; gap: 7px;

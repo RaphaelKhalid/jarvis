@@ -4,3 +4,9 @@ node_modules/
 *.log
 
 .vercel
+
+package.json
+package-lock.json
+_diag.mjs
+sim.png
+assembly.png

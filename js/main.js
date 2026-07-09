@@ -23,6 +23,12 @@ const { renderer, scene, camera, controls, slotMeshes, resize, composer, floorUn
 const assembly = new THREE.Group();
 scene.add(assembly);
 
+// workshop vs. outdoor (sim) atmosphere — swapped on Upload / back
+const WORKSHOP_BG = scene.background.clone();
+const WORKSHOP_FOG = { color: scene.fog.color.clone(), near: scene.fog.near, far: scene.fog.far };
+const SKY_BG = new THREE.Color(0x8fb0cf);
+const SKY_FOG = new THREE.Color(0xd9b98a);
+
 const wiring = new WiringManager(scene, camera, renderer, refreshChecklist);
 const sim = new BalanceSim(scene);
 window.__sim = sim;   // debug/testing hook
@@ -420,6 +426,9 @@ function enterSim() {
   for (const d of assemblyDecor) d.visible = false;
   canvas.style.cursor = 'default';
   controlsLegend.classList.add('hidden');
+  // outdoor atmosphere for driving
+  scene.background = SKY_BG;
+  scene.fog.color.copy(SKY_FOG); scene.fog.near = 170; scene.fog.far = 650;
   document.querySelector('#three-canvas').style.cursor = 'default';
   sim.setGains(currentGains);
   sim.start();
@@ -427,8 +436,8 @@ function enterSim() {
   // hand the camera to the chase rig (disable orbit so driving isn't disorienting)
   controls.enabled = false;
   controls.target.copy(p);
-  camera.position.set(p.x, p.y + 14, p.z - 34);
-  camera.lookAt(p.x, p.y + 2, p.z);
+  camera.position.set(p.x, p.y + 18, p.z - 46);
+  camera.lookAt(p.x, p.y + 4, p.z);
   simHud.classList.remove('hidden');
   hudStatus.textContent = 'Drive with W/A/S/D — the robot balances as it moves';
   graphData.length = 0;
@@ -464,6 +473,9 @@ function exitSim() {
   for (const d of assemblyDecor) d.visible = true;
   canvas.style.cursor = TW_OPEN;
   controlsLegend.classList.remove('hidden');
+  // restore workshop atmosphere
+  scene.background = WORKSHOP_BG;
+  scene.fog.color.copy(WORKSHOP_FOG.color); scene.fog.near = WORKSHOP_FOG.near; scene.fog.far = WORKSHOP_FOG.far;
   controls.enabled = true;
   controls.target.set(0, 2, 1);
   camera.position.set(18, 20, 26);
@@ -576,10 +588,10 @@ function animate() {
       const h = sim.heading;
       const back = new THREE.Vector3(-Math.sin(h), 0, -Math.cos(h)); // behind heading
       const desired = new THREE.Vector3(
-        p.x + back.x * 34, p.y + 14, p.z + back.z * 34);
+        p.x + back.x * 46, p.y + 18, p.z + back.z * 46);
       const k = 1 - Math.pow(0.0015, dt);   // frame-rate-independent smoothing
       camera.position.lerp(desired, k);
-      camera.lookAt(p.x, p.y + 2, p.z);
+      camera.lookAt(p.x, p.y + 4, p.z);
     }
     const el = tiltReadout();
     if (el) el.textContent = `Tilt: ${sim.tiltDeg.toFixed(1)}°`;

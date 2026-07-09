@@ -36,6 +36,22 @@ const placed = {};          // slotId -> { group, compType }
 const usedTypes = new Set();
 let mode = 'assembly';      // 'assembly' | 'sim'
 
+// ── tweezers cursor (open normally, closes while right-dragging the view) ──
+const tweezersSvg = (dx) => `<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'>` +
+  `<path d='M16 6 L${10 + dx} 29 M16 6 L${22 - dx} 29' fill='none' stroke='#000' stroke-width='5' stroke-linecap='round' opacity='0.5'/>` +
+  `<path d='M16 6 L${10 + dx} 29 M16 6 L${22 - dx} 29' fill='none' stroke='#eef3fb' stroke-width='2.3' stroke-linecap='round'/>` +
+  `<circle cx='16' cy='5' r='2.5' fill='#eef3fb' stroke='#000' stroke-width='1'/></svg>`;
+const TW_OPEN = `url("data:image/svg+xml,${encodeURIComponent(tweezersSvg(0))}") 16 28, crosshair`;
+const TW_CLOSED = `url("data:image/svg+xml,${encodeURIComponent(tweezersSvg(5))}") 16 28, grabbing`;
+canvas.style.cursor = TW_OPEN;
+const controlsLegend = document.getElementById('controls-legend');
+canvas.addEventListener('pointerdown', (e) => {
+  if (mode === 'assembly' && e.button === 2) canvas.style.cursor = TW_CLOSED;
+});
+window.addEventListener('pointerup', (e) => {
+  if (mode === 'assembly' && e.button === 2) canvas.style.cursor = TW_OPEN;
+});
+
 // ── build parts tray ────────────────────────────────────────────
 const tray = document.getElementById('parts-tray');
 const cardByType = {};
@@ -259,7 +275,6 @@ canvas.addEventListener('pointermove', (e) => {
 
   // pin hover: explain what the pin means (works as soon as parts are placed)
   const pinHit = pickPin();
-  canvas.style.cursor = (pinHit && wiring.enabled) ? 'pointer' : 'default';
   if (pinHit) {
     const id = pinHit.userData.endpointId;
     if (id !== hoveredPinId) { hoveredPinId = id; showTooltip(e, pinTooltipHtml(id)); }
@@ -325,7 +340,7 @@ function refreshChecklist() {
   const ready = wiring.allRequiredDone();
   uploadBtn.disabled = !ready;
   if (ready && mode === 'assembly') hudStatus.textContent = '✓ Wiring complete — hit UPLOAD to run the robot';
-  clearBtn.disabled = Object.keys(placed).length === 0;
+  clearBtn.disabled = mode === 'sim' || Object.keys(placed).length === 0;
   updateStepper();
 }
 
@@ -402,6 +417,8 @@ function enterSim() {
   assembly.visible = false;
   wiring.setVisible(false);
   for (const d of assemblyDecor) d.visible = false;
+  canvas.style.cursor = 'default';
+  controlsLegend.classList.add('hidden');
   document.querySelector('#three-canvas').style.cursor = 'default';
   sim.setGains(currentGains);
   sim.start();
@@ -444,6 +461,8 @@ function exitSim() {
   assembly.visible = true;
   wiring.setVisible(true);
   for (const d of assemblyDecor) d.visible = true;
+  canvas.style.cursor = TW_OPEN;
+  controlsLegend.classList.remove('hidden');
   controls.enabled = true;
   controls.target.set(0, 2, 1);
   camera.position.set(18, 20, 26);

@@ -2,6 +2,10 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { SLOTS } from './parts.js';
 
 export function createScene(canvas) {
@@ -10,14 +14,14 @@ export function createScene(canvas) {
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.15;
+  renderer.toneMappingExposure = 1.05;
 
   const scene = new THREE.Scene();
-  // bright open sky
-  scene.background = new THREE.Color(0xbfe0ff);
-  scene.fog = new THREE.Fog(0xbfe0ff, 120, 320);
+  // deep tech-studio backdrop (premium, lets the neon accents & bloom read)
+  scene.background = new THREE.Color(0x0e151c);
+  scene.fog = new THREE.Fog(0x0e151c, 90, 300);
 
-  // environment map for realistic metal/chrome reflections
+  // environment map for realistic metal reflections
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
 
@@ -32,10 +36,10 @@ export function createScene(canvas) {
   controls.minDistance = 8;
   controls.maxDistance = 140;
 
-  // ── lights: bright, sunny, open ──
-  scene.add(new THREE.HemisphereLight(0xdcefff, 0x8a9a6a, 1.15));
-  scene.add(new THREE.AmbientLight(0xffffff, 0.35));
-  const key = new THREE.DirectionalLight(0xfff6e6, 2.0);
+  // ── lights: cool studio key + soft fill, dark enough that emissives glow ──
+  scene.add(new THREE.HemisphereLight(0x9fc0e8, 0x0a0f14, 0.55));
+  scene.add(new THREE.AmbientLight(0xffffff, 0.18));
+  const key = new THREE.DirectionalLight(0xfff2df, 2.2);
   key.position.set(40, 70, 35);
   key.castShadow = true;
   key.shadow.mapSize.set(2048, 2048);
@@ -45,13 +49,13 @@ export function createScene(canvas) {
   key.shadow.camera.far = 240;
   key.shadow.bias = -0.0004;
   scene.add(key);
-  const fill = new THREE.DirectionalLight(0xbfe0ff, 0.6);
+  const fill = new THREE.DirectionalLight(0x4da3ff, 0.7);
   fill.position.set(-30, 20, -20);
   scene.add(fill);
 
-  // ── grid floor (subtle, light) ──
-  const grid = new THREE.GridHelper(300, 100, 0xffffff, 0xa9c6d8);
-  grid.material.opacity = 0.25;
+  // ── grid floor (cyan neon lines on dark) ──
+  const grid = new THREE.GridHelper(300, 100, 0x3aa0ff, 0x18465f);
+  grid.material.opacity = 0.35;
   grid.material.transparent = true;
   grid.position.y = -0.02;
   scene.add(grid);
@@ -92,15 +96,23 @@ export function createScene(canvas) {
     slotMeshes[slot.id] = g;
   }
 
+  // ── post-processing: bloom makes the emissive accents glow (big fidelity win) ──
+  const composer = new EffectComposer(renderer);
+  composer.addPass(new RenderPass(scene, camera));
+  const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.7, 0.5, 0.82);
+  composer.addPass(bloom);
+  composer.addPass(new OutputPass());
+
   function resize() {
     const w = canvas.clientWidth, h = canvas.clientHeight;
     if (w === 0 || h === 0) return;
     renderer.setSize(w, h, false);
+    composer.setSize(w, h);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
   }
   window.addEventListener('resize', resize);
   resize();
 
-  return { renderer, scene, camera, controls, slotMeshes, resize };
+  return { renderer, scene, camera, controls, slotMeshes, resize, composer };
 }

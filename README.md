@@ -31,6 +31,15 @@ Built as a proof-of-concept MVP — no build step, no backend.
   a heading-hold keeps it straight. A follow-cam tracks it; perimeter walls keep
   it in the arena; it holds station when you let go.
 
+- **Guided UX** — a first-run onboarding overlay (re-openable via the **?**
+  button) explains the four phases, and a top-center **stepper** (Assemble →
+  Wire → Program → Run) tracks progress. Hovering any component **?** or any 3D
+  pin pops a plain-language explanation ("what *is* IN2?"), and hovering a wire
+  explains the connection. **Clear board** resets the assembly.
+- **Custom assets** — parts are procedural by default, but you can drop
+  high-quality `.glb` models into `assets/models/` and register them in
+  `js/assets.js` (`MODEL_OVERRIDES`) to replace any part, one at a time.
+
 ## Run locally
 
 It's all static files — serve the folder with anything:

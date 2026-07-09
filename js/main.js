@@ -5,9 +5,20 @@ import { PART_DEFS, SLOTS, makeMotor } from './parts.js';
 import { WiringManager, suggestFor } from './wiring.js';
 import { initEditor } from './editor.js';
 import { BalanceSim, loadRapier } from './sim.js';
+import { pinInfo, connectionBlurb } from './glossary.js';
+
+const KIND_LABEL = { power: 'POWER', ground: 'GROUND', data: 'SIGNAL' };
+function pinTooltipHtml(id) {
+  const info = pinInfo(id);
+  if (!info) return `<b>${id}</b>`;
+  const tag = KIND_LABEL[info.kind] || '';
+  return `<span class="tt-tag tt-${info.kind}">${tag}</span><b>${info.title}</b>` +
+         `<div class="tt-role">${info.role}</div>` +
+         `<span class="unit">${id}</span>`;
+}
 
 const canvas = document.getElementById('three-canvas');
-const { renderer, scene, camera, controls, slotMeshes, resize, composer } = createScene(canvas);
+const { renderer, scene, camera, controls, slotMeshes, resize, composer, floorUniforms, assemblyDecor } = createScene(canvas);
 
 const assembly = new THREE.Group();
 scene.add(assembly);
@@ -237,21 +248,29 @@ canvas.addEventListener('pointermove', (e) => {
     hoveredWire = wireHit.object;
     wiring.setWireHover(hoveredWire, true);
     const w = hoveredWire.userData.wire;
-    if (w.valid) showTooltip(e, `✓ ${w.req.label}`);
+    if (w.valid) showTooltip(e, `<span class="tt-tag tt-${w.kind}">✓ ${KIND_LABEL[w.kind] || ''}</span><b>${w.req.label}</b><div class="tt-role">${connectionBlurb(w.req)}</div>`);
     else {
       const want = suggestFor(w.idA) || suggestFor(w.idB);
       const wantTxt = want ? ` — should go to ${want.split('.')[1]}` : '';
       showTooltip(e, `✗ wrong pin${wantTxt}`, true);
     }
   }
-  if (hoveredWire) { moveTooltip(e); return; }
+  if (hoveredWire) { moveTooltip(e); hoveredPinId = null; return; }
 
-  // pin hover cursor
-  if (wiring.enabled) {
-    const pinHit = pickPin();
-    canvas.style.cursor = pinHit ? 'pointer' : 'default';
-  }
+  // pin hover: explain what the pin means (works as soon as parts are placed)
+  const pinHit = pickPin();
+  canvas.style.cursor = (pinHit && wiring.enabled) ? 'pointer' : 'default';
+  if (pinHit) {
+    const id = pinHit.userData.endpointId;
+    if (id !== hoveredPinId) { hoveredPinId = id; showTooltip(e, pinTooltipHtml(id)); }
+    else moveTooltip(e);
+  } else { hidePinTip(); }
 });
+
+let hoveredPinId = null;
+function hidePinTip() {
+  if (hoveredPinId) { hoveredPinId = null; hideTooltip(); }
+}
 
 canvas.addEventListener('pointerdown', (e) => {
   if (mode !== 'assembly' || !wiring.enabled) return;
@@ -299,7 +318,52 @@ function refreshChecklist() {
   const ready = wiring.allRequiredDone();
   uploadBtn.disabled = !ready;
   if (ready && mode === 'assembly') hudStatus.textContent = '✓ Wiring complete — hit UPLOAD to run the robot';
+  clearBtn.disabled = Object.keys(placed).length === 0;
+  updateStepper();
 }
+
+// ── phase stepper ───────────────────────────────────────────────
+const stepEls = {};
+for (const el of document.querySelectorAll('.step')) stepEls[el.dataset.step] = el;
+function updateStepper() {
+  const allPlaced = Object.keys(placed).length >= SLOTS.length;
+  const wired = wiring.allRequiredDone();
+  const running = mode === 'sim';
+  const state = {
+    assemble: running ? 'complete' : (allPlaced ? 'complete' : 'active'),
+    wire:     running ? 'complete' : (!allPlaced ? '' : (wired ? 'complete' : 'active')),
+    program:  running ? 'complete' : (wired ? 'active' : ''),
+    run:      running ? 'active' : '',
+  };
+  for (const [k, cls] of Object.entries(state)) {
+    stepEls[k].classList.remove('active', 'complete');
+    if (cls) stepEls[k].classList.add(cls);
+  }
+}
+
+// ── clear board ─────────────────────────────────────────────────
+const clearBtn = document.getElementById('clear-btn');
+function clearBoard() {
+  if (mode !== 'assembly') return;
+  for (const id of Object.keys(placed)) {
+    wiring.unregisterComponent(placed[id].compType);
+    assembly.remove(placed[id].group);
+    placed[id].group.traverse(o => { o.geometry?.dispose?.(); });
+    delete placed[id];
+  }
+  for (const t of Object.keys(placedCount)) delete placedCount[t];
+  usedTypes.clear();
+  wiring.enabled = false;
+  for (const def of PART_DEFS) {
+    const card = cardByType[def.type];
+    card.classList.remove('depleted');
+    const badge = card.querySelector('[data-remaining]');
+    if (badge) badge.textContent = `×${def.count}`;
+  }
+  hudStatus.textContent = 'Drag parts from the tray onto the chassis';
+  refreshChecklist();
+}
+clearBtn.addEventListener('click', clearBoard);
 
 // ── editor ──────────────────────────────────────────────────────
 let currentGains = { Kp: 15, Ki: 140, Kd: 0.9 };
@@ -330,6 +394,7 @@ function enterSim() {
   mode = 'sim';
   assembly.visible = false;
   wiring.setVisible(false);
+  for (const d of assemblyDecor) d.visible = false;
   document.querySelector('#three-canvas').style.cursor = 'default';
   sim.setGains(currentGains);
   sim.start();
@@ -343,6 +408,7 @@ function enterSim() {
   hudStatus.textContent = 'Drive with W/A/S/D — the robot balances as it moves';
   graphData.length = 0;
   keys.clear();
+  updateStepper();
 }
 
 // ── WASD driving ────────────────────────────────────────────────
@@ -370,11 +436,26 @@ function exitSim() {
   sim.hide();
   assembly.visible = true;
   wiring.setVisible(true);
+  for (const d of assemblyDecor) d.visible = true;
   controls.enabled = true;
   controls.target.set(0, 2, 1);
   camera.position.set(18, 20, 26);
   simHud.classList.add('hidden');
+  updateStepper();
 }
+
+// ── onboarding overlay + help ───────────────────────────────────
+const overlay = document.getElementById('overlay');
+function closeOverlay() {
+  overlay.classList.add('hidden');
+  try { localStorage.setItem('sbl-seen', '1'); } catch {}
+}
+document.getElementById('overlay-start').addEventListener('click', closeOverlay);
+document.getElementById('overlay-skip').addEventListener('click', closeOverlay);
+document.getElementById('help-btn').addEventListener('click', () => overlay.classList.remove('hidden'));
+let seen = false;
+try { seen = localStorage.getItem('sbl-seen') === '1'; } catch {}
+if (seen) overlay.classList.add('hidden');
 
 // ── sim HUD (built dynamically) ─────────────────────────────────
 const simHud = document.createElement('div');
@@ -458,7 +539,7 @@ function animate() {
   const dt = (now - last) / 1000;
   last = now;
 
-  if (mode === 'assembly') controls.update();
+  if (mode === 'assembly') { controls.update(); floorUniforms.uTime.value += dt; }
 
   if (mode === 'sim') {
     sim.step(dt);
@@ -489,3 +570,4 @@ function animate() {
 }
 animate();
 resize();
+updateStepper();

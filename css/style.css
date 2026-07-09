@@ -221,8 +221,6 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
   border-radius: 8px; cursor: pointer;
 }
 #overlay .start:hover { background: #1a4a32; }
-#overlay .skip { display: block; width: 100%; text-align: center; margin-top: 10px; background: none; border: none; color: var(--text-dim); font-family: var(--mono); font-size: 11px; cursor: pointer; }
-#overlay .skip:hover { color: var(--text); }
 
 /* ── CodeMirror sizing ── */
 #editor-container { position: relative; }

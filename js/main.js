@@ -451,7 +451,6 @@ function closeOverlay() {
   try { localStorage.setItem('sbl-seen', '1'); } catch {}
 }
 document.getElementById('overlay-start').addEventListener('click', closeOverlay);
-document.getElementById('overlay-skip').addEventListener('click', closeOverlay);
 document.getElementById('help-btn').addEventListener('click', () => overlay.classList.remove('hidden'));
 let seen = false;
 try { seen = localStorage.getItem('sbl-seen') === '1'; } catch {}

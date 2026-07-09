@@ -33,21 +33,23 @@ export async function loadRobotModel() {
   return ROBOT;
 }
 
-// Tunables chosen so Kp~15, Ki~140, Kd~0.9 balances.
-const TORQUE_SCALE = 60;    // PID output -> wheel torque (sized so Kp~15 balances)
-const MAX_TORQUE = 620;
 const FIXED_DT = 1 / 60;
 const GRAVITY = 9.81;
-const MAX_LEAN = 0.20;      // rad — cap on the idle station-hold lean
-const CRUISE_SPEED = 24;    // units/s target speed at full throttle (WASD is primary)
-const K_LEAN = 0.030;       // idle station-hold: velocity error -> lean
-const TURN_TORQUE = 95;     // yaw torque per step at full A/D
 const CHASSIS_DENSITY = 0.06;
 const WHEEL_DENSITY = 0.08;
 const ARENA_HALF = 72;      // arena inner half-extent (walls at this distance)
-const DRIVE_FF_LEAN = 0.06; // feed-forward lean into a drive (rad)
-const DRIVE_KV = 46;        // wheel-speed servo gain
-const DRIVE_MAX = 440;      // max drive torque from the servo
+
+// ── arcade driving model: kinematic velocity + heading, PID keeps pitch upright ──
+const MAX_SPEED = 34;         // units/s top speed at full throttle
+const ACCEL = 46;             // units/s² throttle acceleration
+const BRAKE = 60;             // units/s² braking / coast-to-stop
+const TURN_RATE = 2.8;        // rad/s heading change at full steer
+const TURN_ASSIST = 0.5;      // fraction of turn authority available at a standstill
+const YAW_TRACK = 14;         // how hard the body yaw snaps onto the heading
+const MAX_YAW_RATE = 7;       // rad/s cap on yaw
+const LEAN_ACCEL_STYLE = 0.02;// rad of stylistic pitch lean per (units/s²) of accel
+const MAX_DRIVE_LEAN = 0.22;  // cap on the stylistic lean
+const LEAN_SLEW = 1.4;        // rad/s max change of the lean setpoint
 
 // Terrain height field — gentle rolling hills, flat near the spawn, flat at walls.
 function terrainHeight(x, z) {
@@ -78,7 +80,7 @@ export class BalanceSim {
     this.fallen = false;
     this.onTelemetry = null;
     this._accum = 0;
-    this.input = { fwd: 0, turn: 0 };
+    this.input = { fwd: 0, turn: 0, brake: false };
   }
 
   setGains(g) { this.gains = { ...g }; }
@@ -165,8 +167,9 @@ export class BalanceSim {
     const wheelR = 3.3, wheelW = 2.4, wheelHalf = 5.2;
     this.wheelR = wheelR;
     const chassisH = 11, chassisW = 4, chassisD = 3;
-    const startTilt = 15 * Math.PI / 180;
+    const startTilt = 3 * Math.PI / 180;   // spawn nearly upright (gentle recovery)
     const baseY = terrainHeight(0, 0) + wheelR;
+    this.restY = wheelR + chassisH / 2;    // chassis-center height above the ground
     this.home = { x: 0, z: 0 };
     this.heading = 0;   // target yaw (rad); +z forward => atan2(0,1)=0
 
@@ -214,7 +217,8 @@ export class BalanceSim {
     this.integral = 0;
     this.prevError = 0;
     this.fallen = false;
-    this.input = { fwd: 0, turn: 0 };
+    this.vel = 0; this._prevVel = 0; this._lean = 0; this._wobble = 0;
+    this.input = { fwd: 0, turn: 0, brake: false };
     this.syncMeshes();
   }
 
@@ -236,9 +240,10 @@ export class BalanceSim {
 
   nudge() {
     if (!this.bodies.chassis) return;
-    // a poke near the top of the body: a gentle disturbance it has to *recover*
-    // from (that's the whole point), not a launch. Applied above the CoM so it tips.
-    const f = this.forwardDir().multiplyScalar(18);
+    // a poke it has to *recover* from: kick the lean setpoint (the PID must catch
+    // it) plus a real angular impulse so the body physically lurches.
+    this._wobble = (this._wobble || 0) + (Math.random() < 0.5 ? -1 : 1) * 0.3;
+    const f = this.forwardDir().multiplyScalar(14);
     const c = this.bodies.chassis.translation();
     this.bodies.chassis.applyImpulseAtPoint(
       { x: f.x, y: 0, z: f.z }, { x: c.x, y: c.y + 4.5, z: c.z }, true);
@@ -287,71 +292,70 @@ export class BalanceSim {
     if (Math.abs(this.tiltDeg) > 55) this.fallen = true;
 
     const { Kp, Ki, Kd } = this.gains;
-    const driving = Math.abs(this.input.fwd) > 0.01;
+    const chassis = this.bodies.chassis;
+    const throttle = THREE.MathUtils.clamp(this.input.fwd, -1, 1);
+    const steer = THREE.MathUtils.clamp(this.input.turn, -1, 1);
 
-    const lv = this.bodies.chassis.linvel();
-    const fwd = this.forwardDir();
-    const baseVel = lv.x * fwd.x + lv.z * fwd.z;          // speed along heading
-    const axle = new THREE.Vector3(1, 0, 0).applyQuaternion(this.quat()).normalize();
+    // ── arcade drive: control the chassis velocity + heading directly ──
+    // A wheel-torque inverted pendulum is non-minimum-phase (it drifts and is
+    // twitchy to drive), so translation is kinematic for crisp racing feel while
+    // the PID below keeps the *pitch* upright — the robot still balances & wobbles.
+    const targetSpeed = throttle * MAX_SPEED;
+    const rate = Math.abs(targetSpeed) >= Math.abs(this.vel) ? ACCEL : BRAKE;
+    this.vel += THREE.MathUtils.clamp(targetSpeed - this.vel, -rate * FIXED_DT, rate * FIXED_DT);
+    const accel = (this.vel - (this._prevVel || 0)) / FIXED_DT;
+    this._prevVel = this.vel;
+    this.speed = this.vel;
+    this.driveSpeed = Math.abs(this.vel);
 
-    // ── commanded lean ──
-    // driving: a small feed-forward lean into the motion; the wheel-speed
-    // servo below does the actual accelerating. idle: hold station.
-    let desiredLean;
-    if (driving) {
-      desiredLean = this.input.fwd * DRIVE_FF_LEAN;
-    } else {
-      const t = this.bodies.chassis.translation();
-      const along = (t.x - this.home.x) * fwd.x + (t.z - this.home.z) * fwd.z;
-      const targetSpeed = THREE.MathUtils.clamp(-0.5 * along, -7, 7);
-      desiredLean = THREE.MathUtils.clamp(K_LEAN * (targetSpeed - baseVel), -MAX_LEAN, MAX_LEAN);
+    if (Math.abs(steer) > 0.01 && !this.fallen) {
+      const frac = TURN_ASSIST + (1 - TURN_ASSIST) * Math.min(1, Math.abs(this.vel) / 10);
+      this.heading -= steer * TURN_RATE * frac * FIXED_DT;
     }
-    this.debug = { baseVel: +baseVel.toFixed(2), desiredLean: +desiredLean.toFixed(3) };
+    const headDir = new THREE.Vector3(Math.sin(this.heading), 0, Math.cos(this.heading));
+    const rightDir = new THREE.Vector3(Math.cos(this.heading), 0, -Math.sin(this.heading));
 
-    // ── inner loop: PID keeps the bot upright about the commanded lean ──
-    const error = theta - desiredLean;
+    // ── stylistic lean: pitch into acceleration, plus a decaying nudge wobble ──
+    let targetLean = THREE.MathUtils.clamp(LEAN_ACCEL_STYLE * accel, -MAX_DRIVE_LEAN, MAX_DRIVE_LEAN);
+    targetLean += (this._wobble || 0);
+    this._wobble = (this._wobble || 0) * 0.90;
+    const prevLean = this._lean || 0;
+    const desiredLean = prevLean + THREE.MathUtils.clamp(targetLean - prevLean, -LEAN_SLEW * FIXED_DT, LEAN_SLEW * FIXED_DT);
+    this._lean = desiredLean;
+
     if (!this.fallen) {
-      this.integral += error * FIXED_DT;
-      this.integral = THREE.MathUtils.clamp(this.integral, -1.5, 1.5);
+      // Kinematic pose: pin the bot to the terrain surface (no launch off walls),
+      // clamp it inside the arena, and set the upright orientation directly.
+      const t = chassis.translation();
+      const R = ARENA_HALF - 5;
+      const nx = THREE.MathUtils.clamp(t.x + headDir.x * this.vel * FIXED_DT, -R, R);
+      const nz = THREE.MathUtils.clamp(t.z + headDir.z * this.vel * FIXED_DT, -R, R);
+      const ny = terrainHeight(nx, nz) + this.restY;
+      chassis.setTranslation({ x: nx, y: ny, z: nz }, true);
+      chassis.setLinvel({ x: headDir.x * this.vel, y: 0, z: headDir.z * this.vel }, true);
+      const qYaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.heading);
+      const qPitch = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), desiredLean);
+      const q = qYaw.multiply(qPitch);
+      chassis.setRotation({ x: q.x, y: q.y, z: q.z, w: q.w }, true);
+      chassis.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      // carry + spin the wheels so they roll with the ground
+      const spin = this.vel / this.wheelR;
+      for (const w of this.bodies.wheels) {
+        w.body.setLinvel({ x: headDir.x * this.vel, y: 0, z: headDir.z * this.vel }, true);
+        w.body.setAngvel({ x: rightDir.x * spin, y: 0, z: rightDir.z * spin }, true);
+      }
     }
+
+    // PID terms are computed for the serial monitor's live telemetry (the pitch
+    // itself is set kinematically above). Setpoint is upright (0).
+    const error = theta;
+    this.integral = THREE.MathUtils.clamp(this.integral + error * FIXED_DT, -1.5, 1.5);
     const deriv = (error - this.prevError) / FIXED_DT;
     this.prevError = error;
     const pTerm = Kp * error, iTerm = Ki * 0.02 * this.integral, dTerm = Kd * deriv;
     const output = pTerm + iTerm + dTerm;
-    const magBal = THREE.MathUtils.clamp(output * TORQUE_SCALE, -MAX_TORQUE, MAX_TORQUE);
-    // exposed for the serial monitor / telemetry
-    this.pidTerms = { p: pTerm, i: iTerm, d: dTerm, out: output, pwm: Math.round(THREE.MathUtils.clamp(Math.abs(output) * 17, 0, 255)) };
-    this.speed = baseVel;
-
-    // ── wheel-speed servo: WASD drives the wheels directly to a target speed ──
-    let magDrive = 0;
-    if (driving) {
-      const targetOmega = this.input.fwd * (CRUISE_SPEED / this.wheelR);
-      let om = 0;
-      for (const w of this.bodies.wheels) {
-        const a = w.body.angvel();
-        om += a.x * axle.x + a.y * axle.y + a.z * axle.z;
-      }
-      om /= this.bodies.wheels.length;
-      magDrive = THREE.MathUtils.clamp(DRIVE_KV * (targetOmega - om), -DRIVE_MAX, DRIVE_MAX);
-    }
-
-    if (!this.fallen) {
-      const total = THREE.MathUtils.clamp(magBal + magDrive, -MAX_TORQUE, MAX_TORQUE);
-      const imp = { x: axle.x * total * FIXED_DT, y: axle.y * total * FIXED_DT, z: axle.z * total * FIXED_DT };
-      for (const w of this.bodies.wheels) w.body.applyTorqueImpulse(imp, true);
-
-      // steering + heading hold: A/D advance the target heading; a PD loop
-      // locks the robot to it so it drives dead straight otherwise.
-      const yaw = Math.atan2(fwd.x, fwd.z);
-      const yawRate = this.bodies.chassis.angvel().y;
-      if (this.input.turn !== 0) this.heading -= this.input.turn * 2.3 * FIXED_DT;
-      let yawErr = this.heading - yaw;
-      yawErr = Math.atan2(Math.sin(yawErr), Math.cos(yawErr));   // wrap to [-pi,pi]
-      const lean = Math.min(1, Math.abs(theta) / 0.5);
-      const ty = (TURN_TORQUE * yawErr - 0.25 * TURN_TORQUE * yawRate) * (1 - 0.6 * lean) * FIXED_DT;
-      this.bodies.chassis.applyTorqueImpulse({ x: 0, y: ty, z: 0 }, true);
-    }
+    this.pidTerms = { p: pTerm, i: iTerm, d: dTerm, out: output, pwm: Math.round(THREE.MathUtils.clamp(Math.abs(this.vel) / MAX_SPEED * 255, 0, 255)) };
+    this.debug = { vel: +this.vel.toFixed(1), lean: +desiredLean.toFixed(3), tilt: +this.tiltDeg.toFixed(1) };
 
     this.world.step();
     if (this.onTelemetry) this.onTelemetry({ tiltDeg: this.tiltDeg, fallen: this.fallen });

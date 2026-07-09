@@ -68,6 +68,35 @@ export function parseGains(text) {
   };
 }
 
+// Maps a token in the sketch to the physical component/pin it controls, so
+// hovering the code explains what hardware each line drives.
+const CODE_NOTES = {
+  Kp: 'Proportional gain — how hard the motors push back per degree of tilt read from the MPU6050. Too low: it falls; too high: it shakes.',
+  Ki: 'Integral gain — slowly trims a steady lean so the robot doesn’t drift off-vertical over time.',
+  Kd: 'Derivative gain — damping. Reacts to how fast the tilt is changing to stop oscillation.',
+  setpoint: 'The target angle: 0° = upright. The PID drives the tilt toward this.',
+  pid: 'The PID controller object — the balance brain running on the Arduino.',
+  PID: 'The PID controller object — the balance brain running on the Arduino.',
+  Compute: 'Runs one PID step: reads tilt, produces a motor command in `output`.',
+  input: 'The live tilt angle (degrees) coming from the MPU6050 IMU.',
+  output: 'The PID’s motor command, sent on to the L298N driver.',
+  Wire: 'I²C bus — the wires on A4 (SDA) and A5 (SCL) that talk to the MPU6050.',
+  mpu: 'The MPU6050 IMU — the 6-axis tilt sensor.',
+  MPU6050: 'The MPU6050 IMU — the 6-axis tilt sensor on the I²C bus.',
+  initialize: 'Wakes up the MPU6050 and starts it measuring.',
+  readTiltAngle: 'Reads the current tilt from the MPU6050 (via A4/A5).',
+  driveMotors: 'Sends the PID output to the L298N driver → the two DC gear motors.',
+  analogWrite: 'PWM out on a digital pin → an L298N input → motor speed/direction.',
+  IN1: 'L298N input IN1 (Arduino D6) — one half of the left motor’s direction control.',
+  IN2: 'L298N input IN2 (Arduino D9) — the other half of the left motor’s direction control.',
+  IN3: 'L298N input IN3 (Arduino D10) — one half of the right motor’s direction control.',
+  IN4: 'L298N input IN4 (Arduino D11) — the other half of the right motor’s direction control.',
+  MPU_INT: 'The MPU6050 INT pin (Arduino D2) — pulses when a fresh reading is ready.',
+  SetOutputLimits: 'Clamps the motor command to ±255, the PWM range the L298N accepts.',
+  pinMode: 'Configures a digital pin as an output that drives the L298N.',
+  constrain: 'Keeps the PWM value inside the valid 0–255 motor range.',
+};
+
 export function initEditor(container, onGains) {
   const cm = window.CodeMirror(container, {
     value: DEFAULT_SKETCH,
@@ -84,5 +113,33 @@ export function initEditor(container, onGains) {
   cm.on('change', () => emit());
   // initial
   setTimeout(emit, 0);
+
+  // ── code → hardware hover annotations ──
+  const tip = document.getElementById('tooltip');
+  const wrap = cm.getWrapperElement();
+  let lastWord = null;
+  wrap.classList.add('annotated');
+  wrap.addEventListener('mousemove', (e) => {
+    const pos = cm.coordsChar({ left: e.clientX, top: e.clientY }, 'window');
+    const tok = cm.getTokenAt(pos);
+    const word = tok && tok.string;
+    const note = word && CODE_NOTES[word];
+    if (note) {
+      if (word !== lastWord) {
+        lastWord = word;
+        tip.innerHTML =
+          `<span class="tt-tag tt-data">CODE → HARDWARE</span><b>${word}</b>` +
+          `<div class="tt-role">${note}</div>`;
+        tip.classList.remove('hidden', 'error');
+      }
+      tip.style.left = (e.clientX + 14) + 'px';
+      tip.style.top = (e.clientY + 16) + 'px';
+    } else if (lastWord) {
+      lastWord = null;
+      tip.classList.add('hidden');
+    }
+  });
+  wrap.addEventListener('mouseleave', () => { lastWord = null; tip.classList.add('hidden'); });
+
   return cm;
 }

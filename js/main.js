@@ -272,6 +272,13 @@ function hidePinTip() {
   if (hoveredPinId) { hoveredPinId = null; hideTooltip(); }
 }
 
+// leaving the canvas entirely: clear any hover state + tooltip so it can't stick
+canvas.addEventListener('pointerleave', () => {
+  if (hoveredWire) { wiring.setWireHover(hoveredWire, false); hoveredWire = null; }
+  hoveredPinId = null;
+  hideTooltip();
+});
+
 canvas.addEventListener('pointerdown', (e) => {
   if (mode !== 'assembly' || !wiring.enabled) return;
   if (e.button === 2 && hoveredWire) {         // right-click deletes a wire

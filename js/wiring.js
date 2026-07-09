@@ -18,6 +18,11 @@ export const REQUIRED = [
   { a: 'l298n.GND',   b: 'battery.-',   kind: 'ground', label: 'L298N GND → Bat −' },
   { a: 'arduino.VIN', b: 'battery.+',   kind: 'power',  label: 'Arduino VIN → Bat +' },
   { a: 'arduino.GND', b: 'battery.-',   kind: 'ground', label: 'Arduino GND → Bat −' },
+  // driver outputs to the two motors — completes the loop so the wheels turn
+  { a: 'l298n.OUT1',  b: 'motorL.M+',   kind: 'power',  label: 'L298N OUT1 → L Motor +' },
+  { a: 'l298n.OUT2',  b: 'motorL.M-',   kind: 'power',  label: 'L298N OUT2 → L Motor −' },
+  { a: 'l298n.OUT3',  b: 'motorR.M+',   kind: 'power',  label: 'L298N OUT3 → R Motor +' },
+  { a: 'l298n.OUT4',  b: 'motorR.M-',   kind: 'power',  label: 'L298N OUT4 → R Motor −' },
 ];
 
 const KIND_COLOR = { power: 0xff4d4d, ground: 0x2a2f3a, data: 0xffd166 };

@@ -18,7 +18,7 @@ const MAX_TORQUE = 620;
 const FIXED_DT = 1 / 60;
 const GRAVITY = 9.81;
 const MAX_LEAN = 0.20;      // rad — cap on the idle station-hold lean
-const CRUISE_SPEED = 30;    // units/s target speed at full throttle (WASD is primary)
+const CRUISE_SPEED = 24;    // units/s target speed at full throttle (WASD is primary)
 const K_LEAN = 0.030;       // idle station-hold: velocity error -> lean
 const TURN_TORQUE = 95;     // yaw torque per step at full A/D
 const CHASSIS_DENSITY = 0.06;
@@ -76,7 +76,7 @@ export class BalanceSim {
     geo.computeVertexNormals();
     const mesh = new THREE.Mesh(
       geo,
-      new THREE.MeshStandardMaterial({ color: 0x86b56a, roughness: 0.98, metalness: 0.0 })
+      new THREE.MeshStandardMaterial({ color: 0x1c2a33, roughness: 0.72, metalness: 0.15 })
     );
     mesh.receiveShadow = true;
     this.group.add(mesh);
@@ -88,8 +88,8 @@ export class BalanceSim {
 
     // ── perimeter walls ──
     const WH = 11, WT = 3, L = ARENA_HALF;
-    const wallMat = new THREE.MeshStandardMaterial({ color: 0xeef1f4, roughness: 0.6, metalness: 0.1 });
-    const capMat = new THREE.MeshStandardMaterial({ color: 0x4da3ff, roughness: 0.4, metalness: 0.3, emissive: 0x11324d });
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0x2b333d, roughness: 0.5, metalness: 0.35 });
+    const capMat = new THREE.MeshStandardMaterial({ color: 0x0a2438, roughness: 0.35, metalness: 0.4, emissive: 0x18b6ff, emissiveIntensity: 2.4 });
     const walls = [
       { x: 0, z: L, sx: (L + WT) * 2, sz: WT },
       { x: 0, z: -L, sx: (L + WT) * 2, sz: WT },
@@ -190,9 +190,12 @@ export class BalanceSim {
 
   nudge() {
     if (!this.bodies.chassis) return;
-    // push along the robot's current forward direction
-    const f = this.forwardDir().multiplyScalar(110);
-    this.bodies.chassis.applyImpulse({ x: f.x, y: 0, z: f.z }, true);
+    // a poke near the top of the body: a gentle disturbance it has to *recover*
+    // from (that's the whole point), not a launch. Applied above the CoM so it tips.
+    const f = this.forwardDir().multiplyScalar(18);
+    const c = this.bodies.chassis.translation();
+    this.bodies.chassis.applyImpulseAtPoint(
+      { x: f.x, y: 0, z: f.z }, { x: c.x, y: c.y + 4.5, z: c.z }, true);
   }
 
   chassisPos() {
@@ -292,7 +295,7 @@ export class BalanceSim {
       // locks the robot to it so it drives dead straight otherwise.
       const yaw = Math.atan2(fwd.x, fwd.z);
       const yawRate = this.bodies.chassis.angvel().y;
-      if (this.input.turn !== 0) this.heading -= this.input.turn * 1.7 * FIXED_DT;
+      if (this.input.turn !== 0) this.heading -= this.input.turn * 2.3 * FIXED_DT;
       let yawErr = this.heading - yaw;
       yawErr = Math.atan2(Math.sin(yawErr), Math.cos(yawErr));   // wrap to [-pi,pi]
       const lean = Math.min(1, Math.abs(theta) / 0.5);
@@ -324,13 +327,17 @@ function zToXQuat() {
   return { x: q.x, y: q.y, z: q.z, w: q.w };
 }
 
-// ── materials (reused; rely on scene.environment for reflections) ──
-const CHROME = new THREE.MeshStandardMaterial({ color: 0xeef3f8, metalness: 1.0, roughness: 0.12 });
-const CHROME_DK = new THREE.MeshStandardMaterial({ color: 0xaeb6c0, metalness: 1.0, roughness: 0.28 });
-const DARKMETAL = new THREE.MeshStandardMaterial({ color: 0x23262c, metalness: 0.85, roughness: 0.4 });
-const GLASS = new THREE.MeshStandardMaterial({ color: 0x0c0f14, metalness: 0.6, roughness: 0.05 });
-const LENS = new THREE.MeshStandardMaterial({ color: 0x2a6cff, metalness: 0.3, roughness: 0.1, emissive: 0x0a2350 });
-const TIRE = new THREE.MeshStandardMaterial({ color: 0x191b1f, metalness: 0.15, roughness: 0.85 });
+// ── premium material set (gunmetal body + steel trim + carbon + glowing accents) ──
+// deliberately NOT uniform white chrome — that read as a "cheap toy". Reflections
+// come from scene.environment; the emissive accents drive the bloom pass.
+const CHROME = new THREE.MeshStandardMaterial({ color: 0x2a2f37, metalness: 0.95, roughness: 0.26 });   // gunmetal (main body)
+const CHROME_DK = new THREE.MeshStandardMaterial({ color: 0x0f1216, metalness: 0.75, roughness: 0.5 });  // dark carbon (panels)
+const DARKMETAL = new THREE.MeshStandardMaterial({ color: 0x090b0e, metalness: 0.6, roughness: 0.6 });   // matte vents
+const STEEL = new THREE.MeshStandardMaterial({ color: 0xc2cad6, metalness: 1.0, roughness: 0.17 });      // bright trim / bolts
+const GLASS = new THREE.MeshStandardMaterial({ color: 0x04060b, metalness: 0.8, roughness: 0.04 });      // dark glass screens
+const LENS = new THREE.MeshStandardMaterial({ color: 0x0a2036, metalness: 0.3, roughness: 0.12, emissive: 0x22c4ff, emissiveIntensity: 4.0 });
+const SEAM = new THREE.MeshStandardMaterial({ color: 0x061a2b, metalness: 0.4, roughness: 0.3, emissive: 0x18b6ff, emissiveIntensity: 3.2 });
+const TIRE = new THREE.MeshStandardMaterial({ color: 0x121418, metalness: 0.2, roughness: 0.8 });
 
 // Chrome sphere-bot matching the reference: metallic body, camera dome,
 // two gripper arms, on a neck above the wheel axle. Origin = chassis center.
@@ -343,7 +350,7 @@ function makeRobotVisual(chassisH) {
   neck.position.y = bottom + 2.1;
   neck.castShadow = true;
   g.add(neck);
-  const collar = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 0.5, 24), CHROME_DK);
+  const collar = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 0.5, 24), STEEL);
   collar.position.y = bottom + 4.1;
   g.add(collar);
 
@@ -352,6 +359,20 @@ function makeRobotVisual(chassisH) {
   body.position.y = bottom + 7.0;
   body.castShadow = true;
   g.add(body);
+
+  // glowing equator seam + a lower accent ring (these bloom)
+  const seam = new THREE.Mesh(new THREE.TorusGeometry(3.36, 0.10, 12, 60), SEAM);
+  seam.rotation.x = Math.PI / 2;
+  seam.position.y = bottom + 7.0;
+  g.add(seam);
+  const seam2 = new THREE.Mesh(new THREE.TorusGeometry(3.15, 0.07, 10, 60), SEAM);
+  seam2.rotation.x = Math.PI / 2;
+  seam2.position.y = bottom + 5.4;
+  g.add(seam2);
+  // machined steel belt just under the equator
+  const belt = new THREE.Mesh(new THREE.CylinderGeometry(3.28, 3.28, 0.5, 40), STEEL);
+  belt.position.y = bottom + 6.55;
+  g.add(belt);
 
   // side vent grilles (dark slots), mirrored on both sides
   for (const sx of [-1, 1]) {
@@ -368,7 +389,7 @@ function makeRobotVisual(chassisH) {
   g.add(face);
 
   // camera dome on top
-  const domeRing = new THREE.Mesh(new THREE.CylinderGeometry(1.75, 1.9, 0.5, 28), CHROME_DK);
+  const domeRing = new THREE.Mesh(new THREE.CylinderGeometry(1.75, 1.9, 0.5, 28), STEEL);
   domeRing.position.y = bottom + 9.9;
   g.add(domeRing);
   const dome = new THREE.Mesh(new THREE.SphereGeometry(1.7, 28, 20, 0, Math.PI * 2, 0, Math.PI / 2), GLASS);
@@ -431,7 +452,7 @@ function makeWheelVisual(r, w) {
   }
   // chrome rim + hub cap on both faces
   for (const sy of [-1, 1]) {
-    const rim = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.55, r * 0.55, 0.25, 24), CHROME);
+    const rim = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.55, r * 0.55, 0.25, 24), STEEL);
     rim.position.y = sy * (w / 2 + 0.02);
     g.add(rim);
     const cap = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.22, r * 0.22, 0.4, 16), CHROME_DK);

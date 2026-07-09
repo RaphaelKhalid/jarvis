@@ -7,7 +7,7 @@ import { initEditor } from './editor.js';
 import { BalanceSim, loadRapier } from './sim.js';
 
 const canvas = document.getElementById('three-canvas');
-const { renderer, scene, camera, controls, slotMeshes, resize } = createScene(canvas);
+const { renderer, scene, camera, controls, slotMeshes, resize, composer } = createScene(canvas);
 
 const assembly = new THREE.Group();
 scene.add(assembly);
@@ -334,8 +334,11 @@ function enterSim() {
   sim.setGains(currentGains);
   sim.start();
   const p = sim.chassisPos();
+  // hand the camera to the chase rig (disable orbit so driving isn't disorienting)
+  controls.enabled = false;
   controls.target.copy(p);
-  camera.position.set(p.x, p.y + 8, p.z + 30);
+  camera.position.set(p.x, p.y + 14, p.z - 34);
+  camera.lookAt(p.x, p.y + 2, p.z);
   simHud.classList.remove('hidden');
   hudStatus.textContent = 'Drive with W/A/S/D — the robot balances as it moves';
   graphData.length = 0;
@@ -367,6 +370,7 @@ function exitSim() {
   sim.hide();
   assembly.visible = true;
   wiring.setVisible(true);
+  controls.enabled = true;
   controls.target.set(0, 2, 1);
   camera.position.set(18, 20, 26);
   simHud.classList.add('hidden');
@@ -454,16 +458,21 @@ function animate() {
   const dt = (now - last) / 1000;
   last = now;
 
-  controls.update();
+  if (mode === 'assembly') controls.update();
 
   if (mode === 'sim') {
     sim.step(dt);
-    // follow-cam: keep the robot centered while preserving the user's orbit
+    // cinematic chase-cam: smoothly swing behind the robot's heading so turns
+    // read naturally (a fixed orbit that only translates felt disorienting).
     if (sim.bodies.chassis) {
       const p = sim.chassisPos();
-      const delta = p.clone().sub(controls.target);
-      controls.target.add(delta);
-      camera.position.add(delta);
+      const h = sim.heading;
+      const back = new THREE.Vector3(-Math.sin(h), 0, -Math.cos(h)); // behind heading
+      const desired = new THREE.Vector3(
+        p.x + back.x * 34, p.y + 14, p.z + back.z * 34);
+      const k = 1 - Math.pow(0.0015, dt);   // frame-rate-independent smoothing
+      camera.position.lerp(desired, k);
+      camera.lookAt(p.x, p.y + 2, p.z);
     }
     const el = tiltReadout();
     if (el) el.textContent = `Tilt: ${sim.tiltDeg.toFixed(1)}°`;
@@ -476,7 +485,7 @@ function animate() {
     drawSpark();
   }
 
-  renderer.render(scene, camera);
+  composer.render();
 }
 animate();
 resize();

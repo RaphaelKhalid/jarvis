@@ -14,13 +14,17 @@ Serve the folder statically and open the printed URL (needs WebGL + WebAssembly)
 npx serve .          # or: python -m http.server 8000
 ```
 
-There are no tests, linter, or build commands — verification is by loading the page and driving the sim. `window.__sim` is exposed in `main.js` as a debug hook onto the live `BalanceSim`. Deployed via Vercel (`.vercel/`).
+Verification: `npm test` runs the Playwright smoke suite (`tests/smoke.spec.js`) headlessly with software WebGL — run it before committing. `npm run lint` runs eslint. Manual verification is by loading the page and driving the sim. `window.__sim` is exposed in `main.js` as a debug hook onto the live `BalanceSim`. Deployed via Vercel (`.vercel/`).
 
 ## Architecture
 
-Three phases share one Three.js scene; `main.js` is the orchestrator holding a single `mode` flag (`'assembly'` | `'sim'`) that gates all pointer/keyboard handlers.
+Three phases share one Three.js scene. The `mode` flag (`'assembly'` | `'sim'`) that gates all pointer/keyboard handlers lives in `js/app/state.js` — a tiny pub/sub store (`state`, `set`, `subscribe`).
 
-- **`js/main.js`** — wires the whole app together: builds the parts tray, drag-to-slot placement, raycasting for pins/wires, hover glossary tooltips, the phase stepper (`updateStepper()`), clear-board + onboarding-overlay logic, checklist, editor callback, Upload → sim transition, WASD input, chase-cam, sparkline HUD, and the single `animate()` render loop (which calls `composer.render()`, not `renderer.render()`, and advances `floorUniforms.uTime`).
+- **`js/main.js`** — thin orchestrator: creates scene/wiring/sim, initializes the app modules below, owns the editor callback, Upload → `enterSim()` / `exitSim()` transitions, chase-cam math, and the single `animate()` render loop (which calls `composer.render()`, not `renderer.render()`, and advances `floorUniforms.uTime`).
+- **`js/app/state.js`** — observable store: `mode`, `booting`, `gains`. Write via `set()` so subscribers fire.
+- **`js/app/assembly.js`** — parts tray, drag-to-slot placement, pin/wire raycasting + tooltips, drag-to-wire, auto-wire, clear board, tweezers cursor. Returns `{ group, placed, getPlacedCount, clearBoard }`.
+- **`js/app/hud.js`** — tooltips, status flash, checklist, phase stepper, onboarding overlay, sound toggle, sim HUD + sparkline, mission HUD (`missionTick` is called from the render loop).
+- **`js/app/input.js`** — keyboard/pointer driving input behind a named-axis abstraction (`input.axis('drive'|'steer')`) so touch/gamepad schemes can plug in later; also owns chase-cam orbit state (`input.cam`).
 - **`js/scene.js`** — `createScene(canvas)` returns `{ renderer, scene, camera, controls, slotMeshes, resize, composer, floorUniforms, assemblyDecor }`. Owns lights, the chassis plate, slot ghost planes, `RoomEnvironment` reflections, the `EffectComposer` bloom pipeline, and a custom `ShaderMaterial` energy-grid floor (`floorUniforms.uTime` is animated by main). `assemblyDecor` is the list of assembly-only meshes (grid, shader floor, chassis plate) that main hides while the sim arena is on screen. **Emissive materials glow because of the `UnrealBloomPass`** — that's why accents use `emissive`/`emissiveIntensity`.
 - **`js/parts.js`** — `PART_DEFS` (tray registry), `SLOTS` (chassis mount points), and one `make*()` factory per component. Every factory returns a `THREE.Group` whose `userData` is `{ type, label, pins: [{ name, obj }] }`. Motors are special-cased: `makeMotor(side)` builds a left/right variant, and the single `motor` tray card (count 2) fills both `motorL`/`motorR` slots. **1 unit = 1 cm.**
 - **`js/wiring.js`** — `WiringManager` (click-a-pin-then-click-target), plus the `REQUIRED` array that is the single source of truth for valid connections, wire colors, the checklist, and Upload gating. Endpoints are keyed `"compType.pin"` (e.g. `arduino.A4`). Wires are 3D bezier `TubeGeometry`. Adding/removing a connection requirement = editing `REQUIRED`.

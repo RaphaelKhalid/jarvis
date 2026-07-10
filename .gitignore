@@ -10,3 +10,5 @@ package-lock.json
 _diag.mjs
 sim.png
 assembly.png
+test-results/
+playwright-report/

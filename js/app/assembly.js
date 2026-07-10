@@ -405,10 +405,17 @@ export function initAssembly({ canvas, scene, camera, controls, slotMeshes, wiri
   }
   clearBtn.addEventListener('click', clearBoard);
 
+  // programmatic placement by tray type (used by save/load + curriculum setups)
+  function placeByType(type) {
+    const def = PART_DEFS.find(d => d.type === type);
+    if (def && remainingFor(type) > 0) placePart(def);
+  }
+
   return {
     group: assembly,
     placed,
     getPlacedCount: () => Object.keys(placed).length,
     clearBoard,
+    placeByType,
   };
 }

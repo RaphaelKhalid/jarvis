@@ -358,3 +358,19 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
   body { overflow-y: auto; }
   #workspace { height: 55vh; }
 }
+
+/* ── resume prompt (save/load) ─────────────────────────────── */
+#resume-bar {
+  position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
+  z-index: 150; display: flex; align-items: center; gap: 12px;
+  background: var(--panel, #151b26); color: var(--text, #dfe7f3);
+  border: 1px solid var(--border, #2a3446); border-radius: 10px;
+  padding: 10px 16px; font-size: 13px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.45);
+}
+#resume-bar button {
+  background: #1d2634; color: inherit; border: 1px solid var(--border, #2a3446);
+  border-radius: 7px; padding: 6px 12px; cursor: pointer; font-size: 12.5px;
+}
+#resume-bar button:hover { background: #26324a; }
+#resume-bar #resume-yes { background: #1f6feb; border-color: #1f6feb; color: #fff; }

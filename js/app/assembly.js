@@ -14,8 +14,9 @@ const tweezersSvg = (dx) => `<svg xmlns='http://www.w3.org/2000/svg' width='32' 
   `<path d='M16 6 L${10 + dx} 29 M16 6 L${22 - dx} 29' fill='none' stroke='#000' stroke-width='5' stroke-linecap='round' opacity='0.5'/>` +
   `<path d='M16 6 L${10 + dx} 29 M16 6 L${22 - dx} 29' fill='none' stroke='#eef3fb' stroke-width='2.3' stroke-linecap='round'/>` +
   `<circle cx='16' cy='5' r='2.5' fill='#eef3fb' stroke='#000' stroke-width='1'/></svg>`;
-export const TW_OPEN = `url("data:image/svg+xml,${encodeURIComponent(tweezersSvg(0))}") 16 28, crosshair`;
-export const TW_CLOSED = `url("data:image/svg+xml,${encodeURIComponent(tweezersSvg(5))}") 16 28, grabbing`;
+// hotspot on the circle at the top (16,5) — that's the point that clicks
+export const TW_OPEN = `url("data:image/svg+xml,${encodeURIComponent(tweezersSvg(0))}") 16 5, crosshair`;
+export const TW_CLOSED = `url("data:image/svg+xml,${encodeURIComponent(tweezersSvg(5))}") 16 5, grabbing`;
 
 function pinTooltipHtml(id) {
   const info = pinInfo(id);

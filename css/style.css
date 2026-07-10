@@ -1,24 +1,5 @@
-/* ── SelfBalance Lab — dark engineering theme ─────────────────── */
-:root {
-  --bg: #0a0d12;
-  --panel: #0f131b;
-  --panel-2: #151a24;
-  --panel-3: #1b212d;
-  --border: #232b3a;
-  --border-2: #2e3849;
-  --text: #d3dce9;
-  --text-dim: #737f92;
-  --accent: #56a8ff;
-  --accent-dim: #16324f;
-  --accent-glow: rgba(86,168,255,0.35);
-  --green: #46e08f;
-  --yellow: #ffd166;
-  --red: #ff6b6b;
-  --ui: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --mono: "JetBrains Mono", "Cascadia Code", "Fira Code", Consolas, monospace;
-  --r: 8px;
-  --shadow: 0 8px 30px rgba(0,0,0,0.45);
-}
+/* ── SelfBalance Lab / GYRO — component styles ──────────────────
+   All color/space/type primitives come from css/tokens.css. */
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { height: 100%; }
 body {
@@ -128,7 +109,7 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
 #workspace-hud {
   position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); z-index: 5;
   max-width: calc(100% - 120px);
-  background: rgba(11,14,19,0.75);
+  background: var(--overlay);
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 6px 14px;
@@ -198,7 +179,7 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
 #stepper {
   position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 6;
   display: flex; align-items: center; gap: 4px;
-  background: rgba(11,14,19,0.78); border: 1px solid var(--border);
+  background: var(--overlay); border: 1px solid var(--border);
   border-radius: 999px; padding: 5px 8px; backdrop-filter: blur(6px);
 }
 .step { display: flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; color: var(--text-dim); font-size: 11px; transition: all 0.25s; }
@@ -212,7 +193,7 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
 /* ── controls legend (bottom-right, assembly only) ── */
 #controls-legend {
   position: absolute; bottom: 52px; left: 12px; z-index: 6;
-  background: rgba(11,14,19,0.78); border: 1px solid var(--border);
+  background: var(--overlay); border: 1px solid var(--border);
   border-radius: 8px; padding: 8px 12px; backdrop-filter: blur(5px);
   font-size: 10.5px; color: var(--text-dim); line-height: 1.7; pointer-events: none;
 }
@@ -223,7 +204,7 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
 #help-btn {
   position: absolute; bottom: 14px; left: 14px; z-index: 6;
   width: 30px; height: 30px; border-radius: 50%;
-  background: rgba(11,14,19,0.8); border: 1px solid var(--border); color: var(--text-dim);
+  background: var(--overlay); border: 1px solid var(--border); color: var(--text-dim);
   font-size: 15px; cursor: pointer; backdrop-filter: blur(4px);
 }
 #help-btn:hover { border-color: var(--accent); color: var(--accent); }
@@ -231,7 +212,7 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
 #sound-btn {
   position: absolute; bottom: 14px; left: 50px; z-index: 6;
   width: 30px; height: 30px; border-radius: 50%;
-  background: rgba(11,14,19,0.8); border: 1px solid var(--border); color: var(--text-dim);
+  background: var(--overlay); border: 1px solid var(--border); color: var(--text-dim);
   display: flex; align-items: center; justify-content: center; cursor: pointer; backdrop-filter: blur(4px);
 }
 #sound-btn:hover { border-color: var(--accent); color: var(--accent); }
@@ -297,7 +278,7 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
 /* ── sim HUD overlay ── */
 #sim-hud {
   position: absolute; top: 10px; right: 12px; z-index: 8;
-  background: rgba(16,20,28,0.92);
+  background: var(--overlay-strong);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 12px;
@@ -307,9 +288,9 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
 .sim-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 #tilt-readout { font-size: 15px; color: var(--text); font-family: var(--mono); font-weight: 500; }
 #sim-state { font-size: 10px; font-weight: 600; letter-spacing: 0.1em; padding: 3px 9px; border-radius: 999px; }
-.sim-ok { color: var(--green); background: rgba(70,224,143,0.14); }
-.sim-warn { color: var(--yellow); background: rgba(255,209,102,0.14); }
-.sim-bad { color: var(--red); background: rgba(255,107,107,0.16); }
+.sim-ok { color: var(--green); background: var(--ok-bg); }
+.sim-warn { color: var(--yellow); background: var(--warn-bg); }
+.sim-bad { color: var(--red); background: var(--bad-bg); }
 #sparkline { width: 100%; height: 70px; background: #0b0e13; border: 1px solid var(--border); border-radius: 6px; display: block; }
 .sim-buttons { display: flex; gap: 6px; margin-top: 10px; }
 .sim-buttons button {
@@ -325,7 +306,7 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
 /* ── mission HUD (top-left in sim) ── */
 #mission-hud {
   position: absolute; bottom: 52px; left: 12px; z-index: 8; width: 250px;
-  background: rgba(16,20,28,0.92); border: 1px solid var(--border);
+  background: var(--overlay-strong); border: 1px solid var(--border);
   border-radius: 10px; padding: 12px; backdrop-filter: blur(6px);
 }
 .m-top { display: flex; justify-content: space-between; align-items: center; }
@@ -374,3 +355,34 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
 }
 #resume-bar button:hover { background: #26324a; }
 #resume-bar #resume-yes { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+
+/* ── guided tour (spotlight + coach card) ──────────────────── */
+#tut-ring {
+  position: fixed; z-index: 240; pointer-events: none;
+  border: 2px solid var(--accent); border-radius: 10px;
+  box-shadow: 0 0 0 6px var(--accent-glow), 0 0 24px var(--accent-glow);
+  transition: all 0.3s ease;
+}
+#tut-card {
+  position: fixed; z-index: 241; width: 300px;
+  background: var(--overlay-strong); border: 1px solid var(--border-2);
+  border-radius: var(--r-lg); padding: 14px 16px;
+  box-shadow: var(--shadow); backdrop-filter: blur(8px);
+  transition: left 0.3s ease, top 0.3s ease;
+}
+#tut-card .tut-progress { font-size: var(--fs-xs); color: var(--accent); letter-spacing: 0.12em; margin-bottom: 4px; }
+#tut-card .tut-title { font-weight: 600; font-size: var(--fs-md); color: var(--text); margin-bottom: 6px; }
+#tut-card .tut-text { font-size: var(--fs-sm); color: var(--text-dim); line-height: 1.55; }
+#tut-card .tut-text b, #tut-card .tut-text code { color: var(--text); }
+#tut-card .tut-btns { margin-top: 10px; display: flex; justify-content: flex-end; }
+#tut-card button {
+  background: transparent; border: 1px solid var(--border); color: var(--text-dim);
+  font-size: var(--fs-sm); border-radius: var(--r-sm); padding: 5px 10px; cursor: pointer;
+}
+#tut-card button:hover { border-color: var(--accent); color: var(--accent); }
+#overlay .tour {
+  width: 100%; margin-top: 8px; padding: 9px; background: transparent;
+  border: 1px solid var(--border-2); color: var(--accent);
+  font-family: var(--ui); font-size: 12px; border-radius: 8px; cursor: pointer;
+}
+#overlay .tour:hover { border-color: var(--accent); }

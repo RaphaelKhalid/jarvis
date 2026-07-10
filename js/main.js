@@ -12,6 +12,7 @@ import { initHud } from './app/hud.js';
 import { initAssembly, TW_OPEN } from './app/assembly.js';
 import { initInput } from './app/input.js';
 import { initSave } from './app/save.js';
+import { initTutorial } from './app/tutorial.js';
 
 const serial = new Serial(document.getElementById('serial-log'));
 
@@ -65,6 +66,18 @@ const saveApi = initSave({
   const origRefresh = hud.refreshChecklist;
   hud.refreshChecklist = (...a) => { origRefresh(...a); saveApi.persist(); };
 }
+
+// ── guided tour ─────────────────────────────────────────────────
+const tutorial = initTutorial({ assemblyApi, wiring });
+const autoTour = tutorial.shouldAutoStart();   // decide before overlay marks 'seen'
+document.getElementById('overlay-start').addEventListener('click', () => {
+  if (autoTour) tutorial.start();
+});
+document.getElementById('overlay-tour').addEventListener('click', () => {
+  document.getElementById('overlay').classList.add('hidden');
+  try { localStorage.setItem('sbl-seen', '1'); } catch {}
+  tutorial.start();
+});
 
 // ── upload / simulation ─────────────────────────────────────────
 const uploadBtn = document.getElementById('upload-btn');

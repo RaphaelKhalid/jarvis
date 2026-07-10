@@ -11,6 +11,7 @@ import { state, set } from './app/state.js';
 import { initHud } from './app/hud.js';
 import { initAssembly, TW_OPEN } from './app/assembly.js';
 import { initInput } from './app/input.js';
+import { initSave } from './app/save.js';
 
 const serial = new Serial(document.getElementById('serial-log'));
 
@@ -45,12 +46,25 @@ const input = initInput({ canvas, sim });
 sim.onTelemetry = ({ tiltDeg }) => hud.pushTilt(tiltDeg);
 
 // ── editor ──────────────────────────────────────────────────────
-initEditor(document.getElementById('editor-container'), (g) => {
+const cm = initEditor(document.getElementById('editor-container'), (g) => {
   set('gains', g);
   sim.setGains(g);
   const gr = document.getElementById('gains-readout');
   if (gr) gr.textContent = `Kp ${g.Kp}  Ki ${g.Ki}  Kd ${g.Kd}`;
+  saveApi?.persist();
 });
+
+// ── save/load (schema v1, localStorage) ─────────────────────────
+const saveApi = initSave({
+  assemblyApi, wiring,
+  getSketch: () => cm.getValue(),
+  setSketch: (s) => cm.setValue(s),
+});
+// any checklist refresh (placement, wiring, clear) marks the state dirty
+{
+  const origRefresh = hud.refreshChecklist;
+  hud.refreshChecklist = (...a) => { origRefresh(...a); saveApi.persist(); };
+}
 
 // ── upload / simulation ─────────────────────────────────────────
 const uploadBtn = document.getElementById('upload-btn');

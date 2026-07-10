@@ -148,12 +148,14 @@ export function initAssembly({ canvas, scene, camera, controls, slotMeshes, wiri
     group.rotation.y = freeSlot.ry;
     assembly.add(group);
 
-    // drop-in animation
+    // drop-in animation — wires connected mid-fall track the pins each frame
     group.position.y = 6;
     const t0 = performance.now();
     (function fall() {
       const k = Math.min(1, (performance.now() - t0) / 350);
       group.position.y = 6 - (6 - 0.3) * (1 - (1 - k) * (1 - k));
+      group.updateMatrixWorld(true);
+      wiring.refreshPositions();
       if (k < 1) requestAnimationFrame(fall);
     })();
 

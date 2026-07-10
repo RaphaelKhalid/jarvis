@@ -138,15 +138,37 @@ export class WiringManager {
     return { state: 'invalid', idA, idB, suggestion: want };
   }
 
-  buildWire(idA, idB, kind, valid) {
-    const pA = this.worldPosOf(idA);
-    const pB = this.worldPosOf(idB);
+  // bezier arc between two pin positions (shared by build + refresh)
+  _curveFor(pA, pB) {
     const mid = pA.clone().add(pB).multiplyScalar(0.5);
     const lift = Math.max(2.5, pA.distanceTo(pB) * 0.35);
     mid.y += lift;
     const c1 = pA.clone().lerp(mid, 0.5); c1.y += lift * 0.3;
     const c2 = pB.clone().lerp(mid, 0.5); c2.y += lift * 0.3;
-    const curve = new THREE.CubicBezierCurve3(pA, c1, c2, pB);
+    return new THREE.CubicBezierCurve3(pA, c1, c2, pB);
+  }
+
+  // Re-anchor every wire to its pins' CURRENT world positions. Needed because
+  // parts animate (drop-in) after placement — wires connected mid-animation
+  // would otherwise stay baked to the airborne pin positions.
+  refreshPositions() {
+    for (const w of this.wires) {
+      const pA = this.worldPosOf(w.idA);
+      const pB = this.worldPosOf(w.idB);
+      if (!pA || !pB) continue;
+      const curve = this._curveFor(pA, pB);
+      const geo = new THREE.TubeGeometry(curve, 32, 0.14, 8, false);
+      geo.userData = { curve };
+      w.mesh.geometry.dispose();
+      w.mesh.geometry = geo;
+      w.mesh.userData.curve = curve;
+    }
+  }
+
+  buildWire(idA, idB, kind, valid) {
+    const pA = this.worldPosOf(idA);
+    const pB = this.worldPosOf(idB);
+    const curve = this._curveFor(pA, pB);
     const geo = new THREE.TubeGeometry(curve, 32, 0.14, 8, false);
     geo.userData = { curve };
     const baseColor = valid ? KIND_COLOR[kind] : HOVER_BAD;

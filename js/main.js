@@ -12,6 +12,7 @@ import { initHud } from './app/hud.js';
 import { initAssembly, TW_OPEN } from './app/assembly.js';
 import { initInput } from './app/input.js';
 import { initSave } from './app/save.js';
+import { initTouch } from './app/touch.js';
 import { initTutorial } from './app/tutorial.js';
 import { initCurriculum } from './curriculum/engine.js';
 
@@ -44,6 +45,7 @@ const hud = initHud({
 });
 const assemblyApi = initAssembly({ canvas, scene, camera, controls, slotMeshes, wiring, hud });
 const input = initInput({ canvas, sim });
+initTouch({ sim });   // no-op on fine-pointer devices
 
 sim.onTelemetry = ({ tiltDeg }) => hud.pushTilt(tiltDeg);
 

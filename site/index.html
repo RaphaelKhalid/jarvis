@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GYRO — Build a robot that actually balances</title>
+<meta name="description" content="A virtual robotics lab. Drag real components onto a chassis, wire every pin, tune a PID controller, and drive a physics robot that balances on two wheels. No hardware required.">
+<style>
+  :root {
+    --bg: #0a0d12; --panel: #12161f; --border: #232b3a;
+    --text: #d3dce9; --dim: #737f92; --accent: #56a8ff; --green: #46e08f; --yellow: #ffd166;
+    --ui: "Inter", system-ui, sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: var(--ui); line-height: 1.6; }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 0 24px; }
+  header { padding: 18px 0; border-bottom: 1px solid var(--border); }
+  header .wrap { display: flex; justify-content: space-between; align-items: center; }
+  .logo { font-weight: 800; letter-spacing: 0.18em; font-size: 18px; color: var(--text); }
+  .logo span { color: var(--accent); }
+  nav a { color: var(--dim); text-decoration: none; margin-left: 22px; font-size: 14px; }
+  nav a:hover { color: var(--text); }
+  .hero { text-align: center; padding: 84px 0 56px; }
+  .hero h1 { font-size: clamp(30px, 5.5vw, 52px); line-height: 1.15; letter-spacing: -0.01em; }
+  .hero h1 em { color: var(--accent); font-style: normal; }
+  .hero p { color: var(--dim); font-size: 18px; max-width: 620px; margin: 18px auto 30px; }
+  .cta { display: inline-block; background: linear-gradient(180deg, #1d6feb, #1558c9); color: #fff;
+         padding: 14px 34px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 16px;
+         box-shadow: 0 10px 34px rgba(31,111,235,0.35); }
+  .cta:hover { filter: brightness(1.1); }
+  .cta-sub { display: block; color: var(--dim); font-size: 13px; margin-top: 12px; }
+  .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px; padding: 40px 0 70px; }
+  .step { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 22px; }
+  .step .n { color: var(--accent); font-weight: 700; font-size: 13px; letter-spacing: 0.1em; }
+  .step h3 { margin: 6px 0 6px; font-size: 17px; }
+  .step p { color: var(--dim); font-size: 14px; }
+  .band { border-top: 1px solid var(--border); padding: 64px 0; }
+  .band h2 { font-size: 28px; margin-bottom: 10px; }
+  .band > .wrap > p { color: var(--dim); max-width: 640px; }
+  .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; margin-top: 28px; }
+  .col { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 24px; }
+  .col h3 { font-size: 16px; margin-bottom: 8px; }
+  .col p, .col li { color: var(--dim); font-size: 14px; }
+  .col ul { padding-left: 18px; margin-top: 8px; }
+  .price { font-size: 30px; font-weight: 700; margin: 10px 0 2px; }
+  .price small { font-size: 13px; color: var(--dim); font-weight: 400; }
+  .tag-free { color: var(--green); } .tag-plus { color: var(--accent); } .tag-class { color: var(--yellow); }
+  footer { border-top: 1px solid var(--border); padding: 30px 0 50px; color: var(--dim); font-size: 13px; }
+  footer a { color: var(--dim); }
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <div class="logo">GY<span>RO</span></div>
+  <nav>
+    <a href="#how">How it works</a>
+    <a href="#educators">Educators</a>
+    <a href="#pricing">Pricing</a>
+    <a href="/app">Launch the lab</a>
+  </nav>
+</div></header>
+
+<section class="hero"><div class="wrap">
+  <h1>Build a robot that <em>actually balances.</em></h1>
+  <p>GYRO is a virtual robotics lab. Drag real components onto a chassis, wire every pin,
+     tune a PID controller in real Arduino code — then drive a physics robot that stands
+     on two wheels, wipes out, and gets back up. No hardware. No installs.</p>
+  <a class="cta" href="/app">Start building — it's free</a>
+  <span class="cta-sub">Runs in your browser · works on iPad · nothing to install</span>
+</div></section>
+
+<section id="how"><div class="wrap steps">
+  <div class="step"><div class="n">01 · ASSEMBLE</div><h3>Place real parts</h3>
+    <p>Arduino Uno, MPU6050 IMU, L298N driver, gear motors, LiPo — each explained in plain language.</p></div>
+  <div class="step"><div class="n">02 · WIRE</div><h3>Wire every pin</h3>
+    <p>SDA to A4, IN1 to D6 — the same wiring diagram you'd use on a physical build, with live feedback.</p></div>
+  <div class="step"><div class="n">03 · PROGRAM</div><h3>Tune the PID</h3>
+    <p>Edit Kp, Ki, Kd in a real Arduino sketch and watch each term's contribution plotted live.</p></div>
+  <div class="step"><div class="n">04 · DRIVE</div><h3>Feel the physics</h3>
+    <p>Hills, ice, launch ramps. The robot leans to accelerate — because that's how balancing robots move.</p></div>
+</div></section>
+
+<section class="band" id="educators"><div class="wrap">
+  <h2>Control theory students can feel</h2>
+  <p>Twenty guided lessons across four tracks — Circuits, Balance &amp; PID, Driving, and Engineering
+     capstones — each one checked automatically against the live simulation. Aligned to NGSS
+     engineering design standards (MS-ETS1, HS-ETS1).</p>
+  <div class="cols">
+    <div class="col"><h3>For teachers</h3>
+      <ul><li>Class join codes — no student emails, COPPA-safe by design</li>
+      <li>Progress dashboard: lessons × stars per student</li>
+      <li>Assign lessons; export CSV</li></ul></div>
+    <div class="col"><h3>For students</h3>
+      <ul><li>A guided tour that gets a 12-year-old to a driving robot in minutes</li>
+      <li>Hover anything — every pin and keyword explained</li>
+      <li>Stars, unlocks, and challenges that reward real understanding</li></ul></div>
+    <div class="col"><h3>Why it works</h3>
+      <ul><li>The robot <b>falls over</b> when control fails — failure you can see beats theory you can't</li>
+      <li>Same wiring + code as a physical kit: skills transfer</li>
+      <li>Zero setup: a browser tab is the whole lab</li></ul></div>
+  </div>
+</div></section>
+
+<section class="band" id="pricing"><div class="wrap">
+  <h2>Pricing</h2>
+  <div class="cols">
+    <div class="col"><h3 class="tag-free">Free</h3><div class="price">$0</div>
+      <ul><li>Full sandbox arena</li><li>Circuits track + first Balance lessons</li><li>No account needed</li></ul></div>
+    <div class="col"><h3 class="tag-plus">GYRO Plus</h3><div class="price">$39.99<small>/year</small></div>
+      <ul><li>All 4 lesson tracks</li><li>Cloud sync across devices</li><li>Cosmetic unlocks</li></ul></div>
+    <div class="col"><h3 class="tag-class">Classroom</h3><div class="price">$99<small>/class/year</small></div>
+      <ul><li>Up to 35 students</li><li>Teacher dashboard + assignments</li><li>Priority support, invoicing</li></ul></div>
+  </div>
+</div></section>
+
+<footer><div class="wrap">
+  © GYRO · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · Built for curious builders everywhere.
+</div></footer>
+</body>
+</html>

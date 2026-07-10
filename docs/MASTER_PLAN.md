@@ -14,6 +14,8 @@
 
 ## Phase 0 — Stabilize the baseline (1 session)
 
+**Status: DONE (2026-07-10) — committed, tagged v0-prototype-baseline.**
+
 **Depends on:** nothing. **Do this first, before anything else.**
 
 The working tree has uncommitted changes to `index.html`, `js/main.js`, `js/sim.js` (~136 lines, mostly sim). There's also stray `_diag.mjs`, and `node_modules`/`package.json` exist despite the zero-build claim in CLAUDE.md.
@@ -30,6 +32,8 @@ Tasks:
 ---
 
 ## Phase 1 — Codebase hardening & architecture for growth (2–4 sessions)
+
+**Status: DONE (2026-07-10) — 1B tests/lint/CI, 1A module split (main.js 836→~200 lines), 1C save/load. Tagged v1-foundation.**
 
 **Depends on:** Phase 0.
 
@@ -58,6 +62,8 @@ Task group 1C — save/load foundation:
 
 ## Phase 2 — Design system & visual/UX polish (3–5 sessions)
 
+**Status: CORE DONE (2026-07-10) — 2A tokens, 2C guided tour, 2E a11y quick wins, touch controls (6A pulled forward). Remaining: 2B web components, 2D HUD gauges, 2F iPad bottom-sheet layout, Lighthouse pass.**
+
 **Depends on:** Phase 1.
 
 Turn "impressive demo" into "product." Design framework choice: **stay vanilla + design tokens** (no React migration — the app is a canvas with a thin DOM shell; a framework buys little and risks the physics loop). Use:
@@ -79,6 +85,8 @@ Task groups:
 ---
 
 ## Phase 3 — Educational core: curriculum engine (4–6 sessions)
+
+**Status: DONE (2026-07-10) — engine + 20 lessons + PID visualizer + progress/gating. Tagged v3-curriculum. Remaining: multi-profile switcher, glossary encyclopedia.**
 
 **Depends on:** Phase 2. **This is what makes it a product rather than a toy.**
 
@@ -109,6 +117,8 @@ Task group 3D — progression & profiles (local-first):
 
 ## Phase 4 — Content depth & replayability (3–4 sessions)
 
+**Status: PARTIAL (2026-07-10) — touch controls shipped. Remaining: ghost replay, new parts (ultrasonic/line/LED), cosmetics, juice pass.**
+
 **Depends on:** Phase 3.
 
 - **4A Sandbox upgrade:** free-play mode with terrain presets, adjustable physics toys (payload mass, wheel friction zones — already have material zones), and a challenge-ghost (replay your best run as a translucent robot; record wheel/chassis transforms at 10 Hz).
@@ -121,6 +131,8 @@ Task group 3D — progression & profiles (local-first):
 ---
 
 ## Phase 5 — Backend: accounts, sync, and classroom (4–6 sessions)
+
+**Status: SCAFFOLDED (2026-07-10) — supabase/schema.sql (with RLS), js/app/cloud.js (needs keys), docs/COMPLIANCE.md. BLOCKED on user: create Supabase project.**
 
 **Depends on:** Phase 3 (schema), can run parallel with Phase 4.
 
@@ -137,6 +149,8 @@ Keep the app static; add a thin backend. **Recommendation: Supabase** (Postgres 
 
 ## Phase 6 — iOS app (4–6 sessions)
 
+**Status: SCAFFOLDED (2026-07-10) — touch controls live, docs/APPSTORE_CHECKLIST.md. BLOCKED on user: Apple Developer account + Mac with Xcode.**
+
 **Depends on:** Phases 2 (responsive), 5B (offline).
 
 **Framework decision: Capacitor.** The app is WebGL+WASM; a native rewrite (SwiftUI + RealityKit) would mean re-porting Rapier and the entire sim — months for no user-visible gain. Capacitor wraps the existing app in a WKWebView with native plugins, keeps one codebase, and WKWebView's WebGL2/WASM performance on modern iPads/iPhones is more than adequate for this scene complexity. (Fallback if perf disappoints on A12-era iPads: reduce bloom resolution and terrain trimesh density behind a device-tier check — build that toggle regardless as `quality: high|low`.)
@@ -152,6 +166,8 @@ Keep the app static; add a thin backend. **Recommendation: Supabase** (Postgres 
 ---
 
 ## Phase 7 — Productization & go-to-market (3–4 sessions + ongoing)
+
+**Status: SCAFFOLDED (2026-07-10) — site/index.html landing page, docs/GTM.md, docs/STANDARDS_MAP.md. BLOCKED on user: Stripe/RevenueCat, pricing sign-off, domain.**
 
 **Depends on:** Phases 5, 6 in flight.
 

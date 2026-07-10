@@ -1,0 +1,97 @@
+/* ── GYRO design tokens ─────────────────────────────────────────
+   Single source of truth for color, space, type, radius, motion.
+   Dark is the product default (matches the bloom aesthetic).
+   `data-theme="light"` on <html> reskins the DOM shell. */
+
+:root {
+  /* color — surfaces */
+  --bg: #0a0d12;
+  --panel: #0f131b;
+  --panel-2: #151a24;
+  --panel-3: #1b212d;
+  --overlay: rgba(11, 14, 19, 0.78);
+  --overlay-strong: rgba(16, 20, 28, 0.92);
+
+  /* color — lines & text */
+  --border: #232b3a;
+  --border-2: #2e3849;
+  --text: #d3dce9;
+  --text-dim: #737f92;
+
+  /* color — semantic */
+  --accent: #56a8ff;
+  --accent-dim: #16324f;
+  --accent-glow: rgba(86, 168, 255, 0.35);
+  --green: #46e08f;
+  --yellow: #ffd166;
+  --red: #ff6b6b;
+  --ok-bg: rgba(70, 224, 143, 0.14);
+  --warn-bg: rgba(255, 209, 102, 0.14);
+  --bad-bg: rgba(255, 107, 107, 0.16);
+
+  /* type */
+  --ui: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", "Cascadia Code", "Fira Code", Consolas, monospace;
+  --fs-xs: 10px;
+  --fs-sm: 11.5px;
+  --fs-md: 13px;
+  --fs-lg: 15px;
+  --fs-xl: 19px;
+
+  /* space (4px grid) */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+
+  /* radius + elevation */
+  --r-sm: 6px;
+  --r: 8px;
+  --r-lg: 12px;
+  --r-pill: 999px;
+  --shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 24px 70px rgba(0, 0, 0, 0.6);
+
+  /* motion */
+  --t-fast: 0.15s;
+  --t-med: 0.25s;
+
+  color-scheme: dark;
+}
+
+/* light shell (the 3D canvas keeps its own scene lighting) */
+:root[data-theme="light"] {
+  --bg: #eef1f6;
+  --panel: #ffffff;
+  --panel-2: #f4f6fa;
+  --panel-3: #e9edf4;
+  --overlay: rgba(244, 246, 250, 0.85);
+  --overlay-strong: rgba(255, 255, 255, 0.94);
+  --border: #d5dbe6;
+  --border-2: #c2cad9;
+  --text: #1c2430;
+  --text-dim: #5c6878;
+  --accent: #1f6feb;
+  --accent-dim: #dbe9ff;
+  --accent-glow: rgba(31, 111, 235, 0.25);
+  --green: #14803c;
+  --yellow: #9a6700;
+  --red: #cf222e;
+  --ok-bg: rgba(20, 128, 60, 0.12);
+  --warn-bg: rgba(154, 103, 0, 0.12);
+  --bad-bg: rgba(207, 34, 46, 0.12);
+  --shadow: 0 8px 30px rgba(30, 40, 60, 0.15);
+  --shadow-lg: 0 24px 70px rgba(30, 40, 60, 0.2);
+  color-scheme: light;
+}
+
+/* motion sensitivity: kill spinners/transitions for users who ask */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

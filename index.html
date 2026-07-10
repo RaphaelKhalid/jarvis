@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
 <!-- Lucide icons (state-of-the-art SVG icon set) -->
 <script src="https://unpkg.com/lucide@0.462.0" defer></script>
+<link rel="stylesheet" href="css/tokens.css">
 <link rel="stylesheet" href="css/style.css">
 <!-- CodeMirror (Arduino code editor) -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
@@ -60,10 +61,10 @@
       <div class="step" data-step="run"><span class="num">4</span>Run</div>
     </div>
     <div id="workspace-hud">
-      <span id="hud-status">Drag parts from the tray onto the chassis</span>
+      <span id="hud-status" role="status" aria-live="polite">Drag parts from the tray onto the chassis</span>
     </div>
-    <button id="help-btn" title="How it works">?</button>
-    <button id="sound-btn" title="Toggle sound"><i data-lucide="volume-2"></i></button>
+    <button id="help-btn" title="How it works" aria-label="How it works">?</button>
+    <button id="sound-btn" title="Toggle sound" aria-label="Toggle sound"><i data-lucide="volume-2"></i></button>
     <div id="controls-legend">
       <div class="lg-title">CONTROLS</div>
       <div><b>Click</b> a pin then its target, or <b>drag</b> pin → pin</div>
@@ -101,6 +102,7 @@
       <li><span class="n">4</span><div><b>Run</b><p>Hit <b>Upload</b> and drive with <b>W A S D</b>. <b>Space</b> jumps (and gets you back up if you wipe out); hit the ramps, and mind the ice. Arrows or drag to look around.</p></div></li>
     </ol>
     <button class="start" id="overlay-start">Start building</button>
+    <button class="tour" id="overlay-tour">Show me around (guided tour)</button>
   </div>
 </div>
 

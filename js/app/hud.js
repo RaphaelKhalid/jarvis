@@ -129,9 +129,9 @@ export function initHud({ wiring, sim, getPlacedCount, getGains, onExitSim }) {
     <div class="m-bar"><div class="m-fill"></div></div>
     <div class="m-status"></div>
     <div class="m-btns">
-      <button id="m-prev" title="Previous mission"><i data-lucide="chevron-left"></i></button>
+      <button id="m-prev" title="Previous mission" aria-label="Previous mission"><i data-lucide="chevron-left"></i></button>
       <button id="m-start">Start</button>
-      <button id="m-next" title="Next mission"><i data-lucide="chevron-right"></i></button>
+      <button id="m-next" title="Next mission" aria-label="Next mission"><i data-lucide="chevron-right"></i></button>
     </div>`;
   document.getElementById('workspace').appendChild(missionHud);
   const mTitle = missionHud.querySelector('.m-title');

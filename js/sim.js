@@ -50,6 +50,11 @@ const MAX_YAW_RATE = 7;       // rad/s cap on yaw
 const LEAN_ACCEL_STYLE = 0.02;// rad of stylistic pitch lean per (units/s²) of accel
 const MAX_DRIVE_LEAN = 0.22;  // cap on the stylistic lean
 const LEAN_SLEW = 1.4;        // rad/s max change of the lean setpoint
+// jumping / airborne / falling
+const AIR_G = 55;             // gravity for the ballistic jump arc (tuned, not real g)
+const JUMP_V = 30;            // upward velocity of a Space jump
+const RAMP_LAUNCH_VY = 14;    // terrain rising faster than this (u/s) flings the bot up
+const LAND_TUMBLE_VY = 36;    // landing faster than this tips it over
 
 // Terrain height field — big rolling hills, flat spawn pad, flat at the walls.
 function terrainHeight(x, z) {
@@ -61,7 +66,27 @@ function terrainHeight(x, z) {
     2.6 * Math.sin(x * 0.013 + z * 0.019) +
     1.8 * Math.cos(z * 0.038 - x * 0.011) +
     1.1 * Math.sin(x * 0.06) * Math.sin(z * 0.055);
-  return h * flat * edge;
+  return h * flat * edge + rampHeight(x, z);
+}
+
+// Launch ramps — wedges baked into the terrain (and its collider). Driving up
+// one fast flings the bot into the air; a bad landing tumbles it.
+const RAMPS = [
+  { x: 0, z: 52, dir: 0, len: 22, w: 11, h: 11 },      // straight ahead of spawn
+  { x: 62, z: -34, dir: -1.0, len: 20, w: 10, h: 10 },
+  { x: -58, z: 46, dir: 2.3, len: 20, w: 10, h: 9 },
+];
+function rampHeight(x, z) {
+  let add = 0;
+  for (const r of RAMPS) {
+    const dx = x - r.x, dz = z - r.z;
+    const c = Math.cos(-r.dir), s = Math.sin(-r.dir);
+    const lx = dx * c - dz * s, lz = dx * s + dz * c;   // ramp-local across / along
+    if (Math.abs(lx) < r.w && lz > 0 && lz < r.len) {
+      add += r.h * (lz / r.len) * (1 - Math.abs(lx) / r.w);   // rises to a lip, tapered
+    }
+  }
+  return add;
 }
 
 // ── ground-material sandbox: circular zones with different physics + look ──
@@ -263,6 +288,7 @@ export class BalanceSim {
     this.prevError = 0;
     this.fallen = false;
     this.vel = 0; this._prevVel = 0; this._lean = 0; this._wobble = 0;
+    this._airborne = false; this._airVy = 0; this._airY = 0; this._prevGroundY = undefined;
     this.input = { fwd: 0, turn: 0, brake: false };
     this.syncMeshes();
   }
@@ -334,23 +360,31 @@ export class BalanceSim {
   fixedStep() {
     const theta = this.currentTilt();
     this.tiltDeg = theta * 180 / Math.PI;
-    if (Math.abs(this.tiltDeg) > 55) this.fallen = true;
 
     const { Kp, Ki, Kd } = this.gains;
     const chassis = this.bodies.chassis;
     const throttle = THREE.MathUtils.clamp(this.input.fwd, -1, 1);
     const steer = THREE.MathUtils.clamp(this.input.turn, -1, 1);
+    const R = ARENA_HALF - 5;
 
-    // ── arcade drive: control the chassis velocity + heading directly ──
-    // A wheel-torque inverted pendulum is non-minimum-phase (it drifts and is
-    // twitchy to drive), so translation is kinematic for crisp racing feel while
-    // the PID below keeps the *pitch* upright — the robot still balances & wobbles.
-    // ground material under the bot modulates speed / accel / brake / grip
     const cpos = chassis.translation();
     const matName = terrainZone(cpos.x, cpos.z);
     const mat = MATERIALS[matName];
     this.material = matName;
 
+    // ── FALLEN: real physics tumble, waiting for a Space self-right ──
+    if (this.fallen) {
+      this.vel = 0; this.speed = 0; this.driveSpeed = 0;
+      const lv = chassis.linvel();
+      chassis.setLinvel({ x: lv.x * 0.9, y: lv.y, z: lv.z * 0.9 }, true);   // slide to rest
+      this.pidTerms = { p: 0, i: 0, d: 0, out: 0, pwm: 0 };
+      this.debug = { state: 'FALLEN', tilt: +this.tiltDeg.toFixed(1) };
+      this.world.step();
+      if (this.onTelemetry) this.onTelemetry({ tiltDeg: this.tiltDeg, fallen: true });
+      return;
+    }
+
+    // ── speed integrator (ground material modulates it) ──
     const targetSpeed = throttle * MAX_SPEED * mat.speed;
     const rate = (Math.abs(targetSpeed) >= Math.abs(this.vel) ? ACCEL * mat.accel : BRAKE * mat.brake);
     this.vel += THREE.MathUtils.clamp(targetSpeed - this.vel, -rate * FIXED_DT, rate * FIXED_DT);
@@ -359,58 +393,116 @@ export class BalanceSim {
     this.speed = this.vel;
     this.driveSpeed = Math.abs(this.vel);
 
-    if (Math.abs(steer) > 0.01 && !this.fallen) {
+    // steering (grounded only — you keep your heading mid-air)
+    if (Math.abs(steer) > 0.01 && !this._airborne) {
       const frac = TURN_ASSIST + (1 - TURN_ASSIST) * Math.min(1, Math.abs(this.vel) / 10);
       this.heading -= steer * TURN_RATE * mat.turn * frac * FIXED_DT;
     }
     const headDir = new THREE.Vector3(Math.sin(this.heading), 0, Math.cos(this.heading));
     const rightDir = new THREE.Vector3(Math.cos(this.heading), 0, -Math.sin(this.heading));
 
-    // ── stylistic lean: slew-limited pitch into acceleration, plus a decaying
-    //     nudge wobble applied directly on top (so a shove reads immediately) ──
+    // stylistic lean + decaying nudge wobble
     const targetLean = THREE.MathUtils.clamp(LEAN_ACCEL_STYLE * accel, -MAX_DRIVE_LEAN, MAX_DRIVE_LEAN);
     const prevLean = this._lean || 0;
     this._lean = prevLean + THREE.MathUtils.clamp(targetLean - prevLean, -LEAN_SLEW * FIXED_DT, LEAN_SLEW * FIXED_DT);
     const desiredLean = this._lean + (this._wobble || 0);
     this._wobble = (this._wobble || 0) * 0.94;
 
-    if (!this.fallen) {
-      // Kinematic pose: pin the bot to the terrain surface (no launch off walls),
-      // clamp it inside the arena, and set the upright orientation directly.
-      const t = chassis.translation();
-      const R = ARENA_HALF - 5;
-      const nx = THREE.MathUtils.clamp(t.x + headDir.x * this.vel * FIXED_DT, -R, R);
-      const nz = THREE.MathUtils.clamp(t.z + headDir.z * this.vel * FIXED_DT, -R, R);
-      const ny = terrainHeight(nx, nz) + this.restY;
-      chassis.setTranslation({ x: nx, y: ny, z: nz }, true);
-      chassis.setLinvel({ x: headDir.x * this.vel, y: 0, z: headDir.z * this.vel }, true);
-      const qYaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.heading);
-      const qPitch = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), desiredLean);
-      const q = qYaw.multiply(qPitch);
-      chassis.setRotation({ x: q.x, y: q.y, z: q.z, w: q.w }, true);
-      chassis.setAngvel({ x: 0, y: 0, z: 0 }, true);
-      // carry + spin the wheels so they roll with the ground
-      const spin = this.vel / this.wheelR;
-      for (const w of this.bodies.wheels) {
-        w.body.setLinvel({ x: headDir.x * this.vel, y: 0, z: headDir.z * this.vel }, true);
-        w.body.setAngvel({ x: rightDir.x * spin, y: 0, z: rightDir.z * spin }, true);
+    const nx = THREE.MathUtils.clamp(cpos.x + headDir.x * this.vel * FIXED_DT, -R, R);
+    const nz = THREE.MathUtils.clamp(cpos.z + headDir.z * this.vel * FIXED_DT, -R, R);
+    const groundY = terrainHeight(nx, nz) + this.restY;
+
+    if (this._airborne) {
+      this._airVy -= AIR_G * FIXED_DT;
+      this._airY += this._airVy * FIXED_DT;
+      if (this._airY <= groundY) {                 // touchdown
+        this._airborne = false;
+        const hard = this._airVy < -LAND_TUMBLE_VY;
+        const sketchy = (matName === 'ice' && this.driveSpeed > 18) || (Math.abs(steer) > 0.7 && this.driveSpeed > 24);
+        if (hard || sketchy) this._startTumble(headDir);
+        else this._pose(chassis, nx, groundY, nz, headDir, rightDir, desiredLean, 0);
+      } else {
+        this._pose(chassis, nx, this._airY, nz, headDir, rightDir, desiredLean - 0.14, this._airVy);  // slight nose-up tuck
+      }
+    } else {
+      // grounded: ramp-crest launch + slippery-ice wipeout
+      const vyTerrain = (groundY - (this._prevGroundY ?? groundY)) / FIXED_DT;   // current climb rate
+      const aheadY = terrainHeight(nx + headDir.x * 5, nz + headDir.z * 5) + this.restY;
+      const dropAhead = groundY - aheadY;   // terrain falls away just ahead (a lip)
+      if (this.driveSpeed > 12 && vyTerrain > 6 && dropAhead > 2.5) {
+        // launch off the ramp lip with the upward momentum we'd built climbing it
+        this._airborne = true;
+        this._airVy = vyTerrain + this.driveSpeed * 0.3;
+        this._airY = groundY;
+        this._pose(chassis, nx, groundY, nz, headDir, rightDir, desiredLean - 0.1, this._airVy);
+      } else if (matName === 'ice' && this.driveSpeed > 24 && Math.abs(steer) > 0.8 && Math.random() < 0.05) {
+        this._startTumble(rightDir.clone().multiplyScalar(Math.sign(steer)));   // spin out
+      } else {
+        this._pose(chassis, nx, groundY, nz, headDir, rightDir, desiredLean, 0);
       }
     }
+    this._prevGroundY = groundY;
 
-    // PID terms are computed for the serial monitor's live telemetry (the pitch
-    // itself is set kinematically above). Setpoint is upright (0).
+    // PID terms for the serial telemetry (pitch is set kinematically above)
     const error = theta;
     this.integral = THREE.MathUtils.clamp(this.integral + error * FIXED_DT, -1.5, 1.5);
     const deriv = (error - this.prevError) / FIXED_DT;
     this.prevError = error;
     const pTerm = Kp * error, iTerm = Ki * 0.02 * this.integral, dTerm = Kd * deriv;
-    const output = pTerm + iTerm + dTerm;
-    this.pidTerms = { p: pTerm, i: iTerm, d: dTerm, out: output, pwm: Math.round(THREE.MathUtils.clamp(Math.abs(this.vel) / MAX_SPEED * 255, 0, 255)) };
-    this.debug = { vel: +this.vel.toFixed(1), lean: +desiredLean.toFixed(3), tilt: +this.tiltDeg.toFixed(1) };
+    this.pidTerms = { p: pTerm, i: iTerm, d: dTerm, out: pTerm + iTerm + dTerm, pwm: Math.round(THREE.MathUtils.clamp(Math.abs(this.vel) / MAX_SPEED * 255, 0, 255)) };
+    this.debug = { vel: +this.vel.toFixed(1), air: this._airborne, tilt: +this.tiltDeg.toFixed(1) };
 
     this.world.step();
     if (this.onTelemetry) this.onTelemetry({ tiltDeg: this.tiltDeg, fallen: this.fallen });
   }
+
+  // set the kinematic pose (position, upright+lean orientation, wheel spin)
+  _pose(chassis, x, y, z, headDir, rightDir, lean, vy) {
+    chassis.setTranslation({ x, y, z }, true);
+    chassis.setLinvel({ x: headDir.x * this.vel, y: vy, z: headDir.z * this.vel }, true);
+    const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.heading)
+      .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), lean));
+    chassis.setRotation({ x: q.x, y: q.y, z: q.z, w: q.w }, true);
+    chassis.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    const spin = this.vel / this.wheelR;
+    for (const w of this.bodies.wheels) {
+      w.body.setLinvel({ x: headDir.x * this.vel, y: vy, z: headDir.z * this.vel }, true);
+      w.body.setAngvel({ x: rightDir.x * spin, y: 0, z: rightDir.z * spin }, true);
+    }
+  }
+
+  _startTumble(dir) {
+    this.fallen = true;
+    this._airborne = false;
+    const c = this.bodies.chassis.translation();
+    const f = new THREE.Vector3(dir.x, 0, dir.z).normalize().multiplyScalar(70);
+    this.bodies.chassis.applyImpulseAtPoint({ x: f.x, y: 6, z: f.z }, { x: c.x, y: c.y + 5, z: c.z }, true);
+    this.bodies.chassis.applyTorqueImpulse(
+      { x: (Math.random() - 0.5) * 50, y: (Math.random() - 0.5) * 25, z: (Math.random() - 0.5) * 50 }, true);
+  }
+
+  jump() {
+    if (this.fallen || this._airborne || !this.bodies.chassis) return;
+    this._airborne = true;
+    this._airY = this.bodies.chassis.translation().y;
+    this._airVy = JUMP_V;
+  }
+
+  recover() {
+    if (!this.fallen || !this.bodies.chassis) return;
+    this.fallen = false; this._airborne = false; this.vel = 0; this._airVy = 0;
+    const c = this.bodies.chassis.translation();
+    const y = terrainHeight(c.x, c.z) + this.restY;
+    const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.heading);
+    this.bodies.chassis.setTranslation({ x: c.x, y, z: c.z }, true);
+    this.bodies.chassis.setRotation({ x: q.x, y: q.y, z: q.z, w: q.w }, true);
+    this.bodies.chassis.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    this.bodies.chassis.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    this._wobble = 0.25;   // little pop as it springs upright
+    this.prevError = 0; this.integral = 0;
+  }
+
+  jumpOrRecover() { this.fallen ? this.recover() : this.jump(); }
 
   syncMeshes() {
     const c = this.bodies.chassis;

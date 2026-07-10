@@ -553,7 +553,8 @@ let camYaw = 0, camElev = 0.36, camZoom = 1, camDragging = false;
 window.addEventListener('keydown', (e) => {
   const k = e.key.toLowerCase();
   if (mode !== 'sim') return;
-  if (DRIVE_KEYS[k]) { keys.add(k); updateDriveInput(); e.preventDefault(); }
+  if (k === ' ' || k === 'spacebar') { if (!booting) { sim.jumpOrRecover(); audio.nudge(); } e.preventDefault(); }
+  else if (DRIVE_KEYS[k]) { keys.add(k); updateDriveInput(); e.preventDefault(); }
   else if (CAM_KEYS[k]) { camKeys.add(k); e.preventDefault(); }
 });
 window.addEventListener('keyup', (e) => {
@@ -809,11 +810,14 @@ function animate() {
     const st = simState();
     if (st) {
       const m = sim.material;
-      if (m && m !== 'normal') { st.textContent = m.toUpperCase(); st.className = 'sim-warn'; }
-      else if (sim.fallen) { st.textContent = 'FALLEN'; st.className = 'sim-bad'; }
+      if (sim.fallen) { st.textContent = 'FALLEN'; st.className = 'sim-bad'; }
+      else if (sim._airborne) { st.textContent = 'AIRBORNE'; st.className = 'sim-warn'; }
+      else if (m && m !== 'normal') { st.textContent = m.toUpperCase(); st.className = 'sim-warn'; }
       else { st.textContent = 'DRIVING'; st.className = 'sim-ok'; }
     }
-    if (simDrive) simDrive.textContent = 'W/S drive · A/D steer · drag / ↑↓←→ to look';
+    if (simDrive) simDrive.textContent = sim.fallen
+      ? 'SPACE to get back up'
+      : 'W/S/A/D · SPACE jump · drag / arrows look';
     drawSpark();
     if (!booting) serial.telemetry(sim, now);
     audio.setMotor(sim.speed || 0);

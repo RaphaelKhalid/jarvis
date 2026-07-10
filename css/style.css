@@ -386,3 +386,73 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
   font-family: var(--ui); font-size: 12px; border-radius: 8px; cursor: pointer;
 }
 #overlay .tour:hover { border-color: var(--accent); }
+
+/* ── learn button ──────────────────────────────────────────── */
+#learn-btn {
+  position: absolute; bottom: 14px; left: 86px; z-index: 6;
+  width: 30px; height: 30px; border-radius: 50%;
+  background: var(--overlay); border: 1px solid var(--border); color: var(--text-dim);
+  display: flex; align-items: center; justify-content: center; cursor: pointer; backdrop-filter: blur(4px);
+}
+#learn-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── learn overlay (track/lesson browser) ─────────────────── */
+#learn-overlay {
+  position: fixed; inset: 0; z-index: 280;
+  background: var(--overlay); backdrop-filter: blur(6px);
+  display: flex; align-items: center; justify-content: center;
+}
+.learn-card {
+  background: var(--panel); border: 1px solid var(--border-2); border-radius: var(--r-lg);
+  width: min(680px, calc(100vw - 40px)); max-height: 84vh; overflow-y: auto;
+  padding: var(--sp-5) var(--sp-6); box-shadow: var(--shadow-lg);
+}
+.learn-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--sp-3); }
+.learn-head h2 { font-size: var(--fs-xl); color: var(--text); }
+.learn-head button { background: none; border: none; color: var(--text-dim); font-size: 16px; cursor: pointer; }
+.learn-track { margin-bottom: var(--sp-4); }
+.lt-name { font-weight: 600; color: var(--accent); font-size: var(--fs-md); }
+.lt-blurb { color: var(--text-dim); font-size: var(--fs-sm); margin: 2px 0 8px; }
+.lt-lessons { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: var(--sp-2); }
+.lt-lesson {
+  display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--r);
+  padding: 9px 12px; color: var(--text); font-family: var(--ui); font-size: var(--fs-sm);
+  cursor: pointer; text-align: left; transition: border-color var(--t-fast);
+}
+.lt-lesson:hover:not(.locked) { border-color: var(--accent); }
+.lt-lesson.locked { opacity: 0.45; cursor: default; }
+.ltl-stars { color: var(--yellow); font-size: var(--fs-xs); flex-shrink: 0; }
+
+/* ── active lesson card ────────────────────────────────────── */
+#lesson-hud {
+  position: absolute; top: 56px; left: 12px; z-index: 9; width: 270px;
+  background: var(--overlay-strong); border: 1px solid var(--border-2);
+  border-radius: var(--r-lg); padding: 14px; backdrop-filter: blur(8px);
+  box-shadow: var(--shadow);
+}
+#lesson-hud .l-top { display: flex; justify-content: space-between; align-items: center; }
+#lesson-hud .l-track { font-size: var(--fs-xs); letter-spacing: 0.12em; color: var(--accent); font-weight: 700; }
+#lesson-hud .l-quit { background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 13px; }
+#lesson-hud .l-quit:hover { color: var(--red); }
+#lesson-hud .l-title { font-weight: 600; font-size: var(--fs-lg); color: var(--text); margin: 4px 0 6px; }
+#lesson-hud .l-brief { color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.5; margin-bottom: 10px; }
+#lesson-hud .l-obj { display: flex; gap: 7px; font-size: var(--fs-sm); color: var(--text-dim); padding: 2px 0; }
+#lesson-hud .l-obj.done { color: var(--green); }
+#lesson-hud .l-obj.current { color: var(--text); font-weight: 500; }
+#lesson-hud .l-bar { height: 5px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-pill); overflow: hidden; margin-top: 10px; }
+#lesson-hud .l-fill { height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--green)); transition: width 0.2s; }
+#lesson-hud .l-stars { font-size: 22px; color: var(--yellow); margin: 6px 0; letter-spacing: 4px; }
+#lesson-hud .l-btns { display: flex; gap: 8px; margin-top: 10px; }
+#lesson-hud .l-btns button {
+  flex: 1; padding: 8px; background: var(--panel-3); border: 1px solid var(--border);
+  color: var(--text); border-radius: var(--r); cursor: pointer; font-family: var(--ui); font-size: var(--fs-sm);
+}
+#lesson-hud .l-btns button:hover { border-color: var(--accent); color: var(--accent); }
+
+/* sparkline legend (PID visualizer) */
+.spark-legend { display: flex; gap: 10px; margin-top: 4px; font-size: 9.5px; letter-spacing: 0.05em; }
+.spark-legend .lg-tilt { color: #3ddc84; }
+.spark-legend .lg-p { color: #56a8ff; }
+.spark-legend .lg-i { color: #ffd166; }
+.spark-legend .lg-d { color: #d686ff; }

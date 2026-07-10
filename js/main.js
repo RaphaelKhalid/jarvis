@@ -13,6 +13,7 @@ import { initAssembly, TW_OPEN } from './app/assembly.js';
 import { initInput } from './app/input.js';
 import { initSave } from './app/save.js';
 import { initTutorial } from './app/tutorial.js';
+import { initCurriculum } from './curriculum/engine.js';
 
 const serial = new Serial(document.getElementById('serial-log'));
 
@@ -66,6 +67,18 @@ const saveApi = initSave({
   const origRefresh = hud.refreshChecklist;
   hud.refreshChecklist = (...a) => { origRefresh(...a); saveApi.persist(); };
 }
+
+// ── curriculum (Learn mode) ─────────────────────────────────────
+function setSketchGains({ Kp, Ki, Kd }) {
+  let v = cm.getValue();
+  if (Kp != null) v = v.replace(/\bKp\s*=\s*-?\d+(?:\.\d+)?/, `Kp = ${Kp}`);
+  if (Ki != null) v = v.replace(/\bKi\s*=\s*-?\d+(?:\.\d+)?/, `Ki = ${Ki}`);
+  if (Kd != null) v = v.replace(/\bKd\s*=\s*-?\d+(?:\.\d+)?/, `Kd = ${Kd}`);
+  cm.setValue(v);
+}
+const curriculum = initCurriculum({ sim, wiring, assemblyApi, hud, setSketchGains });
+document.getElementById('learn-btn').addEventListener('click', () => curriculum.openOverlay());
+window.__lab = { assemblyApi, wiring, curriculum, hud };   // debug/testing hook
 
 // ── guided tour ─────────────────────────────────────────────────
 const tutorial = initTutorial({ assemblyApi, wiring });
@@ -210,6 +223,7 @@ function animate() {
     hud.missionTick(dt);
   }
 
+  curriculum.tick(dt);
   composer.render();
 }
 animate();

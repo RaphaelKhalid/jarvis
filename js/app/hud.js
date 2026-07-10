@@ -105,6 +105,9 @@ export function initHud({ wiring, sim, getPlacedCount, getGains, onExitSim }) {
       <span id="sim-state" class="sim-ok">BALANCING</span>
     </div>
     <canvas id="sparkline" width="300" height="70"></canvas>
+    <div class="spark-legend">
+      <span class="lg-tilt">— tilt</span><span class="lg-p">— P</span><span class="lg-i">— I</span><span class="lg-d">— D</span>
+    </div>
     <div class="sim-buttons">
       <button id="nudge-btn"><i data-lucide="zap"></i><span>Nudge</span></button>
       <button id="reset-btn"><i data-lucide="rotate-ccw"></i><span>Reset</span></button>
@@ -205,12 +208,23 @@ export function initHud({ wiring, sim, getPlacedCount, getGains, onExitSim }) {
   const simDrive = simHud.querySelector('.sim-drive');
 
   // ── sparkline ─────────────────────────────────────────────────
+  // samples: { t: tiltDeg, p, i, d } — PID terms normalized to the ±255 PWM range
   const graphData = [];
   const spark = document.getElementById('sparkline');
   function clearGraph() { graphData.length = 0; }
   function pushTilt(tiltDeg) {
-    graphData.push(tiltDeg);
+    const terms = sim.pidTerms || {};
+    graphData.push({ t: tiltDeg, p: terms.p || 0, i: terms.i || 0, d: terms.d || 0 });
     if (graphData.length > 300) graphData.shift();
+  }
+  function tracePath(ctx, w, h, get, scale) {
+    ctx.beginPath();
+    graphData.forEach((s, idx) => {
+      const x = (idx / (graphData.length - 1 || 1)) * w;
+      const y = h / 2 - THREE.MathUtils.clamp(get(s), -1, 1) * scale;
+      idx ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+    });
+    ctx.stroke();
   }
   function drawSpark() {
     const ctx = spark.getContext('2d');
@@ -219,16 +233,17 @@ export function initHud({ wiring, sim, getPlacedCount, getGains, onExitSim }) {
     // zero line
     ctx.strokeStyle = '#2a3446'; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2); ctx.stroke();
-    // band ±10°
-    const scale = (h / 2) / 45;
-    ctx.strokeStyle = '#3ddc84'; ctx.lineWidth = 2; ctx.beginPath();
-    graphData.forEach((v, i) => {
-      const x = (i / (graphData.length - 1 || 1)) * w;
-      const y = h / 2 - THREE.MathUtils.clamp(v, -45, 45) * scale;
-      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
-    });
-    ctx.strokeStyle = graphData.length && Math.abs(graphData[graphData.length - 1]) > 25 ? '#ff5d5d' : '#3ddc84';
-    ctx.stroke();
+    const half = h / 2 - 2;
+    // PID term contributions (thin, normalized to ±255 output range)
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(86,168,255,0.75)';  tracePath(ctx, w, h, s => s.p / 255, half);   // P — blue
+    ctx.strokeStyle = 'rgba(255,209,102,0.75)'; tracePath(ctx, w, h, s => s.i / 255, half);   // I — yellow
+    ctx.strokeStyle = 'rgba(214,134,255,0.75)'; tracePath(ctx, w, h, s => s.d / 255, half);   // D — purple
+    // tilt (bold, ±45°)
+    const last = graphData[graphData.length - 1];
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = last && Math.abs(last.t) > 25 ? '#ff5d5d' : '#3ddc84';
+    tracePath(ctx, w, h, s => s.t / 45, half);
   }
 
   // per-frame sim readouts (speed, state chip, drive hint)

@@ -456,3 +456,27 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
 .spark-legend .lg-p { color: #56a8ff; }
 .spark-legend .lg-i { color: #ffd166; }
 .spark-legend .lg-d { color: #d686ff; }
+
+/* ── touch driving controls (coarse pointers, sim mode) ────── */
+#touch-controls { position: absolute; inset: 0; z-index: 7; pointer-events: none; }
+#tc-stick {
+  position: absolute; bottom: max(24px, env(safe-area-inset-bottom)); left: 24px;
+  width: 128px; height: 128px; border-radius: 50%;
+  background: var(--overlay); border: 1px solid var(--border-2);
+  pointer-events: auto; touch-action: none; backdrop-filter: blur(4px);
+}
+#tc-knob {
+  position: absolute; left: 50%; top: 50%; margin: -26px 0 0 -26px;
+  width: 52px; height: 52px; border-radius: 50%;
+  background: var(--accent-dim); border: 2px solid var(--accent);
+  box-shadow: 0 0 14px var(--accent-glow);
+  transition: transform 0.05s linear;
+}
+#tc-jump {
+  position: absolute; bottom: max(44px, env(safe-area-inset-bottom)); right: 24px;
+  width: 84px; height: 84px; border-radius: 50%;
+  background: var(--overlay-strong); border: 2px solid var(--green); color: var(--green);
+  font-family: var(--ui); font-weight: 700; font-size: 13px; letter-spacing: 0.08em;
+  pointer-events: auto; touch-action: none; cursor: pointer; backdrop-filter: blur(4px);
+}
+#tc-jump:active { background: var(--ok-bg); }

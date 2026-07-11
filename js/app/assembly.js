@@ -181,6 +181,7 @@ export function initAssembly({ canvas, scene, camera, controls, slotMeshes, wiri
 
   // ── auto-assemble + auto-wire ─────────────────────────────────
   let autoBusy = false;
+  let autoGen = 0;   // bumped by clearBoard to abort an in-flight step-by-step run
 
   function autoAssemble() {
     for (const def of PART_DEFS) {
@@ -201,6 +202,7 @@ export function initAssembly({ canvas, scene, camera, controls, slotMeshes, wiri
   async function autoWire(stepByStep) {
     if (autoBusy || state.mode !== 'assembly') return;
     autoBusy = true;
+    const gen = autoGen;   // clearBoard bumps autoGen → every await below aborts
     autoInstant.disabled = autoStep.disabled = true;
     try {
       if (stepByStep) {
@@ -210,13 +212,16 @@ export function initAssembly({ canvas, scene, camera, controls, slotMeshes, wiri
           while (remainingFor(def.type) > 0 && guard++ < 4) {
             placePart(def);
             await sleep(320);
+            if (gen !== autoGen) return;
           }
         }
         await sleep(300);
+        if (gen !== autoGen) return;
         for (const r of REQUIRED) {
           const exists = wiring.wires.some(w => w.req && w.req.label === r.label);
           if (!exists) { wiring.tryConnect(r.a, r.b); hud.flash(`✓ ${r.label}`, 'ok'); }
           await sleep(260);
+          if (gen !== autoGen) return;
         }
       } else {
         autoAssemble();
@@ -385,6 +390,7 @@ export function initAssembly({ canvas, scene, camera, controls, slotMeshes, wiri
   const clearBtn = document.getElementById('clear-btn');
   function clearBoard() {
     if (state.mode !== 'assembly') return;
+    autoGen++;   // abort any in-flight step-by-step auto-wire
     for (const id of Object.keys(placed)) {
       wiring.unregisterComponent(placed[id].compType);
       assembly.remove(placed[id].group);

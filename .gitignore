@@ -12,3 +12,5 @@ sim.png
 assembly.png
 test-results/
 playwright-report/
+.env
+.firecrawl/

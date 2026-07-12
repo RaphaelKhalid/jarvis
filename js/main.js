@@ -15,7 +15,9 @@ import { initInput } from './app/input.js';
 import { initSave } from './app/save.js';
 import { initTouch } from './app/touch.js';
 import { initCurriculum } from './curriculum/engine.js';
+import { initPerf } from './app/perf.js';
 
+initPerf();   // dev-only FPS/startup HUD (?perf or Alt+P); no-op otherwise
 const serial = new Serial(document.getElementById('serial-log'));
 
 // unlock audio on first interaction (browser autoplay policy)
@@ -105,6 +107,7 @@ uploadBtn.addEventListener('click', async () => {
   try {
     // physics engine is required; the robot model is best-effort (falls back)
     await Promise.all([loadRapier(), loadRobotModel()]);
+    window.__perf?.mark('rapier');
   } catch {
     hud.flash('Failed to load physics engine', 'bad');
     uploadBtn.classList.remove('loading');

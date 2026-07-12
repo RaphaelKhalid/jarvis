@@ -7,7 +7,7 @@
 <!-- modern typography: Inter for UI chrome, JetBrains Mono for code/data -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap">
 <!-- Lucide icons (state-of-the-art SVG icon set) -->
 <script src="https://unpkg.com/lucide@0.462.0" defer></script>
 <link rel="stylesheet" href="css/tokens.css">
@@ -28,6 +28,8 @@
 </script>
 </head>
 <body>
+<!-- top-bar shell: brand + active robot + theme (populated by js/app/topbar.js) -->
+<header id="topbar"></header>
 <div id="app">
 
   <!-- LEFT: parts tray + checklist -->
@@ -85,16 +87,16 @@
 <!-- onboarding (hidden by default; hud.js reveals it for first-time visitors so it never paints-then-hides) -->
 <div id="overlay" class="hidden">
   <div class="card">
-    <h1>SelfBalance Lab</h1>
-    <div class="tagline">Build a self-balancing robot, then drive it.</div>
-    <ol>
-      <li><span class="n">1</span><div><b>Assemble</b><p>Drag the six parts onto the chassis. Hover a part’s <b>?</b> to see what it does.</p></div></li>
-      <li><span class="n">2</span><div><b>Wire</b><p>Click a pin then its target — or drag from one pin to another — to connect them. Hover a pin to see what it is (what’s <i>IN2</i>?), or hit <b>Auto-wire</b> to do it for you.</p></div></li>
-      <li><span class="n">3</span><div><b>Program</b><p>Tune the PID gains (Kp, Ki, Kd) in the Arduino sketch on the right. Hover any keyword to see which physical part it controls.</p></div></li>
-      <li><span class="n">4</span><div><b>Run</b><p>Hit <b>Upload</b> and drive with <b>W A S D</b>. <b>Space</b> jumps (and gets you back up if you wipe out); hit the ramps, and mind the ice. Arrows or drag to look around.</p></div></li>
-    </ol>
-    <button class="start" id="overlay-start">Start building</button>
-    <button class="tour" id="overlay-tour">Follow the step-by-step Guide</button>
+    <div class="ov-mark"><span aria-hidden="true">◐</span> GYRO</div>
+    <h1>Self-Balance Lab</h1>
+    <div class="tagline">Build a real robot in your browser — wire it, code it, watch the physics.</div>
+    <div class="ov-beats">
+      <div class="ov-beat"><span class="ov-n">01</span><b>Build</b><p>Drag parts onto the chassis and wire the pins.</p></div>
+      <div class="ov-beat"><span class="ov-n">02</span><b>Program</b><p>Tune the Arduino PID controller.</p></div>
+      <div class="ov-beat"><span class="ov-n">03</span><b>Play</b><p>Upload and drive it with W A S D.</p></div>
+    </div>
+    <button class="start" id="overlay-start">Start building →</button>
+    <button class="tour" id="overlay-tour">New here? Follow the guided walkthrough</button>
   </div>
 </div>
 

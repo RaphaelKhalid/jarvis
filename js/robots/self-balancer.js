@@ -20,6 +20,7 @@ export const selfBalancer = {
   difficulty: 'Start here',
   available: true,
   simKey: 'balance',        // which sim.js body/controller this robot uses
+  sketchFile: 'balance_bot.ino',   // shown in the firmware header + serial upload line
   parts: PART_DEFS,
   slots: SLOTS,
   required: REQUIRED,

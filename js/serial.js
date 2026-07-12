@@ -1,6 +1,8 @@
 // Arduino-style serial monitor: a scripted power-on bring-up sequence, then a
 // live telemetry stream while driving. Purely visual — makes Upload feel like
-// booting a real robot.
+// booting a real robot. The boot script + telemetry are robot-aware (the rover
+// has no IMU/PID, so it reports a drive loop and speed instead).
+import { activeRobot } from './robots/index.js';
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
@@ -29,8 +31,10 @@ export class Serial {
     const id = ++this.bootId;
     const alive = () => id === this.bootId;
     this.clear();
-    const steps = [
-      ['> avrdude: uploading balance_bot.ino …', 'dim', 260],
+    const robot = activeRobot();
+    const file = robot.sketchFile || 'firmware.ino';
+    const steps = robot.simKey === 'balance' ? [
+      [`> avrdude: uploading ${file} …`, 'dim', 260],
       ['> avrdude: 14848 bytes written  ✓', 'ok', 380],
       ['', '', 120],
       ['[boot] ATmega328P @ 16 MHz', '', 240],
@@ -42,6 +46,15 @@ export class Serial {
       [`[pid]  gains  Kp=${gains.Kp}  Ki=${gains.Ki}  Kd=${gains.Kd}`, 'accent', 300],
       ['[drv]  L298N enable … motor A ✓  motor B ✓', 'ok', 420],
       ['[sys]  entering balance loop @ 100 Hz', '', 300],
+      ['[sys]  READY — drive with W A S D', 'ok', 0],
+    ] : [
+      [`> avrdude: uploading ${file} …`, 'dim', 260],
+      ['> avrdude: 11904 bytes written  ✓', 'ok', 380],
+      ['', '', 120],
+      ['[boot] ATmega328P @ 16 MHz', '', 240],
+      ['[drv]  front L298N … motor A ✓  motor B ✓', 'ok', 320],
+      ['[drv]  rear  L298N … motor C ✓  motor D ✓', 'ok', 320],
+      ['[sys]  skid-steer drive loop @ 100 Hz', '', 300],
       ['[sys]  READY — drive with W A S D', 'ok', 0],
     ];
     for (const [text, cls, wait] of steps) {
@@ -60,8 +73,10 @@ export class Serial {
     this._lastTelemetry = now;
     const p = sim.pidTerms || { p: 0, i: 0, d: 0, pwm: 0 };
     const f = (n) => (n >= 0 ? ' ' : '') + n.toFixed(2);
-    this.line(
-      `tilt ${f(sim.tiltDeg)}°  P${f(p.p)} I${f(p.i)} D${f(p.d)}  pwm ${String(p.pwm).padStart(3)}`,
-      sim.fallen ? 'bad' : '');
+    // the rover has no balance loop — report speed instead of tilt/PID terms
+    const line = activeRobot().simKey === 'balance'
+      ? `tilt ${f(sim.tiltDeg)}°  P${f(p.p)} I${f(p.i)} D${f(p.d)}  pwm ${String(p.pwm).padStart(3)}`
+      : `spd ${f(sim.driveSpeed || 0)} u/s  hdg ${f((sim.heading || 0) * 180 / Math.PI)}°  pwm ${String(p.pwm).padStart(3)}`;
+    this.line(line, sim.fallen ? 'bad' : '');
   }
 }

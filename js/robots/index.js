@@ -7,7 +7,7 @@ import { rover } from './rover.js';
 import { state } from '../app/state.js';
 
 // "Coming soon" stub — enough metadata for the picker card; no parts/sim yet.
-// (The rover is further along: it lives in its own scaffolded def, rover.js.)
+// (The self-balancer and rover are the two buildable defs; see their files.)
 const lineFollower = {
   id: 'line-follower', name: 'Line-Follower', blurb: 'A rover that reads a line sensor and steers to follow a track.',
   difficulty: 'Coming soon', available: false, simKey: 'line',

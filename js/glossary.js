@@ -85,12 +85,29 @@ export const PINS = {
   'battery.-': { title: 'Negative terminal (0V)', role: 'The circuit’s ground reference — everything returns here.', kind: 'ground' },
 };
 
-export function pinInfo(id) { return PINS[id] || null; }
-export function compInfo(type) { return COMPONENTS[type] || null; }
+// The rover reuses the base components under instanced namespaces (two drivers
+// l298nF/l298nR, four motors motorFL/FR/RL/RR). Map an instanced compType back
+// to the base entry so its pins/tooltips resolve without duplicating the data.
+function baseType(t) {
+  if (t === 'l298nF' || t === 'l298nR') return 'l298n';
+  if (t === 'motorFL' || t === 'motorRL') return 'motorL';
+  if (t === 'motorFR' || t === 'motorRR') return 'motorR';
+  return t;
+}
+
+// Re-key an "compType.pin" id onto its base component (e.g. l298nF.IN1 → l298n.IN1).
+function baseId(id) {
+  const dot = id.indexOf('.');
+  if (dot < 0) return id;
+  return baseType(id.slice(0, dot)) + id.slice(dot);
+}
+
+export function pinInfo(id) { return PINS[id] || PINS[baseId(id)] || null; }
+export function compInfo(type) { return COMPONENTS[type] || COMPONENTS[baseType(type)] || null; }
 
 // Explain a required connection (used on wire hover).
 export function connectionBlurb(req) {
-  const a = PINS[req.a], b = PINS[req.b];
+  const a = pinInfo(req.a), b = pinInfo(req.b);
   if (!a || !b) return '';
   return `${a.title} → ${b.title}`;
 }

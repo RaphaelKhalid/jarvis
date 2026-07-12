@@ -64,7 +64,9 @@ const LEAN_SLEW = 1.4;        // rad/s max change of the lean setpoint
 const AIR_G = 55;             // gravity for the ballistic jump arc (tuned, not real g)
 const JUMP_V = 30;            // upward velocity of a Space jump
 const RAMP_LAUNCH_VY = 14;    // terrain rising faster than this (u/s) flings the bot up
-const LAND_TUMBLE_VY = 36;    // landing faster than this tips it over
+const LAND_TUMBLE_VY = 52;    // landing faster than this tips it over (forgiving:
+                              // a Space jump ~30 and capped ramp launches land clean)
+const MAX_LAUNCH_VY = 26;     // cap on ramp-launch upward speed so it lands under LAND_TUMBLE_VY
 
 // Terrain height field — big rolling hills, flat spawn pad, flat at the walls.
 function terrainHeight(x, z) {
@@ -613,7 +615,7 @@ export class BalanceSim {
       if (this.driveSpeed > 12 && vyTerrain > 6 && dropAhead > 2.5) {
         // launch off the ramp lip with the upward momentum we'd built climbing it
         this._airborne = true;
-        this._airVy = vyTerrain + this.driveSpeed * 0.3;
+        this._airVy = Math.min(vyTerrain + this.driveSpeed * 0.3, MAX_LAUNCH_VY);
         this._airY = groundY;
         this._pose(chassis, nx, groundY, nz, headDir, rightDir, desiredLean - 0.1, this._airVy);
       } else if (matName === 'ice' && this.driveSpeed > 24 && Math.abs(steer) > 0.8 && Math.random() < 0.05) {

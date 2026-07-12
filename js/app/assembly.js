@@ -1,6 +1,7 @@
 // Assembly phase: parts tray, drag-to-slot placement, pin/wire raycasting,
 // drag-to-wire, auto-wire, clear board. All handlers gated by state.mode.
 import * as THREE from 'three';
+import { ASSEMBLY_LIFT } from '../scene.js';
 import { PART_DEFS, SLOTS, makeMotor } from '../parts.js';
 import { suggestFor, REQUIRED } from '../wiring.js';
 import { pinInfo } from '../glossary.js';
@@ -32,6 +33,7 @@ export function initAssembly({ canvas, scene, camera, controls, slotMeshes, wiri
   const pointer = new THREE.Vector2();
 
   const assembly = new THREE.Group();
+  assembly.position.y = ASSEMBLY_LIFT;   // stand the rig on its wheels (see scene.js)
   scene.add(assembly);
 
   const placed = {};          // slotId -> { group, compType }

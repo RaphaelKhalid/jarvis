@@ -84,25 +84,24 @@ export function initGuide({ wiring, assemblyApi, getGains }) {
     },
     {
       key: 'program', num: 3, label: 'Program',
-      text: 'The Arduino sketch on the right is the robot’s balance controller. Tune the PID gains: <b>Kp</b> reacts to how far it’s tipped, <b>Kd</b> damps the wobble, <b>Ki</b> removes steady lean.',
-      tip: 'Hover any keyword to see which part it controls. Reference tune: Kp 15, Ki 140, Kd 0.9.',
+      text: 'The Arduino sketch on the right is the robot’s balance controller. Tune the PID gains — <b>Kp</b> reacts to how far it’s tipped, <b>Kd</b> damps the wobble, <b>Ki</b> removes steady lean — then hit <b>UPLOAD</b> (bottom-right) to flash your robot and start it up.',
+      tip: 'Reference tune: Kp 15, Ki 140, Kd 0.9. Not sure? The defaults balance — just hit Upload.',
       checklist: () => {
         const g = getGains();
         return [
-          { label: `Kp = ${g.Kp}`, done: true },
-          { label: `Ki = ${g.Ki}`, done: true },
-          { label: `Kd = ${g.Kd}`, done: true },
+          { label: `Gains set — Kp ${g.Kp} · Ki ${g.Ki} · Kd ${g.Kd}`, done: true },
+          { label: 'Hit Upload to flash & run', done: state.mode === 'sim' },
         ];
       },
       done: () => state.mode === 'sim',
     },
     {
       key: 'run', num: 4, label: 'Run',
-      text: 'Hit <b>UPLOAD</b> to flash the robot, then drive with <b>W A S D</b>. <b>Space</b> jumps (and rights you after a wipeout) — hit the ramps and mind the ice.',
-      tip: 'Arrows or drag to look around while you drive.',
+      text: 'Your robot is live! Drive with <b>W A S D</b>. <b>Space</b> jumps — and rights you after a wipeout. Hit the ramps, mind the ice, and tune the PID sliders live in the panel on the right.',
+      tip: 'Arrows or drag to orbit the camera while you drive.',
       checklist: () => [
-        { label: 'Wiring complete', done: wiring.allRequiredDone() },
         { label: 'Robot uploaded & running', done: state.mode === 'sim' },
+        { label: 'Drive it with W A S D', done: state.mode === 'sim' },
       ],
       done: () => false,
     },

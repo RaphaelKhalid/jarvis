@@ -6,7 +6,7 @@ import { WiringManager } from './wiring.js';
 import { initEditor } from './editor.js';
 import { loadRapier, loadRobotModel } from './sim.js';
 import { createSimBody } from './robots/sim-registry.js';
-import { activeRobot } from './robots/index.js';
+import { activeRobot, bootActiveRobot } from './robots/index.js';
 import { Serial } from './serial.js';
 import { audio } from './audio.js';
 import { state, set } from './app/state.js';
@@ -20,6 +20,7 @@ import { initCurriculum } from './curriculum/engine.js';
 import { initPerf } from './app/perf.js';
 import { initTopbar } from './app/topbar.js';
 
+bootActiveRobot();  // resolve persisted robot into state BEFORE any module reads a def
 initPerf();   // dev-only FPS/startup HUD (?perf or Alt+P); no-op otherwise
 initTopbar(); // product-frame shell: brand, robot name, theme toggle
 const serial = new Serial(document.getElementById('serial-log'));

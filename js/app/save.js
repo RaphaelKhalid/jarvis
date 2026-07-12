@@ -53,6 +53,9 @@ export function initSave({ assemblyApi, wiring, getSketch, setSketch }) {
 
   function isMeaningful(s) {
     if (!s) return false;
+    // a save belongs to the robot it was built for — don't offer to restore one
+    // robot's board onto another (parts/wiring wouldn't match the active def)
+    if ((s.robotId || 'self-balancer') !== state.activeRobotId) return false;
     const hasParts = Object.values(s.placedCount || {}).some(n => n > 0);
     const sketchChanged = typeof s.sketch === 'string' && s.sketch !== DEFAULT_SKETCH;
     return hasParts || (s.wires || []).length > 0 || sketchChanged;

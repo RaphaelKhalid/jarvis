@@ -3,8 +3,8 @@
 // line-follower show as "Coming soon". This is the content-library surface that
 // makes the app read as a product with breadth (Brief 1), and the seam the M4
 // robots plug into. Selecting an available robot sets state.activeRobotId.
-import { ROBOTS, activeRobot } from '../robots/index.js';
-import { state, set } from './state.js';
+import { ROBOTS, activeRobot, switchRobot } from '../robots/index.js';
+import { state } from './state.js';
 
 export function initRobotPicker({ anchor }) {
   const pop = document.createElement('div');
@@ -27,8 +27,8 @@ export function initRobotPicker({ anchor }) {
         </button>`).join('')}`;
     pop.querySelectorAll('.rp-card:not([disabled])').forEach(btn => {
       btn.addEventListener('click', () => {
-        set('activeRobotId', btn.dataset.robot);
         close();
+        switchRobot(btn.dataset.robot);  // persist + reload so the app re-inits on the new def
       });
     });
   }

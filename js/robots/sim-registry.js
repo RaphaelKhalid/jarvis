@@ -7,6 +7,10 @@ import { BalanceSim } from '../sim.js';
 
 const BUILDERS = {
   balance: (scene) => new BalanceSim(scene),
+  // TODO(rover): rover: (scene) => new RoverSim(scene) — a 4-wheel drive body
+  // with NO inverted-pendulum / PID-upright loop. Until it exists, the rover def
+  // (available:false) can't be selected, so the balance fallback is never hit for
+  // real; this comment marks where the rover physics plugs in.
 };
 
 // Resolve and construct the sim body for a robot's simKey. Unknown keys fall

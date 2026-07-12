@@ -78,6 +78,7 @@ export function initHud({ wiring, sim, getPlacedCount, getGains, onExitSim }) {
       run:      running ? 'active' : '',
     };
     for (const [k, cls] of Object.entries(stepState)) {
+      if (!stepEls[k]) continue;   // stepper replaced by the Guide rail; keep this a no-op
       stepEls[k].classList.remove('active', 'complete');
       if (cls) stepEls[k].classList.add(cls);
     }
@@ -93,7 +94,8 @@ export function initHud({ wiring, sim, getPlacedCount, getGains, onExitSim }) {
   document.getElementById('help-btn').addEventListener('click', () => overlay.classList.remove('hidden'));
   let seen = false;
   try { seen = localStorage.getItem('sbl-seen') === '1'; } catch {}
-  if (seen) overlay.classList.add('hidden');
+  // overlay starts hidden in markup (no flash on repeat visits); reveal for newcomers
+  if (!seen) overlay.classList.remove('hidden');
 
   // ── sim HUD (built dynamically) ───────────────────────────────
   const simHud = document.createElement('div');

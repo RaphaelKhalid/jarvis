@@ -9,11 +9,11 @@ import { Serial } from './serial.js';
 import { audio } from './audio.js';
 import { state, set } from './app/state.js';
 import { initHud } from './app/hud.js';
+import { initGuide } from './app/guide.js';
 import { initAssembly, TW_OPEN } from './app/assembly.js';
 import { initInput } from './app/input.js';
 import { initSave } from './app/save.js';
 import { initTouch } from './app/touch.js';
-import { initTutorial } from './app/tutorial.js';
 import { initCurriculum } from './curriculum/engine.js';
 
 const serial = new Serial(document.getElementById('serial-log'));
@@ -44,6 +44,8 @@ const hud = initHud({
   onExitSim: () => exitSim(),
 });
 const assemblyApi = initAssembly({ canvas, scene, camera, controls, slotMeshes, wiring, hud });
+// education-first Guide rail: always-visible instructions that advance with state
+const guide = initGuide({ wiring, assemblyApi, getGains: () => state.gains });
 const input = initInput({ canvas, sim });
 initTouch({ sim });   // no-op on fine-pointer devices
 
@@ -67,7 +69,7 @@ const saveApi = initSave({
 // any checklist refresh (placement, wiring, clear) marks the state dirty
 {
   const origRefresh = hud.refreshChecklist;
-  hud.refreshChecklist = (...a) => { origRefresh(...a); saveApi.persist(); };
+  hud.refreshChecklist = (...a) => { origRefresh(...a); guide.refresh(); saveApi.persist(); };
 }
 
 // ── curriculum (Learn mode) ─────────────────────────────────────
@@ -78,20 +80,19 @@ function setSketchGains({ Kp, Ki, Kd }) {
   if (Kd != null) v = v.replace(/\bKd\s*=\s*-?\d+(?:\.\d+)?/, `Kd = ${Kd}`);
   cm.setValue(v);
 }
-const curriculum = initCurriculum({ sim, wiring, assemblyApi, hud, setSketchGains });
+const curriculum = initCurriculum({ sim, wiring, assemblyApi, hud, setSketchGains, guide });
 document.getElementById('learn-btn').addEventListener('click', () => curriculum.openOverlay());
+guide.onLessons(() => curriculum.openOverlay());
 window.__lab = { assemblyApi, wiring, curriculum, hud };   // debug/testing hook
 
-// ── guided tour ─────────────────────────────────────────────────
-const tutorial = initTutorial({ assemblyApi, wiring });
-const autoTour = tutorial.shouldAutoStart();   // decide before overlay marks 'seen'
-document.getElementById('overlay-start').addEventListener('click', () => {
-  if (autoTour) tutorial.start();
-});
+// ── onboarding → Guide rail ─────────────────────────────────────
+// The always-on Guide rail replaces the old spotlight tour: both onboarding
+// buttons just make sure the rail is open so new users start reading it.
+document.getElementById('overlay-start').addEventListener('click', () => guide.expand());
 document.getElementById('overlay-tour').addEventListener('click', () => {
   document.getElementById('overlay').classList.add('hidden');
   try { localStorage.setItem('sbl-seen', '1'); } catch {}
-  tutorial.start();
+  guide.expand();
 });
 
 // ── upload / simulation ─────────────────────────────────────────
@@ -147,6 +148,7 @@ function enterSim() {
   });
   hud.enterSimMissions();
   hud.updateStepper();
+  guide.refresh();
 }
 
 function exitSim() {
@@ -170,6 +172,7 @@ function exitSim() {
   camera.fov = 45; camera.updateProjectionMatrix();
   hud.simHud.classList.add('hidden');
   hud.updateStepper();
+  guide.refresh();
 }
 
 // ── render loop ─────────────────────────────────────────────────

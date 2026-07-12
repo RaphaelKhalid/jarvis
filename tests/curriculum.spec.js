@@ -14,10 +14,11 @@ async function openApp(page) {
 test('lesson c1 completes via place + wire objectives and awards stars', async ({ page }) => {
   await openApp(page);
   await page.click('#learn-btn');
-  await expect(page.locator('.learn-card')).toBeVisible();
+  // lesson browser now renders inline in the Guide rail (no full-screen modal)
+  await expect(page.locator('#g-browser')).toBeVisible();
   await page.click('[data-lesson="c1"]');
-  await expect(page.locator('#lesson-hud')).toBeVisible();
-  await expect(page.locator('#lesson-hud .l-title')).toHaveText('Power Up');
+  await expect(page.locator('#g-lesson')).toBeVisible();
+  await expect(page.locator('#g-lesson .l-title')).toHaveText('Power Up');
 
   // complete the objectives through the real app APIs
   await page.evaluate(() => {
@@ -30,7 +31,7 @@ test('lesson c1 completes via place + wire objectives and awards stars', async (
     window.__lab.wiring.tryConnect('arduino.GND', 'battery.-');
   });
   await page.waitForTimeout(800);
-  await expect(page.locator('#lesson-hud .l-stars')).toBeVisible();
+  await expect(page.locator('#g-lesson .l-stars')).toBeVisible();
   const stars = await page.evaluate(() => window.__lab.curriculum.starsFor('c1'));
   expect(stars).toBeGreaterThan(0);
 });

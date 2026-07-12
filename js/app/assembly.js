@@ -2,8 +2,8 @@
 // drag-to-wire, auto-wire, clear board. All handlers gated by state.mode.
 import * as THREE from 'three';
 import { ASSEMBLY_LIFT } from '../scene.js';
-import { PART_DEFS, SLOTS, makeMotor } from '../parts.js';
-import { suggestFor, REQUIRED } from '../wiring.js';
+import { makeMotor } from '../parts.js';
+import { activeRobot } from '../robots/index.js';
 import { pinInfo } from '../glossary.js';
 import { connectionBlurb } from '../glossary.js';
 import { audio } from '../audio.js';
@@ -29,6 +29,10 @@ function pinTooltipHtml(id) {
 }
 
 export function initAssembly({ canvas, scene, camera, controls, slotMeshes, wiring, hud }) {
+  // parts/slots/required come from the active RobotDef (M4 seam). One robot is
+  // buildable today and the picker doesn't reload, so resolving once is correct.
+  const { parts: PART_DEFS, slots: SLOTS, required: REQUIRED } = activeRobot();
+
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
 
@@ -269,7 +273,7 @@ export function initAssembly({ canvas, scene, camera, controls, slotMeshes, wiri
       const w = hoveredWire.userData.wire;
       if (w.valid) hud.showTooltip(e, `<span class="tt-tag tt-${w.kind}">✓ ${KIND_LABEL[w.kind] || ''}</span><b>${w.req.label}</b><div class="tt-role">${connectionBlurb(w.req)}</div>`);
       else {
-        const want = suggestFor(w.idA) || suggestFor(w.idB);
+        const want = wiring.suggestFor(w.idA) || wiring.suggestFor(w.idB);
         const wantTxt = want ? ` — should go to ${want.split('.')[1]}` : '';
         hud.showTooltip(e, `✗ wrong pin${wantTxt}`, true);
       }

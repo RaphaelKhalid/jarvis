@@ -4,7 +4,9 @@ import * as THREE from 'three';
 import { createScene } from './scene.js';
 import { WiringManager } from './wiring.js';
 import { initEditor } from './editor.js';
-import { BalanceSim, loadRapier, loadRobotModel } from './sim.js';
+import { loadRapier, loadRobotModel } from './sim.js';
+import { createSimBody } from './robots/sim-registry.js';
+import { activeRobot } from './robots/index.js';
 import { Serial } from './serial.js';
 import { audio } from './audio.js';
 import { state, set } from './app/state.js';
@@ -35,7 +37,7 @@ const SKY_BG = new THREE.Color(0x8fb0cf);
 const SKY_FOG = new THREE.Color(0xd9b98a);
 
 const wiring = new WiringManager(scene, camera, renderer, () => hud.refreshChecklist());
-const sim = new BalanceSim(scene);
+const sim = createSimBody(activeRobot().simKey, scene);
 window.__sim = sim;   // debug/testing hook
 
 const controlsLegend = document.getElementById('controls-legend');

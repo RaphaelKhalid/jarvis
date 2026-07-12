@@ -2,7 +2,7 @@
 // live PID sliders + buttons), mission HUD. (The phase stepper + onboarding
 // overlay it once owned are now the Guide rail — see js/app/guide.js.)
 import * as THREE from 'three';
-import { SLOTS } from '../parts.js';
+import { activeRobot } from '../robots/index.js';
 import { audio } from '../audio.js';
 import { makeMissions } from '../missions.js';
 import { state, set, subscribe } from './state.js';
@@ -69,7 +69,7 @@ export function initHud({ wiring, sim, getPlacedCount, getGains, onExitSim, onGa
   const stepEls = {};
   for (const el of document.querySelectorAll('.step')) stepEls[el.dataset.step] = el;
   function updateStepper() {
-    const allPlaced = getPlacedCount() >= SLOTS.length;
+    const allPlaced = getPlacedCount() >= activeRobot().slots.length;
     const wired = wiring.allRequiredDone();
     const running = state.mode === 'sim';
     const stepState = {

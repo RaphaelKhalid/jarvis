@@ -1,5 +1,6 @@
 // Wiring system: click-to-connect, 3D bezier tube wires, validation, checklist.
 import * as THREE from 'three';
+import { activeRobot } from './robots/index.js';
 
 // Required connections. Key form: "compType.pin". `kind` picks wire color.
 // motorL/motorR endpoints are optional-but-nice; the REQUIRED set drives the
@@ -32,26 +33,22 @@ const HOVER_BAD = 0xff5d5d;
 // Build a canonical endpoint pair key regardless of order.
 function pairKey(a, b) { return [a, b].sort().join('|'); }
 
-// Look up whether a pair of endpoint IDs is a valid required connection.
-function findRequired(idA, idB) {
-  const key = pairKey(idA, idB);
-  return REQUIRED.find(r => pairKey(r.a, r.b) === key);
-}
-
-// Suggest the correct target for a source endpoint (for error tooltips).
-export function suggestFor(id) {
-  const r = REQUIRED.find(r => r.a === id || r.b === id);
+// Module-level suggestion over the default (self-balancer) required set, kept
+// for callers that don't hold a WiringManager instance. Instance code should
+// prefer `wiring.suggestFor` (scoped to the active robot's required set).
+export function suggestFor(id, required = REQUIRED) {
+  const r = required.find(r => r.a === id || r.b === id);
   if (!r) return null;
-  const other = r.a === id ? r.b : r.a;
-  return other;
+  return r.a === id ? r.b : r.a;
 }
 
 export class WiringManager {
-  constructor(scene, camera, renderer, onChange) {
+  constructor(scene, camera, renderer, onChange, required = activeRobot().required) {
     this.scene = scene;
     this.camera = camera;
     this.renderer = renderer;
     this.onChange = onChange;
+    this.required = required;  // the active robot's REQUIRED set (validation source)
     this.wires = [];          // { req, idA, idB, mesh, kind }
     this.endpoints = new Map(); // id -> { obj (pin mesh), compType, pin, worldPos() }
     this.pending = null;       // first-clicked endpoint id
@@ -90,6 +87,17 @@ export class WiringManager {
     this.onChange();
   }
 
+  // Look up whether a pair of endpoint IDs is a valid required connection.
+  findRequired(idA, idB) {
+    const key = pairKey(idA, idB);
+    return this.required.find(r => pairKey(r.a, r.b) === key);
+  }
+
+  // Suggest the correct target for a source endpoint (for error tooltips).
+  suggestFor(id) {
+    return suggestFor(id, this.required);
+  }
+
   worldPosOf(id) {
     const ep = this.endpoints.get(id);
     if (!ep) return null;
@@ -122,7 +130,7 @@ export class WiringManager {
     const dup = this.wires.find(w => pairKey(w.idA, w.idB) === pairKey(idA, idB));
     if (dup) return { state: 'duplicate' };
 
-    const req = findRequired(idA, idB);
+    const req = this.findRequired(idA, idB);
     const kind = req ? req.kind : 'data';
     const mesh = this.buildWire(idA, idB, kind, !!req);
     this.scene.add(mesh);
@@ -134,7 +142,7 @@ export class WiringManager {
     if (req) {
       return { state: 'valid', label: req.label };
     }
-    const want = suggestFor(idA) || suggestFor(idB);
+    const want = this.suggestFor(idA) || this.suggestFor(idB);
     return { state: 'invalid', idA, idB, suggestion: want };
   }
 
@@ -258,7 +266,7 @@ export class WiringManager {
     for (const w of this.wires) {
       if (w.req) done.add(w.req.label);
     }
-    return REQUIRED.map(r => ({ label: r.label, done: done.has(r.label), kind: r.kind }));
+    return this.required.map(r => ({ label: r.label, done: done.has(r.label), kind: r.kind }));
   }
 
   allRequiredDone() {

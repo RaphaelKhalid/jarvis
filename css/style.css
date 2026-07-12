@@ -555,3 +555,40 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
   pointer-events: auto; touch-action: none; cursor: pointer; backdrop-filter: blur(4px);
 }
 #tc-jump:active { background: var(--ok-bg); }
+
+/* ── motion: entrances + success beats (Lab Instrument) ─────────
+   All of this is auto-disabled by the prefers-reduced-motion guard
+   in tokens.css. Kept to DOM chrome — the 3D scene owns its own motion. */
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes rise-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes pop-in  { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+@keyframes ready-pop {
+  0% { transform: scale(1); box-shadow: 0 0 0 rgba(70,224,143,0); }
+  40% { transform: scale(1.025); box-shadow: 0 0 24px rgba(70,224,143,0.35); }
+  100% { transform: scale(1); box-shadow: 0 6px 20px rgba(70,224,143,0.12); }
+}
+@keyframes slide-down { from { opacity: 0; transform: translate(-50%, -12px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+/* title screen: backdrop fades, card rises, beats stagger in */
+#overlay:not(.hidden) { animation: fade-in var(--t-med) ease; }
+#overlay .card { animation: rise-in var(--t-slow) var(--ease-out) both; }
+#overlay .ov-beat { animation: pop-in var(--t-med) var(--ease-spring) both; }
+#overlay .ov-beat:nth-child(1) { animation-delay: 0.06s; }
+#overlay .ov-beat:nth-child(2) { animation-delay: 0.13s; }
+#overlay .ov-beat:nth-child(3) { animation-delay: 0.20s; }
+
+/* Upload becomes armed → one-shot pop (fires when :disabled is removed) */
+#upload-btn:not(:disabled) { animation: ready-pop var(--t-slow) var(--ease-spring); }
+
+/* sim overlays glide in when Upload swaps to drive mode */
+#sim-hud { animation: rise-in var(--t-med) var(--ease-out); }
+#mission-hud { animation: rise-in var(--t-med) var(--ease-out); }
+
+/* resume prompt drops in from the top */
+#resume-bar { animation: slide-down var(--t-slow) var(--ease-out) both; }
+
+/* tooltip: quick fade so it doesn't pop harshly */
+#tooltip:not(.hidden) { animation: fade-in var(--t-fast) ease; }
+
+/* part cards press in when grabbed */
+.part-card:active { transform: scale(0.98); }

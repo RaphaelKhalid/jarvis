@@ -128,10 +128,12 @@ export function initAssembly({ canvas, scene, camera, controls, slotMeshes, wiri
     if (overCanvas) placePart(def);
   }
 
-  // which slots accept this card type (motor -> both motor slots)
+  // Which slots a given tray card fills. A slot's `card` names the tray card
+  // that fills it (defaults to its `accepts` type); this is what lets one 'motor'
+  // card fill several sided motor slots, and (on the rover) one 'l298n' card fill
+  // both driver slots — without the assembly hard-coding either robot's layout.
   function slotsForType(type) {
-    if (type === 'motor') return SLOTS.filter(s => s.accepts === 'motorL' || s.accepts === 'motorR');
-    return SLOTS.filter(s => s.accepts === type);
+    return SLOTS.filter(s => (s.card || s.accepts) === type);
   }
   function highlightSlots(type, on) {
     for (const slot of slotsForType(type)) {
@@ -145,11 +147,14 @@ export function initAssembly({ canvas, scene, camera, controls, slotMeshes, wiri
     if (!freeSlot) return;
 
     let group;
-    const compType = freeSlot.accepts;   // e.g. motorL / motorR / arduino ...
-    if (def.type === 'motor') {
-      group = makeMotor(freeSlot.side);
-    } else {
+    const compType = freeSlot.accepts;   // e.g. motorL / motorR / l298nF / arduino ...
+    // sided motors have no `make` (geometry mirrors on the slot's side); every
+    // other part builds from its own factory, so two driver slots can share the
+    // one makeL298N factory while landing in distinct endpoint namespaces.
+    if (def.make) {
       group = def.make();
+    } else {
+      group = makeMotor(freeSlot.side);
     }
     group.position.set(freeSlot.x, 0.3, freeSlot.z);
     group.rotation.y = freeSlot.ry;

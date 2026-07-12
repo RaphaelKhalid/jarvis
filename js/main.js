@@ -74,6 +74,15 @@ const saveApi = initSave({
   getSketch: () => cm.getValue(),
   setSketch: (s) => cm.setValue(s),
 });
+// each robot ships its own starter sketch (self-balancer's === the editor
+// default). Done after saveApi exists so the editor's change handler, which
+// calls saveApi.persist(), isn't hit during the temporal dead zone.
+if (activeRobot().sketch) cm.setValue(activeRobot().sketch);
+// firmware panel header reflects the active robot's sketch file
+{
+  const ff = document.getElementById('firmware-file');
+  if (ff && activeRobot().sketchFile) ff.textContent = activeRobot().sketchFile;
+}
 // any checklist refresh (placement, wiring, clear) marks the state dirty
 {
   const origRefresh = hud.refreshChecklist;
@@ -153,7 +162,9 @@ function enterSim() {
   audio.startMotor();
   serial.boot(state.gains, () => {
     set('booting', false);
-    hud.setStatus('Drive with W/A/S/D — the robot balances as it moves');
+    hud.setStatus(activeRobot().simKey === 'balance'
+      ? 'Drive with W/A/S/D — the robot balances as it moves'
+      : 'Drive with W/A/S/D — steer by driving the two sides');
   });
   hud.enterSimMissions();
   hud.updateStepper();

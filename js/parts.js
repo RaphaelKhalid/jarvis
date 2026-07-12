@@ -290,6 +290,6 @@ export const SLOTS = [
   { id: 'slot-mpu',     accepts: 'mpu6050', x: 0,    z: -0.4, ry: 0,           w: 3.8,  d: 2.7 },
   { id: 'slot-l298n',   accepts: 'l298n',   x: 0,    z: -6.0, ry: 0,           w: 5.0,  d: 5.0 },
   { id: 'slot-battery', accepts: 'battery', x: 0,    z: 10.0, ry: 0,           w: 7.6,  d: 4.1 },
-  { id: 'slot-motorL',  accepts: 'motorL',  x: -6.9, z: -0.4, ry: 0,           w: 4.6,  d: 7.5, side: -1 },
-  { id: 'slot-motorR',  accepts: 'motorR',  x: 6.9,  z: -0.4, ry: 0,           w: 4.6,  d: 7.5, side: 1 },
+  { id: 'slot-motorL',  accepts: 'motorL',  card: 'motor', x: -6.9, z: -0.4, ry: 0, w: 4.6,  d: 7.5, side: -1 },
+  { id: 'slot-motorR',  accepts: 'motorR',  card: 'motor', x: 6.9,  z: -0.4, ry: 0, w: 4.6,  d: 7.5, side: 1 },
 ];

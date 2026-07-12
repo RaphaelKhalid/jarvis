@@ -6,18 +6,19 @@
 // inline (browser + active lesson card render into this same panel).
 import { state } from './state.js';
 import { activeRobot } from '../robots/index.js';
-
-const REQUIRED_PARTS = [
-  { compType: 'arduino', label: 'Arduino Uno' },
-  { compType: 'mpu6050', label: 'MPU6050 sensor' },
-  { compType: 'l298n',   label: 'L298N driver' },
-  { compType: 'motorL',  label: 'Left motor' },
-  { compType: 'motorR',  label: 'Right motor' },
-  { compType: 'battery', label: '7.4V battery' },
-];
+import { compInfo } from '../glossary.js';
 
 export function initGuide({ wiring, assemblyApi, getGains }) {
   const workspace = document.getElementById('workspace');
+
+  // the parts checklist is derived from the active robot's slots, so the guide
+  // lists exactly what THIS robot needs (6 parts for the balancer, 8 for the rover)
+  const robot = activeRobot();
+  const balances = robot.simKey === 'balance';
+  const requiredParts = () => robot.slots.map(s => ({
+    compType: s.accepts,
+    label: compInfo(s.accepts)?.title || s.accepts,
+  }));
 
   const panel = document.createElement('div');
   panel.id = 'guide';
@@ -70,9 +71,11 @@ export function initGuide({ wiring, assemblyApi, getGains }) {
   const phases = [
     {
       key: 'assemble', num: 1, label: 'Assemble',
-      text: 'Drag all six parts from the tray onto the glowing pads on the chassis. Every robot needs a brain, a balance sensor, a motor driver, two motors, and a battery.',
+      text: balances
+        ? 'Drag every part from the tray onto the glowing pads on the chassis. A self-balancer needs a brain, a balance sensor, a motor driver, two motors, and a battery.'
+        : 'Drag every part from the tray onto the glowing pads on the chassis. The rover needs a brain, two motor drivers, four motors, and a battery — no balance sensor, it rolls on four wheels.',
       tip: 'Hover a part’s <b>?</b> to see what it does.',
-      checklist: () => REQUIRED_PARTS.map(p => ({ label: p.label, done: partDone(p.compType) })),
+      checklist: () => requiredParts().map(p => ({ label: p.label, done: partDone(p.compType) })),
       done: () => placedCount() >= activeRobot().slots.length,
     },
     {
@@ -84,20 +87,28 @@ export function initGuide({ wiring, assemblyApi, getGains }) {
     },
     {
       key: 'program', num: 3, label: 'Program',
-      text: 'The Arduino sketch on the right is the robot’s balance controller. Tune the PID gains — <b>Kp</b> reacts to how far it’s tipped, <b>Kd</b> damps the wobble, <b>Ki</b> removes steady lean — then hit <b>UPLOAD</b> (bottom-right) to flash your robot and start it up.',
-      tip: 'Reference tune: Kp 15, Ki 140, Kd 0.9. Not sure? The defaults balance — just hit Upload.',
+      text: balances
+        ? 'The Arduino sketch on the right is the robot’s balance controller. Tune the PID gains — <b>Kp</b> reacts to how far it’s tipped, <b>Kd</b> damps the wobble, <b>Ki</b> removes steady lean — then hit <b>UPLOAD</b> (bottom-right) to flash your robot and start it up.'
+        : 'The Arduino sketch on the right is the rover’s drive firmware — left and right wheels are driven together (skid-steer). Read it over, then hit <b>UPLOAD</b> (bottom-right) to flash your robot and start it up.',
+      tip: balances
+        ? 'Reference tune: Kp 15, Ki 140, Kd 0.9. Not sure? The defaults balance — just hit Upload.'
+        : 'No tuning needed — just hit Upload and drive.',
       checklist: () => {
         const g = getGains();
-        return [
-          { label: `Gains set — Kp ${g.Kp} · Ki ${g.Ki} · Kd ${g.Kd}`, done: true },
-          { label: 'Hit Upload to flash & run', done: state.mode === 'sim' },
-        ];
+        return balances
+          ? [
+              { label: `Gains set — Kp ${g.Kp} · Ki ${g.Ki} · Kd ${g.Kd}`, done: true },
+              { label: 'Hit Upload to flash & run', done: state.mode === 'sim' },
+            ]
+          : [{ label: 'Hit Upload to flash & run', done: state.mode === 'sim' }];
       },
       done: () => state.mode === 'sim',
     },
     {
       key: 'run', num: 4, label: 'Run',
-      text: 'Your robot is live! Drive with <b>W A S D</b>. <b>Space</b> jumps — and rights you after a wipeout. Hit the ramps, mind the ice, and tune the PID sliders live in the panel on the right.',
+      text: balances
+        ? 'Your robot is live! Drive with <b>W A S D</b>. <b>Space</b> jumps — and rights you after a wipeout. Hit the ramps, mind the ice, and tune the PID sliders live in the panel on the right.'
+        : 'Your rover is live! Drive with <b>W A S D</b>. <b>Space</b> jumps — and rights you after a wipeout. Hit the ramps and mind the ice.',
       tip: 'Arrows or drag to orbit the camera while you drive.',
       checklist: () => [
         { label: 'Robot uploaded & running', done: state.mode === 'sim' },

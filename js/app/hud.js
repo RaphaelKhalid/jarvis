@@ -123,6 +123,11 @@ export function initHud({ wiring, sim, getPlacedCount, getGains, onExitSim, onGa
     </div>
     <div class="sim-drive">W/S drive · A/D steer · Space jump</div>`;
   document.getElementById('workspace').appendChild(simHud);
+  // the rover has no balance loop: hide the PID tuning sliders + the tilt/PID
+  // sparkline (they'd only ever read ~0). Per-frame readouts already show speed.
+  if (activeRobot().simKey !== 'balance') {
+    for (const sel of ['#sim-pid', '#sparkline', '.spark-legend']) simHud.querySelector(sel)?.classList.add('hidden');
+  }
   document.getElementById('reset-btn').addEventListener('click', () => { sim.setGains(getGains()); sim.reset(); clearGraph(); });
   document.getElementById('back-btn').addEventListener('click', () => onExitSim());
 

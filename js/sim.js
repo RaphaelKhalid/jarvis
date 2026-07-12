@@ -825,6 +825,113 @@ function makeRobotVisual(chassisH) {
   return g;
 }
 
+// ── Rover: four-wheel driving body ──────────────────────────────────────────
+// Subclasses BalanceSim to reuse ALL of its proven machinery — the arena/terrain,
+// the tuned arcade-drive model (fixedStep), tire tracks, jump, tumble, recover,
+// telemetry. Only two things differ: the body it builds (a flat chassis on four
+// corner wheels, no inverted pendulum) and the pose (it stays flat — no stylistic
+// pitch lean). Because the drive model is inherited unchanged, the rover handles
+// with the exact same feel as the self-balancer minus the balancing. See
+// js/robots/rover.js (the def) and js/robots/sim-registry.js (the simKey wiring).
+export class RoverSim extends BalanceSim {
+  build() {
+    this.world = new RAPIER.World({ x: 0, y: -GRAVITY, z: 0 });
+    this.group.clear();
+    this._waterUniforms = [];
+    this._trackCtx = null;
+    this.buildArena();
+
+    const RB = RAPIER.RigidBodyDesc, CO = RAPIER.ColliderDesc;
+
+    const wheelR = 3.0, wheelW = 2.2;
+    const track = 6.3, base = 5.5;            // half-width (x) / half-length (z) of the wheel rectangle
+    const chassisH = 2.4, chassisW = 11, chassisD = 13;
+    this.wheelR = wheelR;
+    const baseY = terrainHeight(0, 0) + wheelR;
+    this.restY = wheelR + chassisH / 2;       // chassis-center height above the ground
+    this.home = { x: 0, z: 0 };
+    this.heading = 0;
+
+    // ── flat chassis slab (kinematically posed each frame, like the balancer) ──
+    const chassisBody = this.world.createRigidBody(
+      RB.dynamic()
+        .setTranslation(0, baseY + chassisH / 2, 0)
+        .enabledRotations(true, true, false)
+        .setCcdEnabled(true)
+        .setAngularDamping(1.6)
+        .setLinearDamping(0.05));
+    this.world.createCollider(
+      CO.cuboid(chassisW / 2, chassisH / 2, chassisD / 2).setDensity(CHASSIS_DENSITY), chassisBody);
+    this.bodies.chassis = chassisBody;
+
+    const chassisMesh = makeRoverVisual(chassisH, chassisW, chassisD);
+    this.group.add(chassisMesh);
+    this.bodies.chassisMesh = chassisMesh;
+
+    // ── four wheels at the corners, all on the local-X axle ──
+    this.bodies.wheels = [];
+    for (const sz of [1, -1]) for (const sx of [-1, 1]) {
+      const wx = sx * track, wz = sz * base;
+      const wheelBody = this.world.createRigidBody(
+        RB.dynamic().setTranslation(wx, baseY, wz).setCcdEnabled(true));
+      this.world.createCollider(
+        CO.cylinder(wheelW / 2, wheelR).setRotation(zToXQuat())
+          .setFriction(3.2).setRestitution(0).setDensity(WHEEL_DENSITY),
+        wheelBody);
+      const joint = RAPIER.JointData.revolute(
+        { x: wx, y: -chassisH / 2, z: wz }, { x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 });
+      this.world.createImpulseJoint(joint, chassisBody, wheelBody, true);
+      const wheelMesh = makeWheelVisual(wheelR, wheelW);
+      this.group.add(wheelMesh);
+      this.bodies.wheels.push({ body: wheelBody, mesh: wheelMesh });
+    }
+
+    this.integral = 0; this.prevError = 0; this.fallen = false;
+    this.vel = 0; this._prevVel = 0; this._lean = 0; this._wobble = 0;
+    this._airborne = false; this._airVy = 0; this._airY = 0; this._prevGroundY = undefined;
+    this.input = { fwd: 0, turn: 0, brake: false };
+    this.syncMeshes();
+  }
+
+  // Reuse the parent's drive/pose exactly, but hold the body flat (lean → 0).
+  _pose(chassis, x, y, z, headDir, rightDir, lean, vy) {
+    super._pose(chassis, x, y, z, headDir, rightDir, 0, vy);
+  }
+}
+
+// Low four-wheel buggy body. Origin = chassis center; +Z is forward.
+function makeRoverVisual(h, w, d) {
+  const g = new THREE.Group();
+  const hull = new THREE.Mesh(new THREE.BoxGeometry(w * 0.82, h, d * 0.86), CHROME);
+  g.add(hull);
+  const cabin = new THREE.Mesh(new THREE.BoxGeometry(w * 0.6, h * 0.7, d * 0.5), CHROME_DK);
+  cabin.position.set(0, h * 0.7, -d * 0.05);
+  g.add(cabin);
+  // glowing waistline seam (blooms)
+  const seam = new THREE.Mesh(new THREE.BoxGeometry(w * 0.84, 0.18, d * 0.88), SEAM);
+  seam.position.y = h * 0.2;
+  g.add(seam);
+  // forward light bar
+  const lens = new THREE.Mesh(new THREE.BoxGeometry(w * 0.5, 0.4, 0.3), LENS);
+  lens.position.set(0, h * 0.1, d * 0.44);
+  g.add(lens);
+  // sensor mast + dome
+  const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, h * 1.1, 12), STEEL);
+  mast.position.set(0, h * 1.1, -d * 0.28);
+  g.add(mast);
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(1.0, 20, 14), GLASS);
+  dome.position.set(0, h * 1.6, -d * 0.28);
+  g.add(dome);
+  // steel bumpers front + rear
+  for (const sz of [1, -1]) {
+    const bump = new THREE.Mesh(new THREE.BoxGeometry(w * 0.7, h * 0.5, 0.5), STEEL);
+    bump.position.set(0, -h * 0.1, sz * d * 0.45);
+    g.add(bump);
+  }
+  g.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  return g;
+}
+
 // Fat treaded wheel; local cylinder axis = Y (sync rotates it onto the X axle).
 function makeWheelVisual(r, w) {
   const g = new THREE.Group();

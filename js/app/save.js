@@ -5,7 +5,8 @@ import { DEFAULT_SKETCH } from '../editor.js';
 import { activeRobot } from '../robots/index.js';
 import { state } from './state.js';
 
-const KEY = 'sbl-save-v1';   // storage key (kept stable; schema version is `v`)
+const LEGACY_KEY = 'sbl-save-v1';           // pre-multi-robot single slot (self-balancer)
+const keyFor = (robotId) => `sbl-save-v1:${robotId}`;   // per-robot slot (schema version is `v`)
 const SCHEMA = 2;            // v2 adds robotId (M3); v1 saves migrate on load
 
 // Placement is deterministic (first free slot per type), so per-type counts
@@ -28,6 +29,8 @@ export function captureState({ assemblyApi, wiring, getSketch }) {
 }
 
 export function initSave({ assemblyApi, wiring, getSketch, setSketch }) {
+  // per-robot storage slot, resolved now that bootActiveRobot() has set the id.
+  const KEY = keyFor(state.activeRobotId);
   let timer = null;
   function persist() {
     clearTimeout(timer);
@@ -39,14 +42,25 @@ export function initSave({ assemblyApi, wiring, getSketch, setSketch }) {
     }, 400);
   }
 
-  function load() {
+  function parse(raw) {
+    if (!raw) return null;
     try {
-      const raw = localStorage.getItem(KEY);
-      if (!raw) return null;
       const s = JSON.parse(raw);
       // version-gated migrations. v1 predates multi-robot → default robotId.
       if (s.v === 1) { s.robotId = 'self-balancer'; s.v = SCHEMA; }
       if (s.v !== SCHEMA) return null;   // unknown/newer schema: ignore
+      return s;
+    } catch { return null; }
+  }
+
+  function load() {
+    try {
+      let s = parse(localStorage.getItem(KEY));
+      // migrate the legacy single slot into the self-balancer's per-robot slot
+      if (!s && state.activeRobotId === 'self-balancer') {
+        s = parse(localStorage.getItem(LEGACY_KEY));
+        if (s) { try { localStorage.setItem(KEY, JSON.stringify(s)); localStorage.removeItem(LEGACY_KEY); } catch {} }
+      }
       return s;
     } catch { return null; }
   }

@@ -16,8 +16,10 @@ import { initSave } from './app/save.js';
 import { initTouch } from './app/touch.js';
 import { initCurriculum } from './curriculum/engine.js';
 import { initPerf } from './app/perf.js';
+import { initTopbar } from './app/topbar.js';
 
 initPerf();   // dev-only FPS/startup HUD (?perf or Alt+P); no-op otherwise
+initTopbar(); // product-frame shell: brand, robot name, theme toggle
 const serial = new Serial(document.getElementById('serial-log'));
 
 // unlock audio on first interaction (browser autoplay policy)

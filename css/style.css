@@ -10,7 +10,41 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
+
+/* ── top-bar shell (product frame above the cockpit) ── */
+#topbar {
+  flex-shrink: 0;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: 0 var(--sp-4);
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  border-bottom: 1px solid var(--border);
+}
+.tb-brand { display: flex; align-items: baseline; gap: 8px; }
+.tb-mark { color: var(--accent); font-size: 16px; text-shadow: 0 0 10px var(--accent-glow); line-height: 1; }
+.tb-name { font-family: var(--display); font-weight: 700; font-size: 16px; letter-spacing: 0.06em; color: var(--text); }
+.tb-sub { font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-dim); }
+.tb-robot {
+  display: flex; align-items: center; gap: 7px;
+  padding: 4px 11px; border: 1px solid var(--border-2); border-radius: var(--r-pill);
+  font-size: 11.5px; color: var(--text-dim); font-family: var(--mono);
+}
+.tb-robot .tb-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-dim); }
+.tb-robot.driving { color: var(--green); border-color: var(--green); }
+.tb-robot.driving .tb-dot { background: var(--green); box-shadow: 0 0 7px var(--green); }
+.tb-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.tb-btn {
+  width: 30px; height: 30px; border-radius: var(--r-sm);
+  background: transparent; border: 1px solid var(--border); color: var(--text-dim);
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+  transition: border-color var(--t-fast), color var(--t-fast);
+}
+.tb-btn:hover { border-color: var(--accent); color: var(--accent); }
 
 /* Lucide icon sizing inside buttons/labels */
 .lucide, [data-lucide] { width: 15px; height: 15px; stroke-width: 2; flex-shrink: 0; vertical-align: -2px; }
@@ -22,7 +56,8 @@ button.loading > i, button.loading > .lucide { animation: spin 0.8s linear infin
 #app {
   display: grid;
   grid-template-columns: 240px 1fr 380px;
-  height: 100vh;
+  flex: 1;
+  min-height: 0;
   gap: 1px;
   background: var(--border);
 }
@@ -58,13 +93,13 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
 #auto-bar { display: flex; flex-direction: column; gap: 6px; padding: 8px 8px 0; }
 .auto-btn {
   display: flex; align-items: center; gap: 8px;
-  padding: 9px 11px; background: linear-gradient(180deg, #14283f, #0f2033);
+  padding: 9px 11px; background: var(--btn-accent-grad);
   border: 1px solid var(--border-2);
   color: var(--accent); font-family: var(--ui); font-weight: 500; font-size: 12px;
   border-radius: var(--r); cursor: pointer; text-align: left;
   transition: border-color 0.15s, background 0.15s, transform 0.08s;
 }
-.auto-btn:hover { background: linear-gradient(180deg, #1a3550, #143047); border-color: var(--accent); }
+.auto-btn:hover { background: var(--btn-accent-grad-hover); border-color: var(--accent); }
 .auto-btn:active { transform: translateY(1px); }
 .auto-btn:disabled { opacity: 0.4; cursor: default; }
 
@@ -73,7 +108,7 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
 .part-card {
   background: var(--panel-2);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--r-sm);
   padding: 10px 12px;
   cursor: grab;
   user-select: none;
@@ -111,7 +146,7 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
   max-width: calc(100% - 120px);
   background: var(--overlay);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--r-sm);
   padding: 6px 14px;
   font-size: 11.5px;
   color: var(--text-dim);
@@ -140,13 +175,13 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
   transition: all 0.15s;
 }
 #upload-btn:not(:disabled) {
-  background: linear-gradient(180deg, #16482f, #0f3624);
+  background: var(--btn-go-grad);
   border-color: var(--green);
   color: var(--green);
   cursor: pointer;
   box-shadow: 0 0 0 rgba(70,224,143,0);
 }
-#upload-btn:not(:disabled):hover { background: linear-gradient(180deg, #1c5c3b, #14472e); box-shadow: 0 6px 20px rgba(70,224,143,0.2); }
+#upload-btn:not(:disabled):hover { background: var(--btn-go-grad-hover); box-shadow: 0 6px 20px rgba(70,224,143,0.2); }
 #upload-btn:not(:disabled):active { transform: translateY(1px); }
 
 /* ── tooltip ── */
@@ -154,7 +189,7 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
   position: fixed; z-index: 100;
   background: var(--panel-2);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--r-sm);
   padding: 8px 10px;
   font-size: 11.5px;
   max-width: 260px;
@@ -227,8 +262,8 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
 .gp.future { opacity: 0.5; }
 .gp.done .gp-num { border-color: var(--green); color: var(--green); background: rgba(61,220,132,0.12); }
 .gp.done .gp-label { color: var(--green); }
-.gp.open { background: rgba(86,168,255,0.07); }
-.gp.open .gp-num { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 8px rgba(77,163,255,0.45); }
+.gp.open { background: var(--accent-soft); }
+.gp.open .gp-num { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 8px var(--accent-glow); }
 .gp.open .gp-label { color: var(--text); font-weight: 600; }
 .gp-body { margin: 7px 0 2px 29px; }
 .gp-text { color: var(--text-dim); font-size: 11.8px; line-height: 1.55; }
@@ -244,7 +279,7 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
 #controls-legend {
   position: absolute; bottom: 52px; left: 12px; z-index: 6;
   background: var(--overlay); border: 1px solid var(--border);
-  border-radius: 8px; padding: 8px 12px; backdrop-filter: blur(5px);
+  border-radius: var(--r); padding: 8px 12px; backdrop-filter: blur(5px);
   font-size: 10.5px; color: var(--text-dim); line-height: 1.7; pointer-events: none;
 }
 #controls-legend b { color: var(--accent); font-weight: 600; }
@@ -279,31 +314,36 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
 #clear-btn:hover:not(:disabled) { border-color: var(--red); color: var(--red); }
 #clear-btn:disabled { opacity: 0.35; cursor: default; }
 
-/* ── onboarding overlay ── */
+/* ── title screen (Lab-Instrument welcome) ── */
 #overlay {
   position: fixed; inset: 0; z-index: 300;
-  background: rgba(6,9,13,0.78); backdrop-filter: blur(6px);
+  background: rgba(6,7,10,0.82); backdrop-filter: blur(7px);
   display: flex; align-items: center; justify-content: center;
 }
 #overlay .card {
-  background: linear-gradient(160deg, #131926, #0d1119);
-  border: 1px solid var(--border); border-radius: 14px;
-  padding: 26px 28px; max-width: 460px; width: calc(100% - 40px);
-  box-shadow: 0 24px 70px rgba(0,0,0,0.6);
+  position: relative;
+  background:
+    radial-gradient(120% 90% at 100% 0%, var(--accent-soft), transparent 60%),
+    linear-gradient(160deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--border-2); border-radius: var(--r-lg);
+  padding: 30px 32px; max-width: 480px; width: calc(100% - 40px);
+  box-shadow: var(--shadow-lg);
 }
-#overlay h1 { font-size: 19px; color: var(--text); letter-spacing: 0.02em; margin-bottom: 4px; }
-#overlay .tagline { color: var(--accent); font-size: 12px; margin-bottom: 16px; }
-#overlay ol { list-style: none; display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
-#overlay li { display: flex; gap: 12px; align-items: flex-start; }
-#overlay li .n { width: 22px; height: 22px; flex-shrink: 0; border-radius: 50%; border: 1px solid var(--accent); color: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 11px; }
-#overlay li b { color: var(--text); font-size: 13px; }
-#overlay li p { color: var(--text-dim); font-size: 11.5px; line-height: 1.5; margin-top: 2px; }
+#overlay .ov-mark { font-family: var(--display); font-weight: 700; font-size: 13px; letter-spacing: 0.16em; color: var(--accent); text-transform: uppercase; margin-bottom: 14px; }
+#overlay .ov-mark span { text-shadow: 0 0 10px var(--accent-glow); }
+#overlay h1 { font-family: var(--display); font-weight: 700; font-size: 30px; line-height: 1.05; color: var(--text); letter-spacing: 0.01em; margin-bottom: 8px; }
+#overlay .tagline { color: var(--text-dim); font-size: 13px; line-height: 1.5; margin-bottom: 22px; max-width: 40ch; }
+#overlay .ov-beats { display: flex; gap: 10px; margin-bottom: 24px; }
+#overlay .ov-beat { flex: 1; padding: 12px 12px 13px; background: var(--panel-3); border: 1px solid var(--border); border-radius: var(--r); }
+#overlay .ov-n { font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; color: var(--accent); }
+#overlay .ov-beat b { display: block; color: var(--text); font-size: 13px; margin: 5px 0 3px; }
+#overlay .ov-beat p { color: var(--text-dim); font-size: 11px; line-height: 1.4; }
 #overlay .start {
-  width: 100%; padding: 11px; background: #123524; border: 1px solid var(--green);
-  color: var(--green); font-family: var(--mono); font-size: 13px; letter-spacing: 0.08em;
-  border-radius: 8px; cursor: pointer;
+  width: 100%; padding: 13px; background: var(--btn-accent-grad); border: 1px solid var(--accent);
+  color: var(--accent); font-family: var(--ui); font-weight: 600; font-size: 13.5px; letter-spacing: 0.04em;
+  border-radius: var(--r); cursor: pointer; transition: background var(--t-fast), box-shadow var(--t-fast);
 }
-#overlay .start:hover { background: #1a4a32; }
+#overlay .start:hover { background: var(--btn-accent-grad-hover); box-shadow: 0 6px 22px var(--accent-glow); }
 
 /* ── serial monitor ── */
 #serial { flex-shrink: 0; height: 150px; display: flex; flex-direction: column; border-top: 1px solid var(--border); background: #070a0e; }
@@ -330,7 +370,7 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
   position: absolute; top: 10px; right: 12px; z-index: 8;
   background: var(--overlay-strong);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--r);
   padding: 12px;
   width: 324px;
   backdrop-filter: blur(6px);
@@ -341,7 +381,7 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
 .sim-ok { color: var(--green); background: var(--ok-bg); }
 .sim-warn { color: var(--yellow); background: var(--warn-bg); }
 .sim-bad { color: var(--red); background: var(--bad-bg); }
-#sparkline { width: 100%; height: 70px; background: #0b0e13; border: 1px solid var(--border); border-radius: 6px; display: block; }
+#sparkline { width: 100%; height: 70px; background: #0b0e13; border: 1px solid var(--border); border-radius: var(--r-sm); display: block; }
 .sim-buttons { display: flex; gap: 6px; margin-top: 10px; }
 .sim-buttons button {
   flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px;
@@ -404,7 +444,7 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
   border-radius: 7px; padding: 6px 12px; cursor: pointer; font-size: 12.5px;
 }
 #resume-bar button:hover { background: #26324a; }
-#resume-bar #resume-yes { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+#resume-bar #resume-yes { background: var(--accent); border-color: var(--accent); color: #1b1303; font-weight: 600; }
 
 /* ── guided tour (spotlight + coach card) ──────────────────── */
 #tut-ring {
@@ -433,7 +473,7 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
 #overlay .tour {
   width: 100%; margin-top: 8px; padding: 9px; background: transparent;
   border: 1px solid var(--border-2); color: var(--accent);
-  font-family: var(--ui); font-size: 12px; border-radius: 8px; cursor: pointer;
+  font-family: var(--ui); font-size: 12px; border-radius: var(--r); cursor: pointer;
 }
 #overlay .tour:hover { border-color: var(--accent); }
 

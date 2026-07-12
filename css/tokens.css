@@ -18,10 +18,13 @@
   --text: #d3dce9;
   --text-dim: #737f92;
 
-  /* color — semantic */
-  --accent: #56a8ff;
-  --accent-dim: #16324f;
-  --accent-glow: rgba(86, 168, 255, 0.35);
+  /* color — semantic
+     Lab-Instrument identity: amber-phosphor is the signature accent (CRT/nixie).
+     green is reserved for connected/success, red for fault. */
+  --accent: #ffb000;
+  --accent-dim: #3a2a05;
+  --accent-glow: rgba(255, 176, 0, 0.32);
+  --accent-soft: rgba(255, 176, 0, 0.09);   /* faint fill for active regions */
   --green: #46e08f;
   --yellow: #ffd166;
   --red: #ff6b6b;
@@ -29,9 +32,16 @@
   --warn-bg: rgba(255, 209, 102, 0.14);
   --bad-bg: rgba(255, 107, 107, 0.16);
 
+  /* button surfaces (tokenized — no bespoke gradients in component CSS) */
+  --btn-accent-grad: linear-gradient(180deg, #2a1e05, #1b1303);
+  --btn-accent-grad-hover: linear-gradient(180deg, #3a2a08, #241a05);
+  --btn-go-grad: linear-gradient(180deg, #16482f, #0f3624);
+  --btn-go-grad-hover: linear-gradient(180deg, #1c5c3b, #14472e);
+
   /* type */
   --ui: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: "JetBrains Mono", "Cascadia Code", "Fira Code", Consolas, monospace;
+  --display: "Space Grotesk", "Inter", system-ui, sans-serif;  /* product frame / headers */
   --fs-xs: 10px;
   --fs-sm: 11.5px;
   --fs-md: 13px;
@@ -73,9 +83,14 @@
   --border-2: #c2cad9;
   --text: #1c2430;
   --text-dim: #5c6878;
-  --accent: #1f6feb;
-  --accent-dim: #dbe9ff;
-  --accent-glow: rgba(31, 111, 235, 0.25);
+  --accent: #a15c00;                        /* burnt amber, ~5:1 on white */
+  --accent-dim: #ffedcc;
+  --accent-glow: rgba(161, 92, 0, 0.22);
+  --accent-soft: rgba(161, 92, 0, 0.10);
+  --btn-accent-grad: linear-gradient(180deg, #fff3dd, #ffe9c4);
+  --btn-accent-grad-hover: linear-gradient(180deg, #ffe9c4, #ffdfa8);
+  --btn-go-grad: linear-gradient(180deg, #e7f7ee, #d6f0e0);
+  --btn-go-grad-hover: linear-gradient(180deg, #d6f0e0, #c2e8d0);
   --green: #14803c;
   --yellow: #9a6700;
   --red: #cf222e;

@@ -1,14 +1,15 @@
-// HUD: tooltips, status flash, checklist, phase stepper, onboarding overlay,
-// sound toggle, sim HUD (sparkline + buttons), mission HUD.
+// HUD: tooltips, status flash, checklist, sound toggle, sim HUD (sparkline +
+// live PID sliders + buttons), mission HUD. (The phase stepper + onboarding
+// overlay it once owned are now the Guide rail — see js/app/guide.js.)
 import * as THREE from 'three';
 import { SLOTS } from '../parts.js';
 import { audio } from '../audio.js';
 import { makeMissions } from '../missions.js';
-import { state } from './state.js';
+import { state, set, subscribe } from './state.js';
 
 export const KIND_LABEL = { power: 'POWER', ground: 'GROUND', data: 'SIGNAL' };
 
-export function initHud({ wiring, sim, getPlacedCount, getGains, onExitSim }) {
+export function initHud({ wiring, sim, getPlacedCount, getGains, onExitSim, onGains }) {
   const tooltip = document.getElementById('tooltip');
   const hudStatus = document.getElementById('hud-status');
   const checklistEl = document.getElementById('checklist');
@@ -110,17 +111,35 @@ export function initHud({ wiring, sim, getPlacedCount, getGains, onExitSim }) {
     <div class="spark-legend">
       <span class="lg-tilt">— tilt</span><span class="lg-p">— P</span><span class="lg-i">— I</span><span class="lg-d">— D</span>
     </div>
+    <div class="sim-pid" id="sim-pid">
+      <div class="pid-head">LIVE PID TUNING</div>
+      <label class="pid-row"><span class="pid-k">Kp</span><input id="kp-sl" type="range" min="0" max="40" step="0.5"><span class="pid-v" id="kp-val">15</span></label>
+      <label class="pid-row"><span class="pid-k">Ki</span><input id="ki-sl" type="range" min="0" max="300" step="5"><span class="pid-v" id="ki-val">140</span></label>
+      <label class="pid-row"><span class="pid-k">Kd</span><input id="kd-sl" type="range" min="0" max="3" step="0.05"><span class="pid-v" id="kd-val">0.9</span></label>
+    </div>
     <div class="sim-buttons">
-      <button id="nudge-btn"><i data-lucide="zap"></i><span>Nudge</span></button>
       <button id="reset-btn"><i data-lucide="rotate-ccw"></i><span>Reset</span></button>
       <button id="back-btn"><i data-lucide="arrow-left"></i><span>Assembly</span></button>
     </div>
-    <div class="sim-gains" id="gains-readout">Kp 15  Ki 140  Kd 0.9</div>
-    <div class="sim-drive">W/S drive · A/D steer</div>`;
+    <div class="sim-drive">W/S drive · A/D steer · Space jump</div>`;
   document.getElementById('workspace').appendChild(simHud);
-  document.getElementById('nudge-btn').addEventListener('click', () => { sim.nudge(); audio.nudge(); });
   document.getElementById('reset-btn').addEventListener('click', () => { sim.setGains(getGains()); sim.reset(); clearGraph(); });
   document.getElementById('back-btn').addEventListener('click', () => onExitSim());
+
+  // ── live PID sliders (drive the sim + editor sketch in real time) ──
+  const sl = { Kp: simHud.querySelector('#kp-sl'), Ki: simHud.querySelector('#ki-sl'), Kd: simHud.querySelector('#kd-sl') };
+  const slv = { Kp: simHud.querySelector('#kp-val'), Ki: simHud.querySelector('#ki-val'), Kd: simHud.querySelector('#kd-val') };
+  function syncSliders(g) {
+    for (const k of ['Kp', 'Ki', 'Kd']) { sl[k].value = g[k]; slv[k].textContent = g[k]; }
+  }
+  function onSlide() {
+    const g = { Kp: +sl.Kp.value, Ki: +sl.Ki.value, Kd: +sl.Kd.value };
+    for (const k of ['Kp', 'Ki', 'Kd']) slv[k].textContent = g[k];
+    set('gains', g); sim.setGains(g); onGains?.(g);   // onGains keeps the .ino sketch in sync
+  }
+  for (const k of ['Kp', 'Ki', 'Kd']) sl[k].addEventListener('input', onSlide);
+  syncSliders(getGains());
+  subscribe('gains', syncSliders);   // keep sliders in step with edits from the .ino editor
 
   // ── mission mode HUD (built dynamically) ─────────────────────
   const missions = makeMissions();

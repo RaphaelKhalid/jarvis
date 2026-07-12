@@ -7,6 +7,11 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { SLOTS } from './parts.js';
 
+// Vertical lift applied to the assembly rig (chassis deck, parts, slot ghosts)
+// so the motors' wheels rest on the workbench floor instead of clipping through
+// it. Shared with js/app/assembly.js so parts and deck lift together.
+export const ASSEMBLY_LIFT = 2.1;
+
 export function createScene(canvas) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -135,6 +140,10 @@ export function createScene(canvas) {
     bolt.position.set(bx, 0.06, bz);
     chassis.add(bolt);
   }
+  // lift the whole rig so the motors' wheels (which hang ~2 units below their
+  // mount and off the deck edges) rest on the workbench floor instead of
+  // clipping through it. Assembly parts + slot ghosts lift by the same amount.
+  chassis.position.y = ASSEMBLY_LIFT;
   scene.add(chassis);
 
   // ── workshop backdrop dome: warm horizon glow, amber walls, dim ceiling ──
@@ -184,7 +193,7 @@ export function createScene(canvas) {
       })
     );
     g.rotation.x = -Math.PI / 2;
-    g.position.set(slot.x, 0.06, slot.z);
+    g.position.set(slot.x, 0.06 + ASSEMBLY_LIFT, slot.z);
     g.userData.slot = slot;
     scene.add(g);
     slotMeshes[slot.id] = g;

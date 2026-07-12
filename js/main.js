@@ -46,6 +46,7 @@ const hud = initHud({
   getPlacedCount: () => (assemblyApi ? assemblyApi.getPlacedCount() : 0),
   getGains: () => state.gains,
   onExitSim: () => exitSim(),
+  onGains: (g) => setSketchGains(g),   // live PID sliders write back into the .ino sketch
 });
 const assemblyApi = initAssembly({ canvas, scene, camera, controls, slotMeshes, wiring, hud });
 // education-first Guide rail: always-visible instructions that advance with state

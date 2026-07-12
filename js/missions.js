@@ -21,7 +21,7 @@ export function makeMissions() {
       },
     },
     {
-      id: 'shove', title: 'Shake It Off', brief: 'Survive three shoves and stay standing.',
+      id: 'shove', title: 'Shake It Off', brief: 'The lab shoves your robot three times — keep it upright. (Tests how well your PID tune recovers from a knock.)',
       dur: 16, times: [3, 7, 11],
       update(sim, dt, ctx) {
         ctx.t = (ctx.t || 0) + dt; ctx.shoves = ctx.shoves || 0;

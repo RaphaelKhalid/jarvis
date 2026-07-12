@@ -619,3 +619,46 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
 .rp-tag { font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 2px 7px; border-radius: var(--r-pill); border: 1px solid var(--border-2); color: var(--text-dim); }
 .rp-card.active .rp-tag { color: var(--accent); border-color: var(--accent); }
 .rp-blurb { color: var(--text-dim); font-size: 11px; line-height: 1.4; margin-top: 4px; }
+
+/* ── in-sim live PID sliders ── */
+.sim-pid { margin-top: 10px; padding: 9px 10px; background: var(--panel-3); border: 1px solid var(--border); border-radius: var(--r); }
+.sim-pid .pid-head { font-size: 9px; font-weight: 700; letter-spacing: 0.12em; color: var(--text-dim); margin-bottom: 7px; }
+.pid-row { display: grid; grid-template-columns: 22px 1fr 40px; align-items: center; gap: 8px; margin-bottom: 5px; }
+.pid-row:last-child { margin-bottom: 0; }
+.pid-k { font-family: var(--mono); font-size: 11px; color: var(--accent); font-weight: 600; }
+.pid-v { font-family: var(--mono); font-size: 11px; color: var(--text); text-align: right; }
+.pid-row input[type="range"] {
+  -webkit-appearance: none; appearance: none; height: 4px; border-radius: var(--r-pill);
+  background: var(--border-2); outline: none; cursor: pointer;
+}
+.pid-row input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; width: 14px; height: 14px; border-radius: 50%;
+  background: var(--accent); box-shadow: 0 0 8px var(--accent-glow); cursor: pointer;
+}
+.pid-row input[type="range"]::-moz-range-thumb {
+  width: 14px; height: 14px; border: none; border-radius: 50%;
+  background: var(--accent); box-shadow: 0 0 8px var(--accent-glow); cursor: pointer;
+}
+
+/* ── light-mode overrides for the code editor + serial monitor ──
+   CodeMirror ships the fixed-dark material-darker theme and the serial log
+   hardcodes a near-black bg; both need explicit light reskins. Selector
+   specificity (:root[data-theme] + class) beats the theme's two-class rules. */
+:root[data-theme="light"] .CodeMirror { background: #fbfcfe; color: #1c2430; }
+:root[data-theme="light"] .CodeMirror-gutters { background: #eef1f6; border-right: 1px solid var(--border); }
+:root[data-theme="light"] .CodeMirror-linenumber { color: #9aa4b2; }
+:root[data-theme="light"] .CodeMirror-cursor { border-left: 1px solid #1c2430; }
+:root[data-theme="light"] .CodeMirror-selected { background: #d5e2f5 !important; }
+:root[data-theme="light"] .CodeMirror-activeline-background { background: #eef2f8; }
+:root[data-theme="light"] .cm-comment { color: #6a737d; }
+:root[data-theme="light"] .cm-keyword, :root[data-theme="light"] .cm-atom { color: #cf222e; }
+:root[data-theme="light"] .cm-number { color: #0550ae; }
+:root[data-theme="light"] .cm-def, :root[data-theme="light"] .cm-variable, :root[data-theme="light"] .cm-variable-2 { color: #1c2430; }
+:root[data-theme="light"] .cm-string { color: #0a7d32; }
+:root[data-theme="light"] .cm-type, :root[data-theme="light"] .cm-builtin, :root[data-theme="light"] .cm-tag { color: #8250df; }
+:root[data-theme="light"] .cm-operator, :root[data-theme="light"] .cm-punctuation { color: #57606a; }
+
+:root[data-theme="light"] #serial { background: #f4f6fa; }
+:root[data-theme="light"] #serial-log { color: #3a4658; }
+:root[data-theme="light"] .ser-line { color: #3a4658; }
+:root[data-theme="light"] #sparkline { background: #eef2f8; }

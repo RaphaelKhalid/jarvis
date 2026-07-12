@@ -5,7 +5,7 @@
 // automatically by observing real app state, and hosts the curriculum lessons
 // inline (browser + active lesson card render into this same panel).
 import { state } from './state.js';
-import { SLOTS } from '../parts.js';
+import { activeRobot } from '../robots/index.js';
 
 const REQUIRED_PARTS = [
   { compType: 'arduino', label: 'Arduino Uno' },
@@ -73,7 +73,7 @@ export function initGuide({ wiring, assemblyApi, getGains }) {
       text: 'Drag all six parts from the tray onto the glowing pads on the chassis. Every robot needs a brain, a balance sensor, a motor driver, two motors, and a battery.',
       tip: 'Hover a part’s <b>?</b> to see what it does.',
       checklist: () => REQUIRED_PARTS.map(p => ({ label: p.label, done: partDone(p.compType) })),
-      done: () => placedCount() >= SLOTS.length,
+      done: () => placedCount() >= activeRobot().slots.length,
     },
     {
       key: 'wire', num: 2, label: 'Wire',
@@ -109,7 +109,7 @@ export function initGuide({ wiring, assemblyApi, getGains }) {
 
   function currentIndex() {
     if (state.mode === 'sim') return 3;
-    if (placedCount() < SLOTS.length) return 0;
+    if (placedCount() < activeRobot().slots.length) return 0;
     if (!wiring.allRequiredDone()) return 1;
     return 2;
   }

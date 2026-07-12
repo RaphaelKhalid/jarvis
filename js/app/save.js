@@ -1,8 +1,8 @@
 // Versioned save/load of assembly state (localStorage, schema v1).
 // The same payload later becomes the cloud-sync document — keep it
 // forward-compatible: ignore unknown keys, gate migrations on `v`.
-import { PART_DEFS } from '../parts.js';
 import { DEFAULT_SKETCH } from '../editor.js';
+import { activeRobot } from '../robots/index.js';
 import { state } from './state.js';
 
 const KEY = 'sbl-save-v1';   // storage key (kept stable; schema version is `v`)
@@ -59,7 +59,7 @@ export function initSave({ assemblyApi, wiring, getSketch, setSketch }) {
   }
 
   function restore(s) {
-    for (const def of PART_DEFS) {
+    for (const def of activeRobot().parts) {
       const n = Math.min(s.placedCount?.[def.type] || 0, def.count);
       for (let i = 0; i < n; i++) assemblyApi.placeByType(def.type);
     }

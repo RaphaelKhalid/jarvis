@@ -5,7 +5,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { SLOTS } from './parts.js';
+import { activeRobot } from './robots/index.js';
 
 // Vertical lift applied to the assembly rig (chassis deck, parts, slot ghosts)
 // so the motors' wheels rest on the workbench floor instead of clipping through
@@ -185,7 +185,7 @@ export function createScene(canvas) {
 
   // ── slot ghosts (highlighted during drag) ──
   const slotMeshes = {};
-  for (const slot of SLOTS) {
+  for (const slot of activeRobot().slots) {
     const g = new THREE.Mesh(
       new THREE.PlaneGeometry(slot.w, slot.d),
       new THREE.MeshBasicMaterial({

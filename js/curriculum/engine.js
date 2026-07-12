@@ -5,7 +5,7 @@ import { state } from '../app/state.js';
 
 const PROGRESS_KEY = 'sbl-progress-v1';
 
-export function initCurriculum({ sim, wiring, assemblyApi, hud, setSketchGains }) {
+export function initCurriculum({ sim, wiring, assemblyApi, hud, setSketchGains, guide }) {
   let active = null;   // { lesson, objIdx, t, holdT, counters }
   let progress = {};
   try { progress = JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}'); } catch {}
@@ -90,7 +90,8 @@ export function initCurriculum({ sim, wiring, assemblyApi, hud, setSketchGains }
 
   function quit() {
     active = null;
-    card.classList.add('hidden');
+    guide.showView('walk');
+    guide.refresh();
   }
 
   function complete() {
@@ -152,15 +153,12 @@ export function initCurriculum({ sim, wiring, assemblyApi, hud, setSketchGains }
     }
   }
 
-  // ── UI: lesson card ──────────────────────────────────────────
-  const card = document.createElement('div');
-  card.id = 'lesson-hud';
-  card.className = 'hidden';
-  document.getElementById('workspace').appendChild(card);
+  // ── UI: lesson card (rendered inline into the Guide rail) ─────
+  const card = guide.hosts.lesson;
 
   function renderCard() {
     const { lesson, objIdx } = active;
-    card.classList.remove('hidden');
+    guide.showView('lesson');
     card.innerHTML = `
       <div class="l-top"><span class="l-track">${TRACKS.find(t => t.id === lesson.track).name}</span>
         <button class="l-quit" id="l-quit" aria-label="Quit lesson">✕</button></div>
@@ -186,9 +184,8 @@ export function initCurriculum({ sim, wiring, assemblyApi, hud, setSketchGains }
         <button id="l-next">Next lesson</button>
         <button id="l-close">Close</button>
       </div>`;
-    document.getElementById('l-close').addEventListener('click', () => card.classList.add('hidden'));
+    document.getElementById('l-close').addEventListener('click', () => { guide.showView('walk'); guide.refresh(); });
     document.getElementById('l-next').addEventListener('click', () => {
-      card.classList.add('hidden');
       const list = trackLessons(lesson.track);
       const next = list[list.indexOf(lesson) + 1];
       if (next) { if (state.mode === 'sim') hud.flash('Head back to Assembly to start it', 'bad'); openOverlay(); }
@@ -196,16 +193,13 @@ export function initCurriculum({ sim, wiring, assemblyApi, hud, setSketchGains }
     });
   }
 
-  // ── UI: learn overlay (track/lesson browser) ─────────────────
-  const overlay = document.createElement('div');
-  overlay.id = 'learn-overlay';
-  overlay.className = 'hidden';
-  document.body.appendChild(overlay);
+  // ── UI: lesson browser (rendered inline into the Guide rail) ──
+  const browser = guide.hosts.browser;
 
   function openOverlay() {
-    overlay.classList.remove('hidden');
-    overlay.innerHTML = `<div class="learn-card">
-      <div class="learn-head"><h2>Learn</h2><button id="learn-close" aria-label="Close">✕</button></div>
+    guide.showView('browser');
+    browser.innerHTML = `
+      <div class="learn-head"><h2>Lessons</h2><button id="learn-close" aria-label="Back to guide">✕</button></div>
       ${TRACKS.map(t => `
         <div class="learn-track">
           <div class="lt-name">${t.name}</div>
@@ -220,17 +214,12 @@ export function initCurriculum({ sim, wiring, assemblyApi, hud, setSketchGains }
               </button>`;
             }).join('')}
           </div>
-        </div>`).join('')}
-    </div>`;
-    document.getElementById('learn-close').addEventListener('click', () => overlay.classList.add('hidden'));
-    for (const btn of overlay.querySelectorAll('[data-lesson]')) {
-      btn.addEventListener('click', () => {
-        overlay.classList.add('hidden');
-        start(btn.dataset.lesson);
-      });
+        </div>`).join('')}`;
+    document.getElementById('learn-close').addEventListener('click', () => { guide.showView('walk'); guide.refresh(); });
+    for (const btn of browser.querySelectorAll('[data-lesson]')) {
+      btn.addEventListener('click', () => start(btn.dataset.lesson));
     }
   }
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.classList.add('hidden'); });
 
   return { start, quit, tick, openOverlay, starsFor, get active() { return active; } };
 }

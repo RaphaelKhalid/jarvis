@@ -73,69 +73,37 @@ export function createScene(canvas) {
   lamp.position.set(0, 26, 6);
   scene.add(lamp);
 
-  // ── custom shader floor: a dark-wood workbench surface ──
-  // GLSL ShaderMaterial (no derivatives, so it runs on WebGL1/2 alike):
-  // repeating planks with darker seams + procedural grain streaks, warm-lit and
-  // fading to darkness at the edges so it feels like a bench in a dim workshop.
+  // ── PBR wood-plank workbench floor (real CC0 PolyHaven texture set) ──
+  // A lit MeshStandardMaterial so the floor takes the same warm key light,
+  // casts/receives shadows, and blooms consistently with the bench and parts —
+  // the old unlit shader floor read as fake next to the lit geometry.
+  // floorUniforms kept as a harmless stub so main.js's uTime tick stays valid.
   const floorUniforms = { uTime: { value: 0 } };
-  const floorMat = new THREE.ShaderMaterial({
-    uniforms: floorUniforms,
-    vertexShader: /* glsl */`
-      varying vec2 vWorld;
-      void main() {
-        vWorld = position.xy;                 // plane is XY before rotation
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-      }`,
-    fragmentShader: /* glsl */`
-      precision highp float;
-      varying vec2 vWorld;
-      uniform float uTime;
-      float hash(float n) { return fract(sin(n) * 43758.5453); }
-      float hash2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-      // value noise for organic grain
-      float vnoise(vec2 p) {
-        vec2 i = floor(p), f = fract(p);
-        f = f * f * (3.0 - 2.0 * f);
-        return mix(mix(hash2(i), hash2(i + vec2(1, 0)), f.x),
-                   mix(hash2(i + vec2(0, 1)), hash2(i + vec2(1, 1)), f.x), f.y);
-      }
-      void main() {
-        // staggered planks: run along X, 14 wide, 110 long with per-row offset
-        float plankW = 14.0, plankL = 110.0;
-        float row = floor(vWorld.y / plankW);
-        float xOff = hash(row) * plankL;             // stagger the end joints
-        float colId = floor((vWorld.x + xOff) / plankL);
-        float rj = hash(row * 7.0 + colId * 13.0) - 0.5;   // per-plank tone
-
-        // layered wood grain: long streaks + fine fibers + soft blotches
-        float streak = sin(vWorld.x * 0.55 + row * 9.0
-                      + vnoise(vec2(vWorld.x * 0.05, row)) * 9.0) * 0.5 + 0.5;
-        float fiber = vnoise(vec2(vWorld.x * 1.4, vWorld.y * 6.0)) * 0.5;
-        float blotch = vnoise(vec2(vWorld.x * 0.06, vWorld.y * 0.06));
-        float grain = streak * 0.55 + fiber * 0.25 + blotch * 0.35;
-
-        // seams: between rows and at staggered plank ends
-        float seamY = smoothstep(0.5, 0.465, abs(fract(vWorld.y / plankW) - 0.5));
-        float seamX = smoothstep(0.5, 0.485, abs(fract((vWorld.x + xOff) / plankL) - 0.5));
-        float seam = max(seamY, seamX);
-
-        vec3 dark  = vec3(0.13, 0.075, 0.038);
-        vec3 light = vec3(0.34, 0.205, 0.105);
-        vec3 col = mix(dark, light, clamp(grain * 0.8 + 0.1 + rj * 0.16, 0.0, 1.0));
-        col *= mix(1.0, 0.42, seam);
-
-        // warm lamp pool over the bench + gentle falloff (floor stays visible)
-        float d = length(vWorld);
-        float pool = smoothstep(120.0, 0.0, d);
-        col *= 0.55 + 0.75 * pool;
-        col = mix(col, col * vec3(1.06, 1.0, 0.9), pool * 0.6);   // warmth in the pool
-        col *= smoothstep(320.0, 90.0, d) * 0.85 + 0.15;          // distant falloff
-        gl_FragColor = vec4(col, 1.0);
-      }`,
+  const texLoader = new THREE.TextureLoader();
+  const maxAniso = renderer.capabilities.getMaxAnisotropy();
+  const FLOOR_SIZE = 500;
+  const FLOOR_TILE = 150;                       // world units covered by one texture tile (~1 plank run)
+  const repeat = FLOOR_SIZE / FLOOR_TILE;
+  function loadFloorTex(url, srgb) {
+    const t = texLoader.load(url);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.repeat.set(repeat, repeat);
+    t.anisotropy = maxAniso;
+    if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  }
+  const floorMat = new THREE.MeshStandardMaterial({
+    map:          loadFloorTex('assets/textures/wood_floor_diff.jpg', true),
+    normalMap:    loadFloorTex('assets/textures/wood_floor_nor.png', false),
+    roughnessMap: loadFloorTex('assets/textures/wood_floor_rough.jpg', false),
+    roughness: 0.85, metalness: 0.0,
+    normalScale: new THREE.Vector2(0.75, 0.75),
+    color: 0xcabfa6,                            // desaturated tan so the warm key light doesn't push the planks fully red
   });
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(500, 500), floorMat);
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(FLOOR_SIZE, FLOOR_SIZE), floorMat);
   floor.rotation.x = -Math.PI / 2;
   floor.position.y = -0.02;
+  floor.receiveShadow = true;
   scene.add(floor);
 
   // ── mounting deck the robot is built on (layered, product-looking) ──

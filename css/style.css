@@ -175,20 +175,70 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
 #tooltip.error { border-color: var(--red); color: var(--red); }
 .hidden { display: none !important; }
 
-/* ── phase stepper (top-center of workspace) ── */
-#stepper {
-  position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 6;
-  display: flex; align-items: center; gap: 4px;
-  background: var(--overlay); border: 1px solid var(--border);
-  border-radius: 999px; padding: 5px 8px; backdrop-filter: blur(6px);
+/* ── Guide rail (always-visible instructions, top-left of workspace) ── */
+#guide {
+  position: absolute; top: 12px; left: 12px; z-index: 8;
+  width: 312px; max-height: calc(100% - 92px);
+  display: flex; flex-direction: column;
+  background: var(--overlay-strong); border: 1px solid var(--border-2);
+  border-radius: var(--r-lg); box-shadow: var(--shadow); backdrop-filter: blur(9px);
+  overflow: hidden;
 }
-.step { display: flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; color: var(--text-dim); font-size: 11px; transition: all 0.25s; }
-.step .num { width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--text-dim); display: flex; align-items: center; justify-content: center; font-size: 9px; flex-shrink: 0; }
-.step.active { background: rgba(77,163,255,0.14); color: var(--accent); }
-.step.active .num { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 8px rgba(77,163,255,0.5); }
-.step.complete { color: var(--green); }
-.step.complete .num { border-color: var(--green); color: var(--green); background: rgba(61,220,132,0.12); }
-.step-sep { width: 12px; height: 1px; background: var(--border); }
+#guide.collapsed { width: 40px; height: 40px; background: none; border: none; box-shadow: none; padding: 0; overflow: visible; backdrop-filter: none; }
+#guide.collapsed .g-head, #guide.collapsed .g-body { display: none; }
+.g-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 9px 11px; border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+}
+.g-title { font-size: 10.5px; font-weight: 700; letter-spacing: 0.14em; color: var(--text); display: flex; align-items: center; gap: 7px; }
+.g-title [data-lucide] { color: var(--accent); }
+.g-head-btns { display: flex; align-items: center; gap: 6px; }
+.g-lessons {
+  background: var(--panel-2); border: 1px solid var(--border-2); color: var(--accent);
+  font-family: var(--ui); font-size: 11px; font-weight: 500; padding: 4px 10px;
+  border-radius: var(--r-pill); cursor: pointer; transition: border-color var(--t-fast), background var(--t-fast);
+}
+.g-lessons:hover { border-color: var(--accent); background: var(--accent-dim); }
+.g-collapse {
+  width: 22px; height: 22px; border-radius: var(--r-sm); background: none;
+  border: 1px solid var(--border); color: var(--text-dim); cursor: pointer; font-size: 14px; line-height: 1;
+}
+.g-collapse:hover { border-color: var(--accent); color: var(--accent); }
+.g-body { overflow-y: auto; padding: 8px; }
+.g-reopen {
+  position: absolute; top: 0; left: 0; width: 40px; height: 40px; border-radius: var(--r-lg);
+  background: var(--overlay-strong); border: 1px solid var(--border-2); color: var(--accent);
+  cursor: pointer; backdrop-filter: blur(9px); box-shadow: var(--shadow);
+  display: flex; align-items: center; justify-content: center;
+}
+.g-reopen:hover { border-color: var(--accent); }
+
+/* phase blocks */
+.gp { border-radius: var(--r); padding: 8px 10px; transition: background var(--t-med); }
+.gp + .gp { margin-top: 4px; }
+.gp-head { display: flex; align-items: center; gap: 9px; }
+.gp-num {
+  width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0;
+  border: 1px solid var(--text-dim); color: var(--text-dim);
+  display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 600;
+}
+.gp-label { font-size: 12.5px; color: var(--text-dim); font-weight: 500; }
+.gp.future { opacity: 0.5; }
+.gp.done .gp-num { border-color: var(--green); color: var(--green); background: rgba(61,220,132,0.12); }
+.gp.done .gp-label { color: var(--green); }
+.gp.open { background: rgba(86,168,255,0.07); }
+.gp.open .gp-num { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 8px rgba(77,163,255,0.45); }
+.gp.open .gp-label { color: var(--text); font-weight: 600; }
+.gp-body { margin: 7px 0 2px 29px; }
+.gp-text { color: var(--text-dim); font-size: 11.8px; line-height: 1.55; }
+.gp-text b { color: var(--text); font-weight: 600; }
+.gp-check { margin: 9px 0 0; display: flex; flex-direction: column; gap: 2px; }
+.gp-item { display: flex; gap: 7px; font-size: 11px; color: var(--text-dim); font-family: var(--mono); align-items: baseline; }
+.gp-item.done { color: var(--green); }
+.gp-box { flex-shrink: 0; }
+.gp-tip { margin-top: 9px; font-size: 11px; color: var(--accent); opacity: 0.85; line-height: 1.5; }
+.gp-tip b { color: var(--accent); }
 
 /* ── controls legend (bottom-right, assembly only) ── */
 #controls-legend {
@@ -396,59 +446,44 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
 }
 #learn-btn:hover { border-color: var(--accent); color: var(--accent); }
 
-/* ── learn overlay (track/lesson browser) ─────────────────── */
-#learn-overlay {
-  position: fixed; inset: 0; z-index: 280;
-  background: var(--overlay); backdrop-filter: blur(6px);
-  display: flex; align-items: center; justify-content: center;
-}
-.learn-card {
-  background: var(--panel); border: 1px solid var(--border-2); border-radius: var(--r-lg);
-  width: min(680px, calc(100vw - 40px)); max-height: 84vh; overflow-y: auto;
-  padding: var(--sp-5) var(--sp-6); box-shadow: var(--shadow-lg);
-}
+/* ── lesson browser (rendered inline in the Guide rail) ────── */
 .learn-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--sp-3); }
-.learn-head h2 { font-size: var(--fs-xl); color: var(--text); }
-.learn-head button { background: none; border: none; color: var(--text-dim); font-size: 16px; cursor: pointer; }
-.learn-track { margin-bottom: var(--sp-4); }
+.learn-head h2 { font-size: var(--fs-lg); color: var(--text); }
+.learn-head button { background: none; border: none; color: var(--text-dim); font-size: 15px; cursor: pointer; }
+.learn-head button:hover { color: var(--accent); }
+.learn-track { margin-bottom: var(--sp-3); }
 .lt-name { font-weight: 600; color: var(--accent); font-size: var(--fs-md); }
-.lt-blurb { color: var(--text-dim); font-size: var(--fs-sm); margin: 2px 0 8px; }
-.lt-lessons { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: var(--sp-2); }
+.lt-blurb { color: var(--text-dim); font-size: var(--fs-sm); margin: 2px 0 8px; line-height: 1.45; }
+.lt-lessons { display: flex; flex-direction: column; gap: var(--sp-2); }
 .lt-lesson {
   display: flex; justify-content: space-between; align-items: center; gap: 8px;
   background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--r);
-  padding: 9px 12px; color: var(--text); font-family: var(--ui); font-size: var(--fs-sm);
+  padding: 8px 11px; color: var(--text); font-family: var(--ui); font-size: var(--fs-sm);
   cursor: pointer; text-align: left; transition: border-color var(--t-fast);
 }
 .lt-lesson:hover:not(.locked) { border-color: var(--accent); }
 .lt-lesson.locked { opacity: 0.45; cursor: default; }
 .ltl-stars { color: var(--yellow); font-size: var(--fs-xs); flex-shrink: 0; }
 
-/* ── active lesson card ────────────────────────────────────── */
-#lesson-hud {
-  position: absolute; top: 56px; left: 12px; z-index: 9; width: 270px;
-  background: var(--overlay-strong); border: 1px solid var(--border-2);
-  border-radius: var(--r-lg); padding: 14px; backdrop-filter: blur(8px);
-  box-shadow: var(--shadow);
-}
-#lesson-hud .l-top { display: flex; justify-content: space-between; align-items: center; }
-#lesson-hud .l-track { font-size: var(--fs-xs); letter-spacing: 0.12em; color: var(--accent); font-weight: 700; }
-#lesson-hud .l-quit { background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 13px; }
-#lesson-hud .l-quit:hover { color: var(--red); }
-#lesson-hud .l-title { font-weight: 600; font-size: var(--fs-lg); color: var(--text); margin: 4px 0 6px; }
-#lesson-hud .l-brief { color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.5; margin-bottom: 10px; }
-#lesson-hud .l-obj { display: flex; gap: 7px; font-size: var(--fs-sm); color: var(--text-dim); padding: 2px 0; }
-#lesson-hud .l-obj.done { color: var(--green); }
-#lesson-hud .l-obj.current { color: var(--text); font-weight: 500; }
-#lesson-hud .l-bar { height: 5px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-pill); overflow: hidden; margin-top: 10px; }
-#lesson-hud .l-fill { height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--green)); transition: width 0.2s; }
-#lesson-hud .l-stars { font-size: 22px; color: var(--yellow); margin: 6px 0; letter-spacing: 4px; }
-#lesson-hud .l-btns { display: flex; gap: 8px; margin-top: 10px; }
-#lesson-hud .l-btns button {
+/* ── active lesson card (rendered inline in the Guide rail) ─── */
+#g-lesson .l-top { display: flex; justify-content: space-between; align-items: center; }
+#g-lesson .l-track { font-size: var(--fs-xs); letter-spacing: 0.12em; color: var(--accent); font-weight: 700; }
+#g-lesson .l-quit { background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 13px; }
+#g-lesson .l-quit:hover { color: var(--red); }
+#g-lesson .l-title { font-weight: 600; font-size: var(--fs-lg); color: var(--text); margin: 4px 0 6px; }
+#g-lesson .l-brief { color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.5; margin-bottom: 10px; }
+#g-lesson .l-obj { display: flex; gap: 7px; font-size: var(--fs-sm); color: var(--text-dim); padding: 2px 0; }
+#g-lesson .l-obj.done { color: var(--green); }
+#g-lesson .l-obj.current { color: var(--text); font-weight: 500; }
+#g-lesson .l-bar { height: 5px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-pill); overflow: hidden; margin-top: 10px; }
+#g-lesson .l-fill { height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--green)); transition: width 0.2s; }
+#g-lesson .l-stars { font-size: 22px; color: var(--yellow); margin: 6px 0; letter-spacing: 4px; }
+#g-lesson .l-btns { display: flex; gap: 8px; margin-top: 10px; }
+#g-lesson .l-btns button {
   flex: 1; padding: 8px; background: var(--panel-3); border: 1px solid var(--border);
   color: var(--text); border-radius: var(--r); cursor: pointer; font-family: var(--ui); font-size: var(--fs-sm);
 }
-#lesson-hud .l-btns button:hover { border-color: var(--accent); color: var(--accent); }
+#g-lesson .l-btns button:hover { border-color: var(--accent); color: var(--accent); }
 
 /* sparkline legend (PID visualizer) */
 .spark-legend { display: flex; gap: 10px; margin-top: 4px; font-size: 9.5px; letter-spacing: 0.05em; }

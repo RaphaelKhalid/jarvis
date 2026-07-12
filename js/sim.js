@@ -33,6 +33,16 @@ export async function loadRobotModel() {
   return ROBOT;
 }
 
+// shared loader for the CC0 ground textures (grass / mud); tiled + repeated
+const _texLoader = new THREE.TextureLoader();
+function groundTex(url, repeat, srgb) {
+  const t = _texLoader.load(url);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(repeat, repeat);
+  if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
 const FIXED_DT = 1 / 60;
 const GRAVITY = 9.81;
 const CHASSIS_DENSITY = 0.06;
@@ -111,6 +121,35 @@ function terrainZone(x, z) {
   return 'normal';
 }
 
+// ── obstacle course: blocks & hurdle walls you drive over or jump ──
+// Axis-aligned boxes. Low steps (≤ STEP_UP) you climb; taller ones are walls
+// that block you unless you're airborne above their top. `top` is baked from
+// the terrain height at build time. Spawn area (r<20) is kept clear.
+const STEP_UP = 2.6;                 // max lip you can roll up without jumping
+const OBSTACLES = [
+  { x: 0,   z: 34,  w: 30, d: 4,  h: 6 },    // hurdle wall straight ahead — jump it
+  { x: 44,  z: 44,  w: 22, d: 22, h: 5, platform: true },  // raised platform to land on
+  { x: -40, z: 20,  w: 4,  d: 30, h: 7 },    // long wall
+  { x: -44, z: -44, w: 20, d: 20, h: 3, platform: true },
+  { x: 78,  z: -6,  w: 26, d: 4,  h: 8 },    // tall wall — needs a running jump
+  { x: 20,  z: -46, w: 4,  d: 22, h: 5 },
+  { x: -14, z: 62,  w: 4,  d: 22, h: 5 },
+  { x: 60,  z: 70,  w: 4,  d: 26, h: 6 },
+];
+function bakeObstacles() {
+  for (const o of OBSTACLES) o.top = terrainHeight(o.x, o.z) + o.h;
+}
+function obstacleTop(x, z) {
+  let top = -1e9;
+  for (const o of OBSTACLES)
+    if (Math.abs(x - o.x) < o.w / 2 && Math.abs(z - o.z) < o.d / 2) top = Math.max(top, o.top);
+  return top;
+}
+// height of whatever solid surface you'd stand on at (x,z): terrain or a box top
+function surfaceAt(x, z) {
+  return Math.max(terrainHeight(x, z), obstacleTop(x, z));
+}
+
 export class BalanceSim {
   constructor(scene) {
     this.scene = scene;
@@ -162,7 +201,8 @@ export class BalanceSim {
       }));
     this.group.add(sky);
 
-    // ── ground: rolling grass ──
+    // ── ground: rolling grass (real CC0 grass texture, lit + wind-shifted) ──
+    bakeObstacles();
     const geo = new THREE.PlaneGeometry(size, size, seg, seg);
     geo.rotateX(-Math.PI / 2);
     const pos = geo.attributes.position;
@@ -170,34 +210,40 @@ export class BalanceSim {
       pos.setY(i, terrainHeight(pos.getX(i), pos.getZ(i)));
     }
     geo.computeVertexNormals();
+    const grassRepeat = size / 26;                 // one grass tile ≈ 26 units
+    const grassNormal = groundTex('assets/textures/grass_nor.png', grassRepeat, false);
+    this._grassNormal = grassNormal;               // animated for a subtle wind shimmer
     const mesh = new THREE.Mesh(
       geo,
-      new THREE.MeshStandardMaterial({ color: 0x4a6b3a, roughness: 0.95, metalness: 0.0 })
+      new THREE.MeshStandardMaterial({
+        map: groundTex('assets/textures/grass_diff.jpg', grassRepeat, true),
+        normalMap: grassNormal, normalScale: new THREE.Vector2(0.7, 0.7),
+        color: 0x8fa46e, roughness: 1.0, metalness: 0.0,
+      })
     );
     mesh.receiveShadow = true;
     this.group.add(mesh);
+    this._terrainGeo = geo;                          // reused by the tire-track overlay
 
-    // ── material zone discs (mud / ice / boost / water), draped over the terrain ──
+    // ── material zones: real mud texture, procedural ice + water, glowing boost ──
     for (const zn of ZONES) {
       const m = MATERIALS[zn.type];
-      const zg = new THREE.CircleGeometry(zn.r, 56);
+      const zg = new THREE.CircleGeometry(zn.r, 64);
       zg.rotateX(-Math.PI / 2);
       const zp = zg.attributes.position;
       for (let i = 0; i < zp.count; i++) {
         const wx = zp.getX(i) + zn.x, wz = zp.getZ(i) + zn.z;
-        zp.setY(i, terrainHeight(wx, wz) + 0.12 - terrainHeight(zn.x, zn.z));
+        zp.setY(i, terrainHeight(wx, wz) + 0.1 - terrainHeight(zn.x, zn.z));
       }
       zg.computeVertexNormals();
-      const zmat = new THREE.MeshStandardMaterial({
-        color: m.color, roughness: m.rough, metalness: zn.type === 'ice' ? 0.3 : 0.0,
-        transparent: true, opacity: m.alpha,
-        emissive: m.glow || 0x000000, emissiveIntensity: m.glow ? 2.0 : 0,
-      });
-      const disc = new THREE.Mesh(zg, zmat);
+      const disc = new THREE.Mesh(zg, this._zoneMaterial(zn.type, m, zn.r));
       disc.position.set(zn.x, terrainHeight(zn.x, zn.z), zn.z);
       disc.receiveShadow = true;
       this.group.add(disc);
     }
+
+    this._buildObstacles();
+    this._buildTrackOverlay(size);
 
     const groundBody = this.world.createRigidBody(RB.fixed());
     this.world.createCollider(
@@ -227,9 +273,122 @@ export class BalanceSim {
     }
   }
 
+  // ── per-zone materials: real mud texture, procedural ice + water, boost pad ──
+  _zoneMaterial(type, m, r) {
+    if (type === 'mud') {
+      const rep = r / 12;
+      return new THREE.MeshStandardMaterial({
+        map: groundTex('assets/textures/mud_diff.jpg', rep, true),
+        normalMap: groundTex('assets/textures/mud_nor.png', rep, false),
+        normalScale: new THREE.Vector2(0.8, 0.8),
+        color: 0x9a8b6f, roughness: 1.0, metalness: 0.0,
+      });
+    }
+    if (type === 'ice') {
+      // smooth, glossy, faintly blue — reflects the sky env for a real ice read
+      return new THREE.MeshStandardMaterial({
+        color: 0xbfe8ff, roughness: 0.06, metalness: 0.35,
+        transparent: true, opacity: 0.82,
+      });
+    }
+    if (type === 'water') {
+      const uni = { uTime: { value: 0 } };
+      this._waterUniforms.push(uni);
+      return new THREE.ShaderMaterial({
+        transparent: true, uniforms: uni,
+        vertexShader: /* glsl */`
+          varying vec2 vUv; varying vec3 vN;
+          void main() { vUv = uv; vN = normalMatrix * normal;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+        fragmentShader: /* glsl */`
+          precision highp float; varying vec2 vUv; varying vec3 vN; uniform float uTime;
+          void main() {
+            vec2 p = vUv * 40.0;
+            float w = sin(p.x + uTime * 1.6) * 0.5 + sin(p.y * 1.3 - uTime * 1.1) * 0.5;
+            w += sin((p.x + p.y) * 0.7 + uTime * 0.8);
+            float ripple = 0.5 + 0.5 * sin(w * 2.0);
+            vec3 deep = vec3(0.05, 0.22, 0.35), shal = vec3(0.20, 0.55, 0.70);
+            vec3 col = mix(deep, shal, ripple * 0.6);
+            col += vec3(0.9) * pow(ripple, 6.0) * 0.35;   // glinting highlights
+            gl_FragColor = vec4(col, 0.82);
+          }`,
+      });
+    }
+    // boost: emissive speed pad
+    return new THREE.MeshStandardMaterial({
+      color: m.color, roughness: m.rough, metalness: 0.0,
+      transparent: true, opacity: m.alpha,
+      emissive: m.glow || 0x000000, emissiveIntensity: m.glow ? 2.0 : 0,
+    });
+  }
+
+  // solid course pieces: platforms to land on, hurdle walls to jump
+  _buildObstacles() {
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x3a4658, roughness: 0.7, metalness: 0.3 });
+    const edgeMat = new THREE.MeshStandardMaterial({ color: 0x0a2438, roughness: 0.35, metalness: 0.4, emissive: 0x18b6ff, emissiveIntensity: 2.2 });
+    for (const o of OBSTACLES) {
+      const base = terrainHeight(o.x, o.z);
+      const box = new THREE.Mesh(new THREE.BoxGeometry(o.w, o.h, o.d), bodyMat);
+      box.position.set(o.x, base + o.h / 2, o.z);
+      box.castShadow = true; box.receiveShadow = true;
+      this.group.add(box);
+      // glowing edge strip along the top so the lip reads clearly at speed
+      const strip = new THREE.Mesh(new THREE.BoxGeometry(o.w + 0.3, 0.5, o.d + 0.3), edgeMat);
+      strip.position.set(o.x, base + o.h + 0.1, o.z);
+      this.group.add(strip);
+    }
+  }
+
+  // ── tire tracks: a fading trail drawn onto a canvas, draped on the terrain ──
+  _buildTrackOverlay(size) {
+    const N = 1024;
+    const cvs = document.createElement('canvas');
+    cvs.width = N; cvs.height = N;
+    this._trackCtx = cvs.getContext('2d');
+    this._trackSize = size;
+    this._trackN = N;
+    const tex = new THREE.CanvasTexture(cvs);
+    tex.needsUpdate = true;
+    this._trackTex = tex;
+    const geo = this._terrainGeo.clone();
+    const mat = new THREE.MeshBasicMaterial({
+      map: tex, transparent: true, depthWrite: false,
+      polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+    });
+    const overlay = new THREE.Mesh(geo, mat);
+    overlay.position.y = 0.06;
+    overlay.renderOrder = 2;
+    this.group.add(overlay);
+  }
+
+  // fade existing tracks + stamp new dabs under each wheel that's on the ground
+  _updateTracks(dt) {
+    const ctx = this._trackCtx;
+    if (!ctx || this._airborne || this.fallen) { return; }
+    const N = this._trackN, S = this._trackSize;
+    // fade: erode a little alpha everywhere each frame
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.fillStyle = `rgba(0,0,0,${Math.min(0.05, dt * 0.6)})`;
+    ctx.fillRect(0, 0, N, N);
+    // stamp: dark ovals at each wheel contact (world → uv → pixel)
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = 'rgba(28,20,12,0.5)';
+    for (const w of this.bodies.wheels) {
+      const t = w.body.translation();
+      const u = (t.x + S / 2) / S, v = (t.z + S / 2) / S;
+      const px = u * N, py = (1 - v) * N;   // CanvasTexture flipY → invert the row
+      ctx.beginPath();
+      ctx.ellipse(px, py, 3.2, 3.2, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    this._trackTex.needsUpdate = true;
+  }
+
   build() {
     this.world = new RAPIER.World({ x: 0, y: -GRAVITY, z: 0 });
     this.group.clear();
+    this._waterUniforms = [];
+    this._trackCtx = null;
     this.buildArena();
 
     const RB = RAPIER.RigidBodyDesc, CO = RAPIER.ColliderDesc;
@@ -355,6 +514,15 @@ export class BalanceSim {
       n++;
     }
     this.syncMeshes();
+
+    // ambient life: water ripples, a faint grass-wind shimmer, fading tire tracks
+    const dt = Math.min(realDt, 0.05);
+    for (const u of (this._waterUniforms || [])) u.uTime.value += dt;
+    if (this._grassNormal) {
+      this._grassNormal.offset.x = Math.sin(performance.now() * 0.00013) * 0.006;
+      this._grassNormal.offset.y = Math.cos(performance.now() * 0.00011) * 0.006;
+    }
+    this._updateTracks(dt);
   }
 
   fixedStep() {
@@ -408,14 +576,26 @@ export class BalanceSim {
     const desiredLean = this._lean + (this._wobble || 0);
     this._wobble = (this._wobble || 0) * 0.94;
 
-    const nx = THREE.MathUtils.clamp(cpos.x + headDir.x * this.vel * FIXED_DT, -R, R);
-    const nz = THREE.MathUtils.clamp(cpos.z + headDir.z * this.vel * FIXED_DT, -R, R);
-    const groundY = terrainHeight(nx, nz) + this.restY;
+    let nx = THREE.MathUtils.clamp(cpos.x + headDir.x * this.vel * FIXED_DT, -R, R);
+    let nz = THREE.MathUtils.clamp(cpos.z + headDir.z * this.vel * FIXED_DT, -R, R);
+
+    // wall blocking: while grounded you can't drive into a lip taller than a
+    // small step — tall hurdle walls must be jumped (Space) to clear them.
+    if (!this._airborne) {
+      const curSup = surfaceAt(cpos.x, cpos.z);
+      if (surfaceAt(nx, nz) - curSup > STEP_UP) {
+        nx = cpos.x; nz = cpos.z;      // stall against the wall face
+        this.vel *= 0.2;
+      }
+    }
+
+    const groundY = surfaceAt(nx, nz) + this.restY;         // where we stand / land (incl. box tops)
+    const terrGroundY = terrainHeight(nx, nz) + this.restY; // terrain-only, for ramp-crest detection
 
     if (this._airborne) {
       this._airVy -= AIR_G * FIXED_DT;
       this._airY += this._airVy * FIXED_DT;
-      if (this._airY <= groundY) {                 // touchdown
+      if (this._airY <= groundY) {                 // touchdown (terrain or a platform top)
         this._airborne = false;
         const hard = this._airVy < -LAND_TUMBLE_VY;
         const sketchy = (matName === 'ice' && this.driveSpeed > 18) || (Math.abs(steer) > 0.7 && this.driveSpeed > 24);
@@ -425,10 +605,11 @@ export class BalanceSim {
         this._pose(chassis, nx, this._airY, nz, headDir, rightDir, desiredLean - 0.14, this._airVy);  // slight nose-up tuck
       }
     } else {
-      // grounded: ramp-crest launch + slippery-ice wipeout
-      const vyTerrain = (groundY - (this._prevGroundY ?? groundY)) / FIXED_DT;   // current climb rate
+      // grounded: ramp-crest launch + slippery-ice wipeout (terrain-only, so
+      // rolling onto a low platform doesn't fling the bot)
+      const vyTerrain = (terrGroundY - (this._prevGroundY ?? terrGroundY)) / FIXED_DT;   // current climb rate
       const aheadY = terrainHeight(nx + headDir.x * 5, nz + headDir.z * 5) + this.restY;
-      const dropAhead = groundY - aheadY;   // terrain falls away just ahead (a lip)
+      const dropAhead = terrGroundY - aheadY;   // terrain falls away just ahead (a lip)
       if (this.driveSpeed > 12 && vyTerrain > 6 && dropAhead > 2.5) {
         // launch off the ramp lip with the upward momentum we'd built climbing it
         this._airborne = true;
@@ -441,7 +622,7 @@ export class BalanceSim {
         this._pose(chassis, nx, groundY, nz, headDir, rightDir, desiredLean, 0);
       }
     }
-    this._prevGroundY = groundY;
+    this._prevGroundY = terrGroundY;
 
     // PID terms for the serial telemetry (pitch is set kinematically above)
     const error = theta;

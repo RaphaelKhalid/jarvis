@@ -377,7 +377,10 @@ export class BalanceSim {
     ctx.fillStyle = 'rgba(28,20,12,0.5)';
     for (const w of this.bodies.wheels) {
       const t = w.body.translation();
-      const u = (t.x + S / 2) / S, v = (t.z + S / 2) / S;
+      // world → overlay UV. The overlay is the terrain plane (PlaneGeometry
+      // rotated -90° about X), whose V axis runs opposite to +Z, so Z is
+      // negated here — otherwise tracks stamp on the mirror-Z side of the wheels.
+      const u = (t.x + S / 2) / S, v = (S / 2 - t.z) / S;
       const px = u * N, py = (1 - v) * N;   // CanvasTexture flipY → invert the row
       ctx.beginPath();
       ctx.ellipse(px, py, 3.2, 3.2, 0, 0, Math.PI * 2);

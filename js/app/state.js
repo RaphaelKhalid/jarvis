@@ -6,6 +6,7 @@ export const state = {
   mode: 'assembly',      // 'assembly' | 'sim'
   booting: false,        // sim boot sequence lockout (drive keys ignored)
   gains: { Kp: 15, Ki: 140, Kd: 0.9 },
+  activeRobotId: 'self-balancer',  // key into js/robots registry (M3 seam)
 };
 
 export function set(key, value) {

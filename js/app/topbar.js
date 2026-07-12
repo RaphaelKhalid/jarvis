@@ -3,7 +3,9 @@
 // light/dark theme toggle. Kept deliberately minimal; the workspace keeps its
 // own sound/help/lessons buttons. The current-robot label is a seam for the
 // M3 RobotDef work (it will read state.activeRobot.name once that lands).
-import { subscribe } from './state.js';
+import { state, subscribe } from './state.js';
+import { initRobotPicker } from './robotpicker.js';
+import { activeRobot } from '../robots/index.js';
 
 const THEME_KEY = 'sbl-theme';
 
@@ -17,7 +19,7 @@ export function initTopbar() {
       <span class="tb-name">GYRO</span>
       <span class="tb-sub">Self-Balance Lab</span>
     </div>
-    <div class="tb-robot" id="tb-robot"><span class="tb-dot"></span><span id="tb-robot-name">Self-Balancer</span></div>
+    <button class="tb-robot" id="tb-robot" title="Switch robot"><span class="tb-dot"></span><span id="tb-robot-name">Self-Balancer</span><span class="tb-caret">▾</span></button>
     <div class="tb-actions">
       <button id="tb-theme" class="tb-btn" title="Toggle light / dark" aria-label="Toggle light / dark">
         <i data-lucide="sun-moon"></i>
@@ -38,14 +40,21 @@ export function initTopbar() {
     applyTheme(root.getAttribute('data-theme') === 'light' ? 'dark' : 'light');
   });
 
-  // reflect drive vs. build in the robot chip
-  subscribe('mode', (m) => {
+  // robot picker popover, anchored to the chip (js/app/robotpicker.js)
+  initRobotPicker({ anchor: bar.querySelector('#tb-robot') });
+
+  // chip reflects the active robot + drive/build state
+  function refreshChip() {
     const chip = bar.querySelector('#tb-robot');
-    chip.classList.toggle('driving', m === 'sim');
+    const driving = state.mode === 'sim';
+    chip.classList.toggle('driving', driving);
     bar.querySelector('#tb-robot-name').textContent =
-      m === 'sim' ? 'Self-Balancer — driving' : 'Self-Balancer';
-  });
+      activeRobot().name + (driving ? ' — driving' : '');
+  }
+  subscribe('mode', refreshChip);
+  subscribe('activeRobotId', refreshChip);
+  refreshChip();
 
   try { window.lucide?.createIcons(); } catch { /* icons are best-effort */ }
-  return { setRobotName: (n) => { bar.querySelector('#tb-robot-name').textContent = n; } };
+  return { refreshChip };
 }

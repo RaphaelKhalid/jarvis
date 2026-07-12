@@ -592,3 +592,30 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
 
 /* part cards press in when grabbed */
 .part-card:active { transform: scale(0.98); }
+
+/* ── robot chip as a button + picker popover ── */
+.tb-robot { background: transparent; cursor: pointer; transition: border-color var(--t-fast), color var(--t-fast); }
+.tb-robot:hover { border-color: var(--accent); color: var(--text); }
+.tb-caret { color: var(--text-dim); font-size: 9px; margin-left: 2px; }
+#robot-picker {
+  position: fixed; z-index: 320; width: 300px;
+  background: var(--overlay-strong); border: 1px solid var(--border-2);
+  border-radius: var(--r-lg); box-shadow: var(--shadow-lg); backdrop-filter: blur(9px);
+  padding: 8px; animation: pop-in var(--t-fast) var(--ease-out);
+}
+#robot-picker .rp-head { font-size: 10px; font-weight: 700; letter-spacing: 0.14em; color: var(--text-dim); padding: 4px 8px 8px; }
+.rp-card {
+  display: block; width: 100%; text-align: left; margin-bottom: 6px;
+  background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--r);
+  padding: 10px 12px; cursor: pointer; font-family: var(--ui);
+  transition: border-color var(--t-fast), background var(--t-fast);
+}
+.rp-card:last-child { margin-bottom: 0; }
+.rp-card:hover:not([disabled]) { border-color: var(--accent); }
+.rp-card.active { border-color: var(--accent); background: var(--accent-soft); }
+.rp-card.soon { opacity: 0.55; cursor: default; }
+.rp-top { display: flex; justify-content: space-between; align-items: center; }
+.rp-name { font-weight: 600; color: var(--text); font-size: 13px; }
+.rp-tag { font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 2px 7px; border-radius: var(--r-pill); border: 1px solid var(--border-2); color: var(--text-dim); }
+.rp-card.active .rp-tag { color: var(--accent); border-color: var(--accent); }
+.rp-blurb { color: var(--text-dim); font-size: 11px; line-height: 1.4; margin-top: 4px; }

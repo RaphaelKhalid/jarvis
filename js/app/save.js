@@ -3,8 +3,10 @@
 // forward-compatible: ignore unknown keys, gate migrations on `v`.
 import { PART_DEFS } from '../parts.js';
 import { DEFAULT_SKETCH } from '../editor.js';
+import { state } from './state.js';
 
-const KEY = 'sbl-save-v1';
+const KEY = 'sbl-save-v1';   // storage key (kept stable; schema version is `v`)
+const SCHEMA = 2;            // v2 adds robotId (M3); v1 saves migrate on load
 
 // Placement is deterministic (first free slot per type), so per-type counts
 // fully reproduce the board; wires are endpoint-id pairs.
@@ -16,8 +18,9 @@ export function captureState({ assemblyApi, wiring, getSketch }) {
     placedCount[type] = (placedCount[type] || 0) + 1;
   }
   return {
-    v: 1,
+    v: SCHEMA,
     ts: Date.now(),
+    robotId: state.activeRobotId,
     placedCount,
     wires: wiring.wires.filter(w => w.idA && w.idB).map(w => [w.idA, w.idB]),
     sketch: getSketch(),
@@ -41,7 +44,9 @@ export function initSave({ assemblyApi, wiring, getSketch, setSketch }) {
       const raw = localStorage.getItem(KEY);
       if (!raw) return null;
       const s = JSON.parse(raw);
-      if (s.v !== 1) return null;   // future: version-gated migrations
+      // version-gated migrations. v1 predates multi-robot → default robotId.
+      if (s.v === 1) { s.robotId = 'self-balancer'; s.v = SCHEMA; }
+      if (s.v !== SCHEMA) return null;   // unknown/newer schema: ignore
       return s;
     } catch { return null; }
   }

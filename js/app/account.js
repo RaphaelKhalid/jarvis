@@ -4,7 +4,7 @@
 // are the caller's job (onSignIn/onSignOut) — this module only owns the UI + auth.
 import { cloudEnabled, onAuth, signInWithEmail, signOut } from './cloud.js';
 
-export function initAccount({ onSignIn, onSignOut } = {}) {
+export function initAccount({ onSignIn, onSignOut, onClassroom } = {}) {
   if (!cloudEnabled()) return { signOut: async () => {} };
 
   const topbar = document.getElementById('topbar');
@@ -77,8 +77,10 @@ export function initAccount({ onSignIn, onSignOut } = {}) {
     popover.innerHTML = `
       <div class="acc-email">${currentUser.email || 'Signed in'}</div>
       <div class="acc-plan">You’re on <b>Free</b></div>
+      <button class="acc-classroom" type="button">Classroom</button>
       <button class="acc-signout" type="button">Sign out</button>`;
     topbar.appendChild(popover);
+    popover.querySelector('.acc-classroom').addEventListener('click', () => { closePopover(); onClassroom?.(); });
     popover.querySelector('.acc-signout').addEventListener('click', async () => {
       closePopover(); await signOut();
     });

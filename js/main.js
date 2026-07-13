@@ -22,6 +22,7 @@ import { initTopbar } from './app/topbar.js';
 import { installErrorBoundary, isWebGLAvailable, showFatal } from './app/errors.js';
 import { track, trackOnce, EVENTS, initAnalytics } from './app/analytics.js';
 import { initAccount } from './app/account.js';
+import { initClassroom } from './app/classroom.js';
 import { pushDocument, pullDocument, flushQueue } from './app/cloud.js';
 
 installErrorBoundary();  // global error/rejection reporting + fatal fallback wiring
@@ -178,7 +179,9 @@ track(EVENTS.LOAD, { robot: activeRobot().id });   // funnel entry — app boote
 // On sign-in: pull the cloud progress/save, merge locally (progress = max stars
 // per lesson so nothing is lost; save applies only onto an empty board), push
 // our local-only state back up, then flush any queued offline writes.
+const classroom = initClassroom();
 initAccount({
+  onClassroom: () => classroom.open(),
   onSignIn: async () => {
     try {
       const rp = await pullDocument('progress', 0);

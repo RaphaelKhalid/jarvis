@@ -19,12 +19,18 @@ test('tapping the guide connection rows wires the whole board', async ({ page })
   await expect(page.locator('#g-walk .gp-wire')).not.toHaveCount(0);
   await expect(page.locator('#g-walk .gp-wire.next')).toHaveCount(1);
 
-  // tap the highlighted "next" row until the loom is complete
+  // tap the highlighted "next" row until the loom is complete. Click via
+  // evaluate (instant) rather than locator.click(): the guide re-renders the
+  // list on its 600ms poll, which would race a stability-waiting click.
   for (let i = 0; i < 25; i++) {
     if (await page.evaluate(() => window.__lab.wiring.allRequiredDone())) break;
-    const next = page.locator('#g-walk .gp-wire.next');
-    if (await next.count() === 0) break;
-    await next.click();
+    const clicked = await page.evaluate(() => {
+      const btn = document.querySelector('#g-walk .gp-wire.next');
+      if (btn) { btn.click(); return true; }
+      return false;
+    });
+    if (!clicked) break;
+    await page.waitForTimeout(120);
   }
 
   expect(await page.evaluate(() => window.__lab.wiring.allRequiredDone())).toBe(true);

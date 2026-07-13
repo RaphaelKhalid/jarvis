@@ -13,6 +13,7 @@ export const EVENTS = Object.freeze({
   WIRE: 'wire',
   UPLOAD: 'upload',
   DRIVE: 'drive',
+  SHARE: 'share',   // virality signal — user copied a shareable build link
 });
 
 const buffer = [];

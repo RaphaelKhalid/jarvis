@@ -13,6 +13,24 @@ export function cloudEnabled() {
   return Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 }
 
+// Local-first fast path: don't load the (heavy) Supabase SDK at all unless the
+// user actually has a session or is returning from a magic-link callback. This
+// keeps signed-out boots (the common case) zero-network and fast.
+function hasStoredSession() {
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && /^sb-.*-auth-token$/.test(k)) return true;
+    }
+  } catch { /* storage blocked */ }
+  return false;
+}
+function isAuthCallback() {
+  try { return /[#&](access_token|error_description)=/.test(window.location.hash); }
+  catch { return false; }
+}
+function signedOut() { return !hasStoredSession() && !isAuthCallback(); }
+
 let client = null;
 export async function getClient() {
   if (!cloudEnabled()) return null;
@@ -58,6 +76,7 @@ export async function signOut() {
 
 /** Subscribe to auth state; fires immediately with the current user (or null). */
 export async function onAuth(cb) {
+  if (!cloudEnabled() || signedOut()) { cb(null); return; }   // don't load the SDK when signed out
   const c = await getClient();
   if (!c) { cb(null); return; }
   c.auth.onAuthStateChange((_evt, session) => cb(session?.user || null));
@@ -73,6 +92,7 @@ function dequeue(kind) { const q = loadQueue(); delete q[kind]; saveQueue(q); }
 
 /** Push a local document up (after local persist). Queues on failure/offline. */
 export async function pushDocument(kind, body) {
+  if (signedOut()) { enqueue(kind, body); return; }   // stay local: queue, don't load the SDK
   const c = await getClient();
   const user = c && await userOf(c);
   if (!c || !user) { enqueue(kind, body); return; }
@@ -86,6 +106,7 @@ export async function pushDocument(kind, body) {
 
 /** Return the remote doc body iff it's newer than localTs, else null. */
 export async function pullDocument(kind, localTs) {
+  if (signedOut()) return null;   // stay local when signed out
   const c = await getClient();
   const user = c && await userOf(c);
   if (!user) return null;

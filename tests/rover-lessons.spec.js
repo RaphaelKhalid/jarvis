@@ -23,6 +23,9 @@ test('rover lessons show only for the rover and build its board', async ({ page 
   // self-balancer lessons are hidden while the rover is active
   await expect(browser).not.toContainText('Power Up');
 
+  // rover lessons are Pro-gated; entitle Pro so rv2 actually starts (the gate
+  // itself is covered by entitlement.spec.js)
+  await page.evaluate(() => window.__lab.curriculum.setTier('pro'));
   // rv2 (assemble+wire) should pre-build and pre-wire the full 8-part rover
   await page.click('[data-lesson="rv2"]');
   await expect.poll(() => page.evaluate(() => window.__lab.assemblyApi.getPlacedCount())).toBe(8);

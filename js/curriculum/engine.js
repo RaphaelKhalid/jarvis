@@ -9,7 +9,7 @@ const lessonRobot = (l) => l.robot || 'self-balancer';
 
 const PROGRESS_KEY = 'sbl-progress-v1';
 
-export function initCurriculum({ sim, wiring, assemblyApi, hud, setSketchGains, guide, onProgress }) {
+export function initCurriculum({ sim, wiring, assemblyApi, hud, setSketchGains, guide, onProgress, onUpgrade }) {
   let active = null;   // { lesson, objIdx, t, holdT, counters }
   let progress = {};
   try { progress = JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}'); } catch {}
@@ -40,6 +40,20 @@ export function initCurriculum({ sim, wiring, assemblyApi, hud, setSketchGains, 
     const list = trackLessons(lesson.track);
     const idx = list.indexOf(lesson);
     return idx === 0 || starsFor(list[idx - 1].id) > 0;
+  }
+
+  // ── entitlement (Free vs Pro) ────────────────────────────────
+  // A lesson is 'pro' via its data; the current plan comes from the account
+  // (set by main.js from the Supabase profile). Checked ONLY in start(), never
+  // in tick(), so an upgrade prompt can never fire mid-lesson.
+  let userTier = 'free';
+  const isPro = (l) => (l.tier || 'free') === 'pro';
+  const entitled = (l) => !isPro(l) || userTier === 'pro';
+  function setTier(tier) {
+    if (tier !== userTier) {
+      userTier = (tier === 'pro') ? 'pro' : 'free';
+      if (!browser.classList.contains('hidden')) openOverlay();
+    }
   }
 
   // ── objective predicates ─────────────────────────────────────
@@ -83,6 +97,7 @@ export function initCurriculum({ sim, wiring, assemblyApi, hud, setSketchGains, 
   function start(lessonId) {
     const lesson = LESSONS.find(l => l.id === lessonId);
     if (!lesson || !isUnlocked(lesson)) return;
+    if (!entitled(lesson)) { openUpgrade(lesson); return; }   // Pro gate (start-time only)
     if (state.mode === 'sim') return hud.flash('Go back to Assembly first', 'bad');
 
     const s = lesson.setup || {};
@@ -220,6 +235,28 @@ export function initCurriculum({ sim, wiring, assemblyApi, hud, setSketchGains, 
     });
   }
 
+  // inline Pro upgrade panel (rail view-stack; never interrupts a running lesson)
+  function openUpgrade(lesson) {
+    guide.showView('lesson');
+    card.innerHTML = `
+      <div class="l-top"><span class="l-track l-pro-track">GYRO PRO</span>
+        <button class="l-quit" id="up-close" aria-label="Close">✕</button></div>
+      <div class="l-title">Unlock the full lab</div>
+      <div class="l-brief">You’ve wired and balanced a real robot. Pro opens the terrain challenges, the engineering capstones${lesson && lesson.track === 'rover' ? '' : ''}, and the four-wheel rover.</div>
+      <div class="up-compare">
+        <div class="up-row"><span class="up-tag up-free">FREE</span>Build &amp; wire the robot, tune a real PID, and take your first drives. Yours forever.</div>
+        <div class="up-row"><span class="up-tag up-pro">PRO</span>Every driving challenge, engineering capstone, and mastery lesson.</div>
+        <div class="up-row"><span class="up-tag up-pro">PRO</span>The Rover — a second robot to build, wire, and drive off-road.</div>
+      </div>
+      <div class="l-btns">
+        <button id="up-go" class="up-cta">Unlock Pro — $6.99/mo</button>
+        <button id="up-later">Keep exploring free</button>
+      </div>`;
+    card.querySelector('#up-close').addEventListener('click', openOverlay);
+    card.querySelector('#up-later').addEventListener('click', openOverlay);
+    card.querySelector('#up-go').addEventListener('click', () => onUpgrade?.(lesson));
+  }
+
   // ── UI: lesson browser (rendered inline into the Guide rail) ──
   const browser = guide.hosts.browser;
 
@@ -251,10 +288,15 @@ export function initCurriculum({ sim, wiring, assemblyApi, hud, setSketchGains, 
             ${list.map(l => {
               const unlocked = isUnlocked(l);
               const st = starsFor(l.id);
-              const isNew = unlocked && st === 0;
-              return `<button class="lt-lesson ${unlocked ? '' : 'locked'}" data-lesson="${l.id}" ${unlocked ? '' : 'disabled'}>
-                <span class="ltl-title">${l.title}${isNew ? '<span class="ltl-new">NEW</span>' : ''}</span>
-                <span class="ltl-stars">${st ? '★'.repeat(st) + '☆'.repeat(3 - st) : unlocked ? '' : '🔒'}</span>
+              const pro = isPro(l) && !entitled(l);
+              const isNew = unlocked && !pro && st === 0;
+              const cls = !unlocked ? 'locked' : (pro ? 'pro' : '');
+              const right = st ? '★'.repeat(st) + '☆'.repeat(3 - st)
+                : (!unlocked ? '🔒' : (pro ? '<span class="ltl-pro">PRO</span>' : ''));
+              // pro rows stay clickable (aria-disabled, not disabled) → open the upgrade panel
+              return `<button class="lt-lesson ${cls}" data-lesson="${l.id}" ${!unlocked ? 'disabled' : ''}${pro ? ' aria-disabled="true"' : ''}>
+                <span class="ltl-title">${l.title}${isNew ? '<span class="ltl-new">NEW</span>' : ''}${pro ? '<span class="ltl-sub">Pro lesson — preview inside</span>' : ''}</span>
+                <span class="ltl-stars">${right}</span>
               </button>`;
             }).join('')}
           </div>
@@ -267,7 +309,7 @@ export function initCurriculum({ sim, wiring, assemblyApi, hud, setSketchGains, 
   }
 
   return {
-    start, quit, tick, openOverlay, starsFor, applyRemoteProgress,
+    start, quit, tick, openOverlay, starsFor, applyRemoteProgress, setTier,
     getProgress: () => ({ ...progress }),
     get active() { return active; },
   };

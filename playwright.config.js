@@ -4,7 +4,10 @@ import { defineConfig } from '@playwright/test';
 export default defineConfig({
   testDir: './tests',
   timeout: 90_000,
-  retries: process.env.CI ? 1 : 0,
+  // Software-WebGL boots are heavy; too many concurrent contexts cause boot-time
+  // timeouts. Cap parallelism and allow one retry to absorb transient slowness.
+  workers: 2,
+  retries: process.env.CI ? 2 : 1,
   use: {
     baseURL: 'http://localhost:8799',
     viewport: { width: 1280, height: 800 },

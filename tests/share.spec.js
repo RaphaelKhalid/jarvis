@@ -3,7 +3,8 @@
 // on that link, and confirm it restores the same parts + wires.
 import { test, expect } from '@playwright/test';
 
-const ready = (page) => page.waitForFunction(() => !!(window.__lab && window.__lab.saveApi));
+const ready = (page) => page.waitForFunction(() => !!(window.__lab && window.__lab.saveApi), null, { timeout: 25_000 });
+const POLL = { timeout: 15_000 };
 
 async function dismissOverlay(page) {
   await page.evaluate(() => {
@@ -24,7 +25,7 @@ test('a build round-trips through a shareable URL', async ({ page }) => {
     window.__lab.wiring.tryConnect('arduino.VIN', 'battery.+');
     window.__lab.wiring.tryConnect('arduino.GND', 'battery.-');
   });
-  await expect.poll(() => page.evaluate(() => window.__lab.assemblyApi.getPlacedCount())).toBe(2);
+  await expect.poll(() => page.evaluate(() => window.__lab.assemblyApi.getPlacedCount()), POLL).toBe(2);
   const url = await page.evaluate(() => window.__lab.saveApi.shareUrl());
   expect(url).toContain('#build=');
 
@@ -38,7 +39,7 @@ test('a build round-trips through a shareable URL', async ({ page }) => {
   await dismissOverlay(page);          // clear the first-visit overlay if present
   await page.click('#resume-yes');
 
-  await expect.poll(() => page.evaluate(() => window.__lab.assemblyApi.getPlacedCount())).toBe(2);
+  await expect.poll(() => page.evaluate(() => window.__lab.assemblyApi.getPlacedCount()), POLL).toBe(2);
   const wired = await page.evaluate(() => window.__lab.wiring.wires.filter(w => w.idA && w.idB).length);
   expect(wired).toBe(2);
   // the #build= hash is cleared after loading so a refresh won't re-prompt

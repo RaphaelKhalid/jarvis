@@ -44,14 +44,31 @@ export function initGuide({ wiring, assemblyApi, getGains, onWire }) {
   const reopenBtn = panel.querySelector('#g-reopen');
 
   // ── collapse / expand ─────────────────────────────────────────
+  // On tablets (≤1024px) the rail becomes an overlay drawer with a scrim, so it
+  // never permanently sits over the 3D drag area; tapping the scrim collapses it.
+  const isTablet = () => window.matchMedia('(max-width: 1024px)').matches;
+  const scrim = document.createElement('div');
+  scrim.id = 'guide-scrim';
+  scrim.className = 'hidden';
+  workspace.appendChild(scrim);
+  scrim.addEventListener('click', () => setCollapsed(true));
+  function updateScrim() {
+    scrim.classList.toggle('hidden', panel.classList.contains('collapsed') || !isTablet());
+  }
   function setCollapsed(v) {
     panel.classList.toggle('collapsed', v);
     reopenBtn.classList.toggle('hidden', !v);
+    updateScrim();
     try { localStorage.setItem('sbl-guide-collapsed', v ? '1' : '0'); } catch {}
   }
   panel.querySelector('#g-collapse').addEventListener('click', () => setCollapsed(true));
   reopenBtn.addEventListener('click', () => setCollapsed(false));
-  try { if (localStorage.getItem('sbl-guide-collapsed') === '1') setCollapsed(true); } catch {}
+  window.addEventListener('resize', updateScrim);
+  try {
+    const pref = localStorage.getItem('sbl-guide-collapsed');
+    if (pref === '1') setCollapsed(true);
+    else if (pref === null && isTablet()) setCollapsed(true);   // tablets start collapsed
+  } catch {}
 
   function expand() { setCollapsed(false); }
 

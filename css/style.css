@@ -469,15 +469,24 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
 #m-start.running:hover { background: rgba(255,107,107,0.12); }
 
 /* ── mobile: stack vertically ── */
-@media (max-width: 900px) {
+/* ── tablet / small-screen reflow (≤1024px incl. landscape iPad) ─── */
+@media (max-width: 1024px) {
   #app {
     grid-template-columns: 1fr;
-    grid-template-rows: auto 55vh auto;
+    grid-template-rows: auto 60vh auto;
     height: auto;
   }
   body { overflow-y: auto; }
-  #workspace { height: 55vh; }
+  #workspace { height: 60vh; min-height: 340px; }
+  /* the Guide rail is an overlay drawer here (default-collapsed via guide.js),
+     so it never permanently occludes the 3D drag/wire area */
+  #guide { max-width: min(340px, 88vw); background: var(--panel); }
+  /* narrow the sim HUD so it doesn't dominate the smaller scene */
+  #sim-hud { width: min(300px, 62vw); }
 }
+/* scrim behind the expanded Guide rail on tablets (tap to collapse) */
+#guide-scrim { position: absolute; inset: 0; z-index: 7; background: rgba(0, 0, 0, 0.5); }
+#guide-scrim.hidden { display: none; }
 
 /* ── fatal fallback (WebGL unavailable / boot crash) + noscript ─ */
 #fatal {

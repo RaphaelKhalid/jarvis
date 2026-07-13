@@ -86,3 +86,30 @@ create policy "class members see assignments" on assignments
 create policy "teacher manages assignments" on assignments
   for insert with check (exists (
     select 1 from classes c where c.id = class_id and c.teacher_id = auth.uid()));
+
+-- ── auto-provision a profile on signup ──────────────────────────
+-- classes/class_members/documents all FK to profiles(id). Without this trigger,
+-- the very first write after a magic-link signup FK-violates (no profile row
+-- exists yet). security definer lets it insert past RLS; on conflict keeps it
+-- idempotent. Backfill any users that signed up before this ran (see below).
+create or replace function handle_new_user()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  insert into public.profiles (id, display_name)
+  values (new.id, coalesce(new.raw_user_meta_data->>'display_name', 'Builder'))
+  on conflict (id) do nothing;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function handle_new_user();
+
+-- Backfill profiles for any pre-existing auth users (safe to re-run):
+insert into public.profiles (id)
+  select id from auth.users on conflict (id) do nothing;

@@ -42,7 +42,7 @@ export function captureState({ assemblyApi, wiring, getSketch }) {
   };
 }
 
-export function initSave({ assemblyApi, wiring, getSketch, setSketch }) {
+export function initSave({ assemblyApi, wiring, getSketch, setSketch, onPersist }) {
   // per-robot storage slot, resolved now that bootActiveRobot() has set the id.
   const KEY = keyFor(state.activeRobotId);
   let timer = null;
@@ -52,6 +52,7 @@ export function initSave({ assemblyApi, wiring, getSketch, setSketch }) {
       try {
         const s = captureState({ assemblyApi, wiring, getSketch });
         localStorage.setItem(KEY, JSON.stringify(s));
+        onPersist?.(s);   // cloud-sync hook (best-effort)
       } catch {}
     }, 400);
   }
@@ -161,5 +162,17 @@ export function initSave({ assemblyApi, wiring, getSketch, setSketch }) {
     }
   }
 
-  return { persist, clear, shareUrl };
+  // apply a remote build pulled from the cloud — only onto this robot and only
+  // when the local board is empty, so we never clobber work in progress.
+  function applyRemote(body) {
+    if (!body || (body.robotId || 'self-balancer') !== state.activeRobotId) return false;
+    if (assemblyApi.getPlacedCount() > 0) return false;
+    restore(body);
+    return true;
+  }
+
+  return {
+    persist, clear, shareUrl, applyRemote,
+    getDoc: () => captureState({ assemblyApi, wiring, getSketch }),
+  };
 }

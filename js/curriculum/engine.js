@@ -9,13 +9,29 @@ const lessonRobot = (l) => l.robot || 'self-balancer';
 
 const PROGRESS_KEY = 'sbl-progress-v1';
 
-export function initCurriculum({ sim, wiring, assemblyApi, hud, setSketchGains, guide }) {
+export function initCurriculum({ sim, wiring, assemblyApi, hud, setSketchGains, guide, onProgress }) {
   let active = null;   // { lesson, objIdx, t, holdT, counters }
   let progress = {};
   try { progress = JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}'); } catch {}
 
   function saveProgress() {
     try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress)); } catch {}
+    onProgress?.(progress);   // cloud-sync hook (best-effort)
+  }
+
+  // merge a remote progress doc in (max stars per lesson — never lose a star),
+  // persist, and re-render the browser if it's open. Returns true if it changed.
+  function applyRemoteProgress(remote) {
+    if (!remote || typeof remote !== 'object') return false;
+    let changed = false;
+    for (const [id, stars] of Object.entries(remote)) {
+      if ((progress[id] || 0) < stars) { progress[id] = stars; changed = true; }
+    }
+    if (changed) {
+      try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress)); } catch {}
+      if (!browser.classList.contains('hidden')) openOverlay();
+    }
+    return changed;
   }
 
   function starsFor(id) { return progress[id] || 0; }
@@ -250,5 +266,9 @@ export function initCurriculum({ sim, wiring, assemblyApi, hud, setSketchGains, 
     }
   }
 
-  return { start, quit, tick, openOverlay, starsFor, get active() { return active; } };
+  return {
+    start, quit, tick, openOverlay, starsFor, applyRemoteProgress,
+    getProgress: () => ({ ...progress }),
+    get active() { return active; },
+  };
 }

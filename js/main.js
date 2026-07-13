@@ -21,6 +21,8 @@ import { initPerf } from './app/perf.js';
 import { initTopbar } from './app/topbar.js';
 import { installErrorBoundary, isWebGLAvailable, showFatal } from './app/errors.js';
 import { track, trackOnce, EVENTS, initAnalytics } from './app/analytics.js';
+import { initAccount } from './app/account.js';
+import { pushDocument, pullDocument, flushQueue } from './app/cloud.js';
 
 installErrorBoundary();  // global error/rejection reporting + fatal fallback wiring
 initAnalytics();         // attach the PostHog sink (privacy-locked; buffers until ready)
@@ -99,6 +101,7 @@ const saveApi = initSave({
   assemblyApi, wiring,
   getSketch: () => cm.getValue(),
   setSketch: (s) => cm.setValue(s),
+  onPersist: (doc) => { pushDocument('save', doc).catch(() => {}); },   // cloud sync (queued if signed out)
 });
 // each robot ships its own starter sketch (self-balancer's === the editor
 // default). Done after saveApi exists so the editor's change handler, which
@@ -142,7 +145,10 @@ function setSketchGains({ Kp, Ki, Kd }) {
   if (Kd != null) v = v.replace(/\bKd\s*=\s*-?\d+(?:\.\d+)?/, `Kd = ${Kd}`);
   cm.setValue(v);
 }
-const curriculum = initCurriculum({ sim, wiring, assemblyApi, hud, setSketchGains, guide });
+const curriculum = initCurriculum({
+  sim, wiring, assemblyApi, hud, setSketchGains, guide,
+  onProgress: (p) => { pushDocument('progress', p).catch(() => {}); },   // cloud sync (queued if signed out)
+});
 // single help/learn surface: the Guide rail. "?" expands it; its own "Lessons"
 // button opens the curriculum. (The old floating learn-btn was redundant.)
 document.getElementById('help-btn').addEventListener('click', () => guide.expand());
@@ -163,6 +169,24 @@ document.getElementById('share-btn').addEventListener('click', async () => {
 });
 window.__lab = { assemblyApi, wiring, curriculum, hud, saveApi };   // debug/testing hook
 track(EVENTS.LOAD, { robot: activeRobot().id });   // funnel entry — app booted
+
+// ── cloud account + sync ─────────────────────────────────────────
+// On sign-in: pull the cloud progress/save, merge locally (progress = max stars
+// per lesson so nothing is lost; save applies only onto an empty board), push
+// our local-only state back up, then flush any queued offline writes.
+initAccount({
+  onSignIn: async () => {
+    try {
+      const rp = await pullDocument('progress', 0);
+      if (rp) curriculum.applyRemoteProgress(rp);
+      pushDocument('progress', curriculum.getProgress()).catch(() => {});
+      const rs = await pullDocument('save', 0);
+      if (rs) saveApi.applyRemote(rs);
+      await flushQueue();
+      hud.flash('Synced to your account', 'ok');
+    } catch { /* sync is best-effort */ }
+  },
+});
 
 // ── onboarding → Guide rail ─────────────────────────────────────
 // The always-on Guide rail replaces the old spotlight tour: both onboarding

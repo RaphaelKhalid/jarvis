@@ -560,6 +560,20 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
 .learn-head button:hover { color: var(--accent); }
 .learn-track { margin-bottom: var(--sp-3); }
 .lt-name { font-weight: 600; color: var(--accent); font-size: var(--fs-md); }
+
+/* progression spine (lesson browser) */
+.learn-progress { margin-bottom: var(--sp-3); }
+.lp-row { display: flex; justify-content: space-between; font-size: var(--fs-sm); color: var(--text-dim); margin-bottom: 5px; }
+.lp-stars { color: var(--yellow); font-weight: 600; }
+.lp-bar { height: 5px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-pill); overflow: hidden; }
+.lp-fill { height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--green)); transition: width var(--t-med); }
+.lt-head { display: flex; justify-content: space-between; align-items: baseline; }
+.lt-count { font-size: var(--fs-xs); color: var(--text-dim); font-family: var(--mono); }
+.ltl-new {
+  margin-left: 7px; font-family: var(--ui); font-size: 8.5px; font-weight: 700; letter-spacing: 0.08em;
+  color: var(--accent); background: var(--accent-soft); border: 1px solid var(--accent-dim);
+  padding: 1px 5px; border-radius: var(--r-pill); vertical-align: middle;
+}
 .lt-blurb { color: var(--text-dim); font-size: var(--fs-sm); margin: 2px 0 8px; line-height: 1.45; }
 .lt-lessons { display: flex; flex-direction: column; gap: var(--sp-2); }
 .lt-lesson {
@@ -579,6 +593,14 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
 #g-lesson .l-quit:hover { color: var(--red); }
 #g-lesson .l-title { font-weight: 600; font-size: var(--fs-lg); color: var(--text); margin: 4px 0 6px; }
 #g-lesson .l-brief { color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.5; margin-bottom: 10px; }
+#g-lesson .l-learned { font-size: var(--fs-xs); letter-spacing: 0.12em; color: var(--green); font-weight: 700; margin: 8px 0 3px; }
+#g-lesson .l-unlock {
+  display: flex; align-items: center; gap: 6px; margin-bottom: 8px;
+  font-size: var(--fs-sm); color: var(--accent);
+  background: var(--accent-soft); border: 1px solid var(--accent-dim);
+  border-radius: var(--r-sm); padding: 6px 9px;
+}
+#g-lesson .l-unlock b { color: var(--text); }
 #g-lesson .l-obj { display: flex; gap: 7px; font-size: var(--fs-sm); color: var(--text-dim); padding: 2px 0; }
 #g-lesson .l-obj.done { color: var(--green); }
 #g-lesson .l-obj.current { color: var(--text); font-weight: 500; }

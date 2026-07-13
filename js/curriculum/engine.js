@@ -180,13 +180,19 @@ export function initCurriculum({ sim, wiring, assemblyApi, hud, setSketchGains, 
     if (f) f.style.width = (k * 100).toFixed(0) + '%';
   }
   function renderDebrief(lesson, stars) {
+    const list = trackLessons(lesson.track);
+    const next = list[list.indexOf(lesson) + 1];
+    // this completion just unlocked `next` if it's still unplayed (0 stars)
+    const unlockedNext = next && starsFor(next.id) === 0;
     card.innerHTML = `
       <div class="l-top"><span class="l-track">LESSON COMPLETE</span></div>
       <div class="l-title">${lesson.title}</div>
       <div class="l-stars">${'★'.repeat(stars)}${'☆'.repeat(3 - stars)}</div>
+      <div class="l-learned">WHAT YOU LEARNED</div>
       <div class="l-brief">${lesson.debrief}</div>
+      ${unlockedNext ? `<div class="l-unlock">🔓 Unlocked: <b>${next.title}</b></div>` : ''}
       <div class="l-btns">
-        <button id="l-next">Next lesson</button>
+        <button id="l-next">${next ? 'Next lesson' : 'More lessons'}</button>
         <button id="l-close">Close</button>
       </div>`;
     document.getElementById('l-close').addEventListener('click', () => { guide.showView('walk'); guide.refresh(); });
@@ -207,24 +213,37 @@ export function initCurriculum({ sim, wiring, assemblyApi, hud, setSketchGains, 
     // only this robot's lessons (self-balancer and rover have distinct tracks)
     const visibleTracks = TRACKS.filter(t => LESSONS.some(l => l.track === t.id && lessonRobot(l) === robotId));
     const otherHasLessons = LESSONS.some(l => lessonRobot(l) !== robotId);
+    const robotLessons = LESSONS.filter(l => lessonRobot(l) === robotId);
+    const doneCount = robotLessons.filter(l => starsFor(l.id) > 0).length;
+    const totalStars = robotLessons.reduce((s, l) => s + starsFor(l.id), 0);
+    const maxStars = robotLessons.length * 3;
     browser.innerHTML = `
       <div class="learn-head"><h2>Lessons</h2><button id="learn-close" aria-label="Back to guide">✕</button></div>
+      <div class="learn-progress">
+        <div class="lp-row"><span>${doneCount}/${robotLessons.length} lessons</span><span class="lp-stars">★ ${totalStars}/${maxStars}</span></div>
+        <div class="lp-bar"><div class="lp-fill" style="width:${robotLessons.length ? (doneCount / robotLessons.length * 100).toFixed(0) : 0}%"></div></div>
+      </div>
       ${otherHasLessons ? `<div class="lt-blurb learn-switch-hint">Switch robots in the top bar to see the other robot’s lessons.</div>` : ''}
-      ${visibleTracks.map(t => `
+      ${visibleTracks.map(t => {
+        const list = trackLessons(t.id).filter(l => lessonRobot(l) === robotId);
+        const tDone = list.filter(l => starsFor(l.id) > 0).length;
+        return `
         <div class="learn-track">
-          <div class="lt-name">${t.name}</div>
+          <div class="lt-head"><span class="lt-name">${t.name}</span><span class="lt-count">${tDone}/${list.length}</span></div>
           <div class="lt-blurb">${t.blurb}</div>
           <div class="lt-lessons">
-            ${trackLessons(t.id).filter(l => lessonRobot(l) === robotId).map(l => {
+            ${list.map(l => {
               const unlocked = isUnlocked(l);
               const st = starsFor(l.id);
+              const isNew = unlocked && st === 0;
               return `<button class="lt-lesson ${unlocked ? '' : 'locked'}" data-lesson="${l.id}" ${unlocked ? '' : 'disabled'}>
-                <span class="ltl-title">${l.title}</span>
+                <span class="ltl-title">${l.title}${isNew ? '<span class="ltl-new">NEW</span>' : ''}</span>
                 <span class="ltl-stars">${st ? '★'.repeat(st) + '☆'.repeat(3 - st) : unlocked ? '' : '🔒'}</span>
               </button>`;
             }).join('')}
           </div>
-        </div>`).join('')}`;
+        </div>`;
+      }).join('')}`;
     document.getElementById('learn-close').addEventListener('click', () => { guide.showView('walk'); guide.refresh(); });
     for (const btn of browser.querySelectorAll('[data-lesson]')) {
       btn.addEventListener('click', () => start(btn.dataset.lesson));

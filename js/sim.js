@@ -203,7 +203,9 @@ export class BalanceSim {
     skyTex.wrapS = THREE.RepeatWrapping;   // horizontal wrap so there's no seam
     const sky = new THREE.Mesh(
       new THREE.SphereGeometry(600, 60, 40),
-      new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide, depthWrite: false, fog: false }));
+      // toneMapped:false — the sky is a finished image; ACES tone mapping would
+      // otherwise crush the sunset to near-black.
+      new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide, depthWrite: false, fog: false, toneMapped: false }));
     this.group.add(sky);
 
     // ── ground: rolling grass (real CC0 grass texture, lit + wind-shifted) ──

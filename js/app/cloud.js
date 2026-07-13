@@ -74,6 +74,16 @@ export async function signOut() {
   if (c) { try { await c.auth.signOut(); } catch { /* ignore */ } }
 }
 
+/** The signed-in user's profile row ({ tier, role, display_name, ... }) or null. */
+export async function getProfile() {
+  const c = await getClient(); const u = c && await userOf(c);
+  if (!u) return null;
+  try {
+    const { data } = await c.from('profiles').select('*').eq('id', u.id).maybeSingle();
+    return data || null;
+  } catch { return null; }
+}
+
 /** Subscribe to auth state; fires immediately with the current user (or null). */
 export async function onAuth(cb) {
   if (!cloudEnabled() || signedOut()) { cb(null); return; }   // don't load the SDK when signed out

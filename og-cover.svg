@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <radialGradient id="glow" cx="78%" cy="32%" r="55%">
+      <stop offset="0%" stop-color="#1c1403"/>
+      <stop offset="100%" stop-color="#0a0d12"/>
+    </radialGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+  <g transform="translate(90,250)">
+    <circle cx="55" cy="55" r="52" fill="none" stroke="#ffb000" stroke-width="10"/>
+    <path d="M55 3 a52 52 0 0 1 0 104 z" fill="#ffb000"/>
+  </g>
+  <text x="230" y="300" font-family="Space Grotesk, Inter, sans-serif" font-size="82" font-weight="700" fill="#d3dce9" letter-spacing="2">SelfBalance Lab</text>
+  <text x="232" y="360" font-family="Inter, sans-serif" font-size="30" fill="#ffb000" letter-spacing="6">GYRO · ROBOTICS SIMULATOR</text>
+  <text x="232" y="430" font-family="Inter, sans-serif" font-size="30" fill="#868fa0">Assemble it · wire it · tune a real PID loop · feel the physics.</text>
+</svg>

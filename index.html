@@ -4,6 +4,23 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SelfBalance Lab — Robot Assembly Simulator</title>
+<meta name="description" content="Assemble, wire, and program a self-balancing robot in your browser — then tune a real PID loop and feel the physics. A zero-install robotics lab.">
+<meta name="theme-color" content="#0a0d12">
+<link rel="canonical" href="https://selfbalance-lab.vercel.app/">
+<!-- favicon + installable manifest -->
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="/manifest.json">
+<!-- Open Graph / Twitter (link unfurls for HN/Product Hunt/social) -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="SelfBalance Lab">
+<meta property="og:title" content="SelfBalance Lab — build a balancing robot in your browser">
+<meta property="og:description" content="Wire an MPU6050, tune a real PID loop, and watch the physics. A zero-install robotics assembly lab.">
+<meta property="og:url" content="https://selfbalance-lab.vercel.app/">
+<meta property="og:image" content="https://selfbalance-lab.vercel.app/og-cover.svg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="SelfBalance Lab — build a balancing robot in your browser">
+<meta name="twitter:description" content="Wire an MPU6050, tune a real PID loop, and watch the physics. A zero-install robotics assembly lab.">
+<meta name="twitter:image" content="https://selfbalance-lab.vercel.app/og-cover.svg">
 <!-- modern typography: Inter for UI chrome, JetBrains Mono for code/data -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -99,6 +116,20 @@
     <button class="tour" id="overlay-tour">New here? Follow the guided walkthrough</button>
   </div>
 </div>
+
+<!-- fatal fallback: shown by js/app/errors.js on WebGL-unavailable or a boot crash -->
+<div id="fatal" class="hidden" role="alert">
+  <div class="fatal-card">
+    <div class="fatal-mark" aria-hidden="true">◐</div>
+    <h1>This lab needs a bit more from your browser</h1>
+    <p id="fatal-msg">SelfBalance Lab runs a 3D physics simulation that needs WebGL and WebAssembly.</p>
+    <p class="fatal-tips">Try a recent Chrome, Edge, Firefox, or Safari on a device with hardware graphics enabled. If you're on a work or school network, WebGL may be blocked by policy.</p>
+    <button id="fatal-reload" type="button">Reload</button>
+  </div>
+</div>
+<noscript>
+  <div class="fatal-noscript">SelfBalance Lab needs JavaScript enabled to run. Please turn it on and reload.</div>
+</noscript>
 
 <script type="module" src="js/main.js"></script>
 </body>

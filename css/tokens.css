@@ -16,7 +16,7 @@
   --border: #232b3a;
   --border-2: #2e3849;
   --text: #d3dce9;
-  --text-dim: #737f92;
+  --text-dim: #868fa0;   /* muted, but ≥4.5:1 (WCAG AA) on every surface incl. --panel-3 */
 
   /* color — semantic
      Lab-Instrument identity: amber-phosphor is the signature accent (CRT/nixie).
@@ -31,6 +31,17 @@
   --ok-bg: rgba(70, 224, 143, 0.14);
   --warn-bg: rgba(255, 209, 102, 0.14);
   --bad-bg: rgba(255, 107, 107, 0.16);
+
+  /* PID oscilloscope trace palette — a multi-series scope legitimately needs
+     distinct hues, but they belong to the instrument system (phosphor cyan/
+     amber/magenta/green), not the pre-rebrand Material blue/purple. Single
+     source of truth for both the legend (CSS) and the canvas (hud.js). */
+  --trace-tilt: #46e08f;
+  --trace-p: #4fd6e0;
+  --trace-i: #ffd166;
+  --trace-d: #e06bd0;
+  --trace-grid: #2a3446;
+  --trace-fault: #ff5d5d;
 
   /* button surfaces (tokenized — no bespoke gradients in component CSS) */
   --btn-accent-grad: linear-gradient(180deg, #2a1e05, #1b1303);
@@ -102,6 +113,13 @@
   --bad-bg: rgba(207, 34, 46, 0.12);
   --shadow: 0 8px 30px rgba(30, 40, 60, 0.15);
   --shadow-lg: 0 24px 70px rgba(30, 40, 60, 0.2);
+  /* darker trace hues so the scope stays legible on the light HUD surface */
+  --trace-tilt: #14803c;
+  --trace-p: #0a7d8a;
+  --trace-i: #9a6700;
+  --trace-d: #a5359a;
+  --trace-grid: #c2cad9;
+  --trace-fault: #cf222e;
   color-scheme: light;
 }
 

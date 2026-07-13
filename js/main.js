@@ -19,6 +19,15 @@ import { initTouch } from './app/touch.js';
 import { initCurriculum } from './curriculum/engine.js';
 import { initPerf } from './app/perf.js';
 import { initTopbar } from './app/topbar.js';
+import { installErrorBoundary, isWebGLAvailable, showFatal } from './app/errors.js';
+import { track, trackOnce, EVENTS } from './app/analytics.js';
+
+installErrorBoundary();  // global error/rejection reporting + fatal fallback wiring
+if (!isWebGLAvailable()) {
+  // 3D can't run at all — show the friendly fallback instead of a blank canvas.
+  showFatal();
+  throw new Error('WebGL unavailable — halting boot.');
+}
 
 bootActiveRobot();  // resolve persisted robot into state BEFORE any module reads a def
 initPerf();   // dev-only FPS/startup HUD (?perf or Alt+P); no-op otherwise
@@ -29,7 +38,16 @@ const serial = new Serial(document.getElementById('serial-log'));
 window.addEventListener('pointerdown', () => audio.resume(), { once: false });
 
 const canvas = document.getElementById('three-canvas');
-const { renderer, scene, camera, controls, slotMeshes, resize, composer, floorUniforms, assemblyDecor } = createScene(canvas);
+let sceneBits;
+try {
+  sceneBits = createScene(canvas);
+} catch (e) {
+  // context creation can still fail past the capability check (blocklisted GPU,
+  // exhausted contexts) — fall back gracefully instead of a half-dead page.
+  showFatal();
+  throw e;
+}
+const { renderer, scene, camera, controls, slotMeshes, resize, composer, floorUniforms, assemblyDecor } = sceneBits;
 
 // workshop vs. outdoor (sim) atmosphere — swapped on Upload / back
 const WORKSHOP_BG = scene.background.clone();
@@ -86,7 +104,14 @@ if (activeRobot().sketch) cm.setValue(activeRobot().sketch);
 // any checklist refresh (placement, wiring, clear) marks the state dirty
 {
   const origRefresh = hud.refreshChecklist;
-  hud.refreshChecklist = (...a) => { origRefresh(...a); guide.refresh(); saveApi.persist(); };
+  hud.refreshChecklist = (...a) => {
+    origRefresh(...a);
+    guide.refresh();
+    saveApi.persist();
+    // funnel milestones — first part placed, then all wiring done
+    if (assemblyApi.getPlacedCount() > 0) trackOnce(EVENTS.PLACE, { robot: activeRobot().id });
+    if (wiring.allRequiredDone()) trackOnce(EVENTS.WIRE, { robot: activeRobot().id });
+  };
 }
 
 // ── curriculum (Learn mode) ─────────────────────────────────────
@@ -101,6 +126,7 @@ const curriculum = initCurriculum({ sim, wiring, assemblyApi, hud, setSketchGain
 document.getElementById('learn-btn').addEventListener('click', () => curriculum.openOverlay());
 guide.onLessons(() => curriculum.openOverlay());
 window.__lab = { assemblyApi, wiring, curriculum, hud };   // debug/testing hook
+track(EVENTS.LOAD, { robot: activeRobot().id });   // funnel entry — app booted
 
 // ── onboarding → Guide rail ─────────────────────────────────────
 // The always-on Guide rail replaces the old spotlight tour: both onboarding
@@ -117,6 +143,7 @@ const uploadBtn = document.getElementById('upload-btn');
 const uploadLabel = uploadBtn.querySelector('span');
 uploadBtn.addEventListener('click', async () => {
   if (uploadBtn.disabled) return;
+  trackOnce(EVENTS.UPLOAD, { robot: activeRobot().id });
   uploadBtn.classList.add('loading');
   uploadLabel.textContent = 'COMPILING…';
   try {
@@ -135,6 +162,7 @@ uploadBtn.addEventListener('click', async () => {
 });
 
 function enterSim() {
+  trackOnce(EVENTS.DRIVE, { robot: activeRobot().id });
   set('mode', 'sim');
   assemblyApi.group.visible = false;
   wiring.setVisible(false);

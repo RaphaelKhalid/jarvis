@@ -176,7 +176,6 @@ uploadBtn.addEventListener('click', async () => {
 });
 
 function enterSim() {
-  trackOnce(EVENTS.DRIVE, { robot: activeRobot().id });
   set('mode', 'sim');
   assemblyApi.group.visible = false;
   wiring.setVisible(false);
@@ -253,6 +252,11 @@ function animate() {
 
   if (state.mode === 'sim') {
     sim.step(dt);
+    // funnel: DRIVE = the user actually drove (first real WASD/touch input after
+    // boot), not merely reaching sim mode — keyboard and touch both feed sim.input.
+    if (sim.input && (sim.input.fwd !== 0 || sim.input.turn !== 0)) {
+      trackOnce(EVENTS.DRIVE, { robot: activeRobot().id });
+    }
     // racing chase-cam: trails behind the heading, orbitable with mouse/arrows,
     // pulls back + widens FOV with speed, and looks ahead along travel.
     if (sim.bodies.chassis) {

@@ -172,8 +172,10 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
 /* progressive disclosure: the firmware is demoted (not hidden) until the board
    is wired, so a cold-start user leads with Build → Wire, not a wall of code. */
 #editor-container, #serial { transition: opacity var(--t-med) var(--ease-out); }
+/* 0.55 keeps the panel clearly de-emphasized while staying legible — dimming
+   further pushed the (AA-compliant) editor/serial text back below AA. */
 #right-panel.demoted #editor-container,
-#right-panel.demoted #serial { opacity: 0.4; }
+#right-panel.demoted #serial { opacity: 0.55; }
 #fw-hint {
   display: flex; align-items: center; gap: 8px;
   margin: 8px 12px 0; padding: 8px 10px;

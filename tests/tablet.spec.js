@@ -16,7 +16,7 @@ test('on a 1024px tablet the guide starts collapsed and the layout stacks', asyn
 
   // app is a single stacked column at tablet width
   const cols = await page.evaluate(() =>
-    getComputedStyle(document.getElementById('app')).gridTemplateColumns.split(' ').length);
+    window.getComputedStyle(document.getElementById('app')).gridTemplateColumns.split(' ').length);
   expect(cols).toBe(1);
 
   // expanding shows the scrim (tap-to-dismiss overlay), so it's never permanent

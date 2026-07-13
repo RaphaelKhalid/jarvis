@@ -252,23 +252,31 @@ export function initHud({ wiring, sim, getPlacedCount, getGains, onExitSim, onGa
     });
     ctx.stroke();
   }
+  // trace colors come from the shared --trace-* tokens (tokens.css) so the
+  // canvas and the CSS legend can't drift, and both follow the light/dark theme.
+  const hexA = (hex, a) => {
+    const n = parseInt(hex.trim().slice(1), 16);
+    return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+  };
   function drawSpark() {
     const ctx = spark.getContext('2d');
     const w = spark.width, h = spark.height;
+    const css = window.getComputedStyle(document.documentElement);
+    const tk = (name) => css.getPropertyValue(name);
     ctx.clearRect(0, 0, w, h);
     // zero line
-    ctx.strokeStyle = '#2a3446'; ctx.lineWidth = 1;
+    ctx.strokeStyle = tk('--trace-grid'); ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2); ctx.stroke();
     const half = h / 2 - 2;
     // PID term contributions (thin, normalized to ±255 output range)
     ctx.lineWidth = 1;
-    ctx.strokeStyle = 'rgba(86,168,255,0.75)';  tracePath(ctx, w, h, s => s.p / 255, half);   // P — blue
-    ctx.strokeStyle = 'rgba(255,209,102,0.75)'; tracePath(ctx, w, h, s => s.i / 255, half);   // I — yellow
-    ctx.strokeStyle = 'rgba(214,134,255,0.75)'; tracePath(ctx, w, h, s => s.d / 255, half);   // D — purple
+    ctx.strokeStyle = hexA(tk('--trace-p'), 0.75); tracePath(ctx, w, h, s => s.p / 255, half);
+    ctx.strokeStyle = hexA(tk('--trace-i'), 0.75); tracePath(ctx, w, h, s => s.i / 255, half);
+    ctx.strokeStyle = hexA(tk('--trace-d'), 0.75); tracePath(ctx, w, h, s => s.d / 255, half);
     // tilt (bold, ±45°)
     const last = graphData[graphData.length - 1];
     ctx.lineWidth = 2;
-    ctx.strokeStyle = last && Math.abs(last.t) > 25 ? '#ff5d5d' : '#3ddc84';
+    ctx.strokeStyle = last && Math.abs(last.t) > 25 ? tk('--trace-fault') : tk('--trace-tilt');
     tracePath(ctx, w, h, s => s.t / 45, half);
   }
 

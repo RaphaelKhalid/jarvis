@@ -139,7 +139,21 @@ const curriculum = initCurriculum({ sim, wiring, assemblyApi, hud, setSketchGain
 // button opens the curriculum. (The old floating learn-btn was redundant.)
 document.getElementById('help-btn').addEventListener('click', () => guide.expand());
 guide.onLessons(() => curriculum.openOverlay());
-window.__lab = { assemblyApi, wiring, curriculum, hud };   // debug/testing hook
+
+// ── share build ─────────────────────────────────────────────────
+document.getElementById('share-btn').addEventListener('click', async () => {
+  if (assemblyApi.getPlacedCount() === 0) { hud.flash('Place some parts first, then share', 'bad'); return; }
+  const url = saveApi.shareUrl();
+  try {
+    await navigator.clipboard.writeText(url);
+    hud.flash('Build link copied to clipboard', 'ok');
+  } catch {
+    // clipboard blocked (insecure context / permissions) — fall back to a prompt
+    window.prompt('Copy your shareable build link:', url);
+  }
+  track(EVENTS.SHARE, { robot: activeRobot().id });
+});
+window.__lab = { assemblyApi, wiring, curriculum, hud, saveApi };   // debug/testing hook
 track(EVENTS.LOAD, { robot: activeRobot().id });   // funnel entry — app booted
 
 // ── onboarding → Guide rail ─────────────────────────────────────

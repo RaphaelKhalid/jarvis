@@ -327,6 +327,15 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
 #sound-btn:hover { border-color: var(--accent); color: var(--accent); }
 #sound-btn.muted { color: var(--text-dim); opacity: 0.7; }
 
+#share-btn {
+  position: absolute; bottom: 14px; left: 86px; z-index: 6;
+  width: 30px; height: 30px; border-radius: 50%;
+  background: var(--overlay); border: 1px solid var(--border); color: var(--text-dim);
+  display: flex; align-items: center; justify-content: center; cursor: pointer; backdrop-filter: blur(4px);
+}
+#share-btn:hover { border-color: var(--accent); color: var(--accent); }
+#share-btn svg { width: 15px; height: 15px; }
+
 /* ── clear-all button ── */
 #clear-btn {
   display: flex; align-items: center; justify-content: center; gap: 7px;

@@ -2,8 +2,22 @@
 // The same payload later becomes the cloud-sync document — keep it
 // forward-compatible: ignore unknown keys, gate migrations on `v`.
 import { DEFAULT_SKETCH } from '../editor.js';
-import { activeRobot } from '../robots/index.js';
+import { activeRobot, getRobot, switchRobot } from '../robots/index.js';
 import { state } from './state.js';
+
+// ── share encoding: the save payload ↔ a URL-safe base64 string ──
+// This is the same forward-compatible JSON as a cloud document, so a build is
+// shareable as a self-contained link (no backend). Unicode-safe base64url.
+function encodeBuild(obj) {
+  const b64 = window.btoa(window.unescape(encodeURIComponent(JSON.stringify(obj))));
+  return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function decodeBuild(str) {
+  try {
+    const b64 = str.replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(decodeURIComponent(window.escape(window.atob(b64))));
+  } catch { return null; }
+}
 
 const LEGACY_KEY = 'sbl-save-v1';           // pre-multi-robot single slot (self-balancer)
 const keyFor = (robotId) => `sbl-save-v1:${robotId}`;   // per-robot slot (schema version is `v`)
@@ -90,25 +104,62 @@ export function initSave({ assemblyApi, wiring, getSketch, setSketch }) {
     try { localStorage.removeItem(KEY); } catch {}
   }
 
-  // resume / start-fresh prompt (only when a meaningful save exists)
-  const saved = load();
-  if (isMeaningful(saved)) {
-    const bar = document.createElement('div');
-    bar.id = 'resume-bar';
-    bar.innerHTML = `
-      <span>Welcome back — resume your build?</span>
-      <button id="resume-yes">Resume</button>
-      <button id="resume-no">Start fresh</button>`;
-    document.body.appendChild(bar);
-    document.getElementById('resume-yes').addEventListener('click', () => {
-      restore(saved);
-      bar.remove();
-    });
-    document.getElementById('resume-no').addEventListener('click', () => {
-      clear();
-      bar.remove();
-    });
+  // ── shareable build URL ───────────────────────────────────────
+  // Encode the current board into a self-contained link. Drop the sketch when
+  // it's the robot's default (keeps the URL short) and the volatile timestamp.
+  function shareUrl() {
+    const s = captureState({ assemblyApi, wiring, getSketch });
+    delete s.ts;
+    if (s.sketch === (activeRobot().sketch || DEFAULT_SKETCH)) delete s.sketch;
+    return `${window.location.origin}${window.location.pathname}#build=${encodeBuild(s)}`;
+  }
+  function clearHash() {
+    try { window.history.replaceState(null, '', window.location.pathname + window.location.search); } catch {}
   }
 
-  return { persist, clear };
+  function bar(html) {
+    const el = document.createElement('div');
+    el.id = 'resume-bar';
+    el.innerHTML = html;
+    document.body.appendChild(el);
+    return el;
+  }
+
+  // An incoming shared build (URL #build=...) takes priority over the local
+  // resume prompt — it's an explicit intent from whoever opened the link.
+  const sharedRaw = (window.location.hash.match(/build=([^&#]+)/) || [])[1];
+  const shared = sharedRaw ? decodeBuild(sharedRaw) : null;
+  const validShared = shared && shared.v === SCHEMA && shared.placedCount;
+
+  if (validShared) {
+    const forRobot = shared.robotId || 'self-balancer';
+    if (forRobot === state.activeRobotId) {
+      const el = bar(`<span>Someone shared a build — load it?</span>
+        <button id="resume-yes">Load build</button>
+        <button id="resume-no">Dismiss</button>`);
+      document.getElementById('resume-yes').addEventListener('click', () => { clearHash(); restore(shared); el.remove(); });
+      document.getElementById('resume-no').addEventListener('click', () => { clearHash(); el.remove(); });
+    } else {
+      // build is for a different robot — switch to it (persists + reloads); the
+      // hash survives the reload, so the load prompt reappears for that robot.
+      const name = getRobot(forRobot)?.name || 'another robot';
+      const el = bar(`<span>Shared build for <b>${name}</b> — switch &amp; load?</span>
+        <button id="resume-yes">Switch &amp; load</button>
+        <button id="resume-no">Dismiss</button>`);
+      document.getElementById('resume-yes').addEventListener('click', () => switchRobot(forRobot));
+      document.getElementById('resume-no').addEventListener('click', () => { clearHash(); el.remove(); });
+    }
+  } else {
+    // resume / start-fresh prompt (only when a meaningful local save exists)
+    const saved = load();
+    if (isMeaningful(saved)) {
+      const el = bar(`<span>Welcome back — resume your build?</span>
+        <button id="resume-yes">Resume</button>
+        <button id="resume-no">Start fresh</button>`);
+      document.getElementById('resume-yes').addEventListener('click', () => { restore(saved); el.remove(); });
+      document.getElementById('resume-no').addEventListener('click', () => { clear(); el.remove(); });
+    }
+  }
+
+  return { persist, clear, shareUrl };
 }

@@ -124,7 +124,7 @@ export const LESSONS = [
     debrief: 'An inverted pendulum is unstable — left alone it falls in under a second. Continuous correction is the only reason it stands.',
   },
   {
-    id: 'b5', track: 'balance', title: 'Disturbance Rejection', par: 90,
+    id: 'b5', tier: 'pro', track: 'balance', title: 'Disturbance Rejection', par: 90,
     brief: 'A controller proves itself under stress. Boot up, hit the Nudge button to shove the robot, and watch the tilt trace spike and settle.',
     setup: { assemble: true, wire: true },
     objectives: [
@@ -157,7 +157,7 @@ export const LESSONS = [
     debrief: 'Differential drive: no steering wheel, just a speed difference between the two motors.',
   },
   {
-    id: 'd3', track: 'driving', title: 'Ice Walker', par: 90,
+    id: 'd3', tier: 'pro', track: 'driving', title: 'Ice Walker', par: 90,
     brief: 'There’s an ice patch out there — low grip, long stops. Find it, cross it, and make it back onto solid ground without wiping out.',
     setup: { assemble: true, wire: true },
     objectives: [
@@ -168,7 +168,7 @@ export const LESSONS = [
     debrief: 'Less friction = less control authority. Real robots slow down and steer gently on slick surfaces — now you know why.',
   },
   {
-    id: 'd4', track: 'driving', title: 'Get Some Air', par: 90,
+    id: 'd4', tier: 'pro', track: 'driving', title: 'Get Some Air', par: 90,
     brief: 'Straight ahead of spawn there’s a launch ramp. Hit it fast, fly, and stick the landing.',
     setup: { assemble: true, wire: true },
     objectives: [
@@ -179,7 +179,7 @@ export const LESSONS = [
     debrief: 'Mid-air there’s nothing to push against — no control. Line up your landing before you leave the ground.',
   },
   {
-    id: 'd5', track: 'driving', title: 'Wipeout Practice', par: 90,
+    id: 'd5', tier: 'pro', track: 'driving', title: 'Wipeout Practice', par: 90,
     brief: 'Every driver crashes. Cause a wipeout on purpose — land badly or spin out on ice — then use SPACE to get back up and stabilize.',
     setup: { assemble: true, wire: true },
     objectives: [
@@ -205,7 +205,7 @@ export const LESSONS = [
     debrief: 'You just did waypoint navigation — the core of every delivery robot’s job.',
   },
   {
-    id: 'e2', track: 'engineering', title: 'Speed Run', par: 35,
+    id: 'e2', tier: 'pro', track: 'engineering', title: 'Speed Run', par: 35,
     brief: 'Straight sprint: from spawn to the north ramp. Three stars under 35 seconds total.',
     setup: { assemble: true, wire: true },
     objectives: [
@@ -215,7 +215,7 @@ export const LESSONS = [
     debrief: 'Speed vs stability is the eternal robot trade-off. The faster you go, the harder the terrain punishes mistakes.',
   },
   {
-    id: 'e3', track: 'engineering', title: 'Triple Jump', par: 120,
+    id: 'e3', tier: 'pro', track: 'engineering', title: 'Triple Jump', par: 120,
     brief: 'Catch air three separate times — ramps or SPACE-jumps at speed both count. Land them all.',
     setup: { assemble: true, wire: true },
     objectives: [
@@ -225,7 +225,7 @@ export const LESSONS = [
     debrief: 'Each landing is a controlled crash the suspension (and controller) must absorb.',
   },
   {
-    id: 'e4', track: 'engineering', title: 'Iron Bot', par: 180,
+    id: 'e4', tier: 'pro', track: 'engineering', title: 'Iron Bot', par: 180,
     brief: 'Endurance: cover 400 units of ground without a single wipeout. Plan your route, respect the ice.',
     setup: { assemble: true, wire: true },
     objectives: [
@@ -235,7 +235,7 @@ export const LESSONS = [
     debrief: 'Reliability engineering: it’s not the top speed that matters, it’s never having to stop.',
   },
   {
-    id: 'e5', track: 'engineering', title: 'Final Exam', par: 300,
+    id: 'e5', tier: 'pro', track: 'engineering', title: 'Final Exam', par: 300,
     brief: 'Everything, from scratch: build the robot, wire it, upload, sprint to the north ramp, catch air, and come home.',
     setup: { clear: true },
     objectives: [
@@ -251,7 +251,7 @@ export const LESSONS = [
 
   // ── ROVER SCHOOL (robot: 'rover') ────────────────────────────
   {
-    id: 'rv1', track: 'rover', robot: 'rover', title: 'Build the Rover',
+    id: 'rv1', tier: 'pro', track: 'rover', robot: 'rover', title: 'Build the Rover',
     brief: 'The rover has no balance sensor — it rolls on four wheels. Place all eight parts (a brain, two L298N drivers, four motors, a battery) and wire the full skid-steer loom. Auto-wire is there if you get stuck.',
     setup: { clear: true },
     objectives: [
@@ -261,7 +261,7 @@ export const LESSONS = [
     debrief: 'Two drivers, four motors: the left pair shares one set of signal lines, the right pair another. Drive them together and you have a tank — no steering wheel needed.',
   },
   {
-    id: 'rv2', track: 'rover', robot: 'rover', title: 'Roll Out', par: 45,
+    id: 'rv2', tier: 'pro', track: 'rover', robot: 'rover', title: 'Roll Out', par: 45,
     brief: 'No balancing to worry about — just power and go. Upload, then get the rover up to speed with W.',
     setup: { assemble: true, wire: true },
     objectives: [
@@ -271,7 +271,7 @@ export const LESSONS = [
     debrief: 'A four-wheeled rover is statically stable — it stands still on its own. All the firmware does is set wheel speed, no PID required.',
   },
   {
-    id: 'rv3', track: 'rover', robot: 'rover', title: 'Tank Turn', par: 60,
+    id: 'rv3', tier: 'pro', track: 'rover', robot: 'rover', title: 'Tank Turn', par: 60,
     brief: 'Skid-steer turns by driving the left and right wheels at different speeds — exactly like a tank. Carve at least two full circles of turning.',
     setup: { assemble: true, wire: true },
     objectives: [
@@ -281,7 +281,7 @@ export const LESSONS = [
     debrief: 'With no steering axle, a skid-steer literally skids the wheels sideways to rotate. Tight turns, but they scrub the tyres — you can see the tracks it leaves.',
   },
   {
-    id: 'rv4', track: 'rover', robot: 'rover', title: 'Off-Road', par: 100,
+    id: 'rv4', tier: 'pro', track: 'rover', robot: 'rover', title: 'Off-Road', par: 100,
     brief: 'Four-wheel drive shrugs off terrain a balancer would fear. Find the ice patch, cross it, then climb out to the north ramp.',
     setup: { assemble: true, wire: true },
     objectives: [
@@ -292,7 +292,7 @@ export const LESSONS = [
     debrief: 'Low centre of gravity + four contact patches = grip a two-wheeler can’t match. This is why rovers, not balancers, go exploring.',
   },
   {
-    id: 'rv5', track: 'rover', robot: 'rover', title: 'Rover Rally', par: 150,
+    id: 'rv5', tier: 'pro', track: 'rover', robot: 'rover', title: 'Rover Rally', par: 150,
     brief: 'Everything together: reach the north ramp, catch some air, and race back to the start. Beat the clock for three stars.',
     setup: { assemble: true, wire: true },
     objectives: [

@@ -148,6 +148,10 @@ function setSketchGains({ Kp, Ki, Kd }) {
 const curriculum = initCurriculum({
   sim, wiring, assemblyApi, hud, setSketchGains, guide,
   onProgress: (p) => { pushDocument('progress', p).catch(() => {}); },   // cloud sync (queued if signed out)
+  onUpgrade: (lesson) => {   // Pro CTA — measure intent now; Stripe checkout lands here later
+    track('upgrade_click', { lesson: lesson?.id || null });
+    hud.flash('GYRO Pro is launching soon — thanks for the interest!', 'ok');
+  },
 });
 // single help/learn surface: the Guide rail. "?" expands it; its own "Lessons"
 // button opens the curriculum. (The old floating learn-btn was redundant.)

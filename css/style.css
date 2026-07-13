@@ -639,6 +639,27 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
 .lt-lesson.locked { opacity: 0.45; cursor: default; }
 .ltl-stars { color: var(--yellow); font-size: var(--fs-xs); flex-shrink: 0; }
 
+/* Pro (entitlement) lessons — aspirational, NOT the greyed prereq-lock look */
+.lt-lesson.pro { border-left: 2px solid var(--accent); opacity: 1; cursor: pointer; }
+.lt-lesson.pro:hover { border-color: var(--accent); }
+.ltl-sub { display: block; font-family: var(--ui); font-size: 9.5px; color: var(--text-dim); margin-top: 2px; }
+.ltl-pro {
+  font-family: var(--ui); font-size: 9px; font-weight: 700; letter-spacing: 0.08em;
+  color: var(--accent); background: var(--accent-soft); border: 1px solid var(--accent);
+  padding: 1px 6px; border-radius: var(--r-pill);
+}
+/* upgrade panel (inline rail view) */
+.l-pro-track { color: var(--accent) !important; }
+.up-compare { display: flex; flex-direction: column; gap: 7px; margin: 10px 0; }
+.up-row { display: flex; gap: 8px; align-items: flex-start; font-size: var(--fs-sm); color: var(--text-dim); line-height: 1.45; }
+.up-tag {
+  flex-shrink: 0; font-size: 8.5px; font-weight: 700; letter-spacing: 0.06em;
+  padding: 2px 6px; border-radius: var(--r-pill); margin-top: 1px;
+}
+.up-tag.up-free { color: var(--text-dim); background: var(--panel-3); border: 1px solid var(--border); }
+.up-tag.up-pro { color: var(--accent); background: var(--accent-soft); border: 1px solid var(--accent); }
+.up-cta { background: var(--btn-accent-grad) !important; color: var(--accent) !important; border-color: var(--accent) !important; font-weight: 600; }
+
 /* ── active lesson card (rendered inline in the Guide rail) ─── */
 #g-lesson .l-top { display: flex; justify-content: space-between; align-items: center; }
 #g-lesson .l-track { font-size: var(--fs-xs); letter-spacing: 0.12em; color: var(--accent); font-weight: 700; }

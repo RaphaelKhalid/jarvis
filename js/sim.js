@@ -197,29 +197,13 @@ export class BalanceSim {
     // arena, so drop it on low-quality devices (still hilly, just coarser).
     const size = (ARENA_HALF + 8) * 2, seg = isLowQuality() ? 110 : 180;
 
-    // ── dusk sky dome (gradient: deep blue → warm horizon) ──
+    // ── sky dome (equirectangular photo sky mapped onto a big inverted sphere) ──
+    const skyTex = _texLoader.load('assets/textures/sky_06_2k.png');
+    skyTex.colorSpace = THREE.SRGBColorSpace;
+    skyTex.wrapS = THREE.RepeatWrapping;   // horizontal wrap so there's no seam
     const sky = new THREE.Mesh(
-      new THREE.SphereGeometry(600, 40, 20),
-      new THREE.ShaderMaterial({
-        side: THREE.BackSide, depthWrite: false, fog: false,
-        uniforms: {
-          uTop: { value: new THREE.Color(0x1c3566) },
-          uMid: { value: new THREE.Color(0x6f9ac4) },
-          uHor: { value: new THREE.Color(0xe7ad6e) },
-        },
-        vertexShader: /* glsl */`
-          varying vec3 vP;
-          void main() { vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-        fragmentShader: /* glsl */`
-          precision highp float; varying vec3 vP;
-          uniform vec3 uTop, uMid, uHor;
-          void main() {
-            float h = normalize(vP).y;
-            vec3 c = mix(uMid, uTop, smoothstep(0.02, 0.55, h));
-            c = mix(c, uHor, smoothstep(0.16, -0.06, h));   // warm horizon band
-            gl_FragColor = vec4(c, 1.0);
-          }`,
-      }));
+      new THREE.SphereGeometry(600, 60, 40),
+      new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide, depthWrite: false, fog: false }));
     this.group.add(sky);
 
     // ── ground: rolling grass (real CC0 grass texture, lit + wind-shifted) ──

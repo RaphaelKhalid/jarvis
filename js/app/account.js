@@ -69,6 +69,7 @@ export function initAccount({ onSignIn, onSignOut, onClassroom } = {}) {
   // ── signed-in popover ──
   let popover = null;
   let currentUser = null;
+  let tier = 'free';
   function closePopover() { if (popover) { popover.remove(); popover = null; } }
   function openPopover() {
     closePopover();
@@ -76,7 +77,7 @@ export function initAccount({ onSignIn, onSignOut, onClassroom } = {}) {
     popover.className = 'acc-popover';
     popover.innerHTML = `
       <div class="acc-email">${currentUser.email || 'Signed in'}</div>
-      <div class="acc-plan">You’re on <b>Free</b></div>
+      <div class="acc-plan">You’re on <b>${tier === 'pro' ? 'Pro' : 'Free'}</b></div>
       <button class="acc-classroom" type="button">Classroom</button>
       <button class="acc-signout" type="button">Sign out</button>`;
     topbar.appendChild(popover);
@@ -100,7 +101,7 @@ export function initAccount({ onSignIn, onSignOut, onClassroom } = {}) {
     closePopover();
     if (user) {
       chip.classList.add('signed-in');
-      chip.innerHTML = `<span class="acc-dot" title="Free"></span><span class="acc-name">${user.email}</span>`;
+      chip.innerHTML = `<span class="acc-dot ${tier === 'pro' ? 'pro' : ''}" title="${tier === 'pro' ? 'Pro' : 'Free'}"></span><span class="acc-name">${user.email}</span>`;
     } else {
       chip.classList.remove('signed-in');
       chip.textContent = 'Sign in';
@@ -113,5 +114,8 @@ export function initAccount({ onSignIn, onSignOut, onClassroom } = {}) {
     else { onSignOut?.(); }
   });
 
-  return { signOut: async () => { await signOut(); } };
+  return {
+    signOut: async () => { await signOut(); },
+    setTier: (t) => { tier = (t === 'pro') ? 'pro' : 'free'; if (currentUser) renderChip(currentUser); },
+  };
 }

@@ -523,6 +523,7 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
 }
 .tb-account:hover { border-color: var(--accent); color: var(--accent); }
 .tb-account .acc-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-dim); flex-shrink: 0; }
+.tb-account .acc-dot.pro { background: var(--green); box-shadow: 0 0 6px var(--green); }
 .tb-account .acc-name { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .acc-popover {
   position: absolute; top: 44px; right: 12px; z-index: 260; width: 220px;

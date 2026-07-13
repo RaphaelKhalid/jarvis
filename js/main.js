@@ -23,7 +23,7 @@ import { installErrorBoundary, isWebGLAvailable, showFatal } from './app/errors.
 import { track, trackOnce, EVENTS, initAnalytics } from './app/analytics.js';
 import { initAccount } from './app/account.js';
 import { initClassroom } from './app/classroom.js';
-import { pushDocument, pullDocument, flushQueue } from './app/cloud.js';
+import { pushDocument, pullDocument, flushQueue, getProfile } from './app/cloud.js';
 
 installErrorBoundary();  // global error/rejection reporting + fatal fallback wiring
 initAnalytics();         // attach the PostHog sink (privacy-locked; buffers until ready)
@@ -180,10 +180,17 @@ track(EVENTS.LOAD, { robot: activeRobot().id });   // funnel entry — app boote
 // per lesson so nothing is lost; save applies only onto an empty board), push
 // our local-only state back up, then flush any queued offline writes.
 const classroom = initClassroom();
-initAccount({
+const account = initAccount({
   onClassroom: () => classroom.open(),
+  onSignOut: () => { curriculum.setTier('free'); },   // note: fires synchronously at init (account is in TDZ) — don't touch it here
   onSignIn: async () => {
     try {
+      // entitlement: read the paid tier from the profile (default free)
+      const prof = await getProfile();
+      const tier = (prof && prof.tier) || 'free';
+      curriculum.setTier(tier);
+      account.setTier(tier);
+      // sync: pull + merge progress/save, push local-only state, flush the queue
       const rp = await pullDocument('progress', 0);
       if (rp) curriculum.applyRemoteProgress(rp);
       pushDocument('progress', curriculum.getProgress()).catch(() => {});

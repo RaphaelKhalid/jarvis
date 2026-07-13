@@ -172,6 +172,12 @@ document.getElementById('share-btn').addEventListener('click', async () => {
   }
   track(EVENTS.SHARE, { robot: activeRobot().id });
 });
+
+// ── minimizable panels (tray + firmware): collapse to their header so the 3D
+// workspace can take the whole screen (especially on phones) ──
+for (const btn of document.querySelectorAll('.panel-min')) {
+  btn.addEventListener('click', () => document.getElementById(btn.dataset.panel)?.classList.toggle('min'));
+}
 window.__lab = { assemblyApi, wiring, curriculum, hud, saveApi };   // debug/testing hook
 track(EVENTS.LOAD, { robot: activeRobot().id });   // funnel entry — app booted
 

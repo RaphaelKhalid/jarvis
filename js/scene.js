@@ -150,41 +150,14 @@ export function createScene(canvas) {
   chassis.position.y = ASSEMBLY_LIFT;
   scene.add(chassis);
 
-  // ── workshop backdrop dome: warm horizon glow, amber walls, dim ceiling ──
-  // Reads as a lamplit room instead of a black void, at any camera angle.
+  // ── backdrop sky dome: the same sunset panorama the sim uses, so the build
+  // view shares the outdoor look (toneMapped:false — it's a finished image). ──
+  const skyTex = new THREE.TextureLoader().load('assets/textures/sky_06_2k.png');
+  skyTex.colorSpace = THREE.SRGBColorSpace;
+  skyTex.wrapS = THREE.RepeatWrapping;
   const sky = new THREE.Mesh(
-    new THREE.SphereGeometry(420, 32, 16),
-    new THREE.ShaderMaterial({
-      side: THREE.BackSide, depthWrite: false,
-      uniforms: {
-        uCeil:    { value: new THREE.Color(0x1d1610) },   // dim warm ceiling
-        uWall:    { value: new THREE.Color(0x3a2818) },   // amber wall band
-        uHorizon: { value: new THREE.Color(0x6b4520) },   // lamplight glow
-        uFloor:   { value: new THREE.Color(0x0d0805) },   // below the bench
-      },
-      vertexShader: /* glsl */`
-        varying vec3 vPos;
-        void main() { vPos = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-      fragmentShader: /* glsl */`
-        precision highp float;
-        varying vec3 vPos;
-        uniform vec3 uCeil; uniform vec3 uWall; uniform vec3 uHorizon; uniform vec3 uFloor;
-        float hash2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-        void main() {
-          vec3 n = normalize(vPos);
-          float h = n.y;
-          // horizon glow band -> warm walls -> dim ceiling; dark under the floor
-          vec3 col = mix(uHorizon, uWall, smoothstep(0.02, 0.35, h));
-          col = mix(col, uCeil, smoothstep(0.35, 0.9, h));
-          col = mix(uFloor, col, smoothstep(-0.12, 0.02, h));
-          // subtle large-scale mottling so the walls aren't flat
-          float m = hash2(floor(n.xz * 8.0 + 31.0)) * 0.5 + hash2(floor(n.xy * 5.0)) * 0.5;
-          col *= 0.92 + 0.16 * m;
-          // faint extra glow toward the lamp side
-          col *= 1.0 + 0.25 * max(0.0, n.z) * (1.0 - abs(h));
-          gl_FragColor = vec4(col, 1.0);
-        }`,
-    }));
+    new THREE.SphereGeometry(600, 60, 40),
+    new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide, depthWrite: false, fog: false, toneMapped: false }));
   scene.add(sky);
 
   // ── slot ghosts (highlighted during drag) ──

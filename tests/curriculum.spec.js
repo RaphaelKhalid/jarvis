@@ -13,7 +13,7 @@ async function openApp(page) {
 
 test('lesson c1 completes via place + wire objectives and awards stars', async ({ page }) => {
   await openApp(page);
-  await page.click('#learn-btn');
+  await page.click('#g-lessons');
   // lesson browser now renders inline in the Guide rail (no full-screen modal)
   await expect(page.locator('#g-browser')).toBeVisible();
   await page.click('[data-lesson="c1"]');
@@ -38,7 +38,7 @@ test('lesson c1 completes via place + wire objectives and awards stars', async (
 
 test('locked lessons are disabled until the previous one is passed', async ({ page }) => {
   await openApp(page);
-  await page.click('#learn-btn');
+  await page.click('#g-lessons');
   await expect(page.locator('[data-lesson="c1"]')).toBeEnabled();
   await expect(page.locator('[data-lesson="c2"]')).toBeDisabled();
   await expect(page.locator('[data-lesson="c5"]')).toBeDisabled();
@@ -50,7 +50,7 @@ test('locked lessons are disabled until the previous one is passed', async ({ pa
 
 test('lesson with sim setup pre-assembles and pre-wires the board', async ({ page }) => {
   await openApp(page);
-  await page.click('#learn-btn');
+  await page.click('#g-lessons');
   await page.evaluate(() => {
     // unlock b4 by seeding progress
     localStorage.setItem('sbl-progress-v1', JSON.stringify({ b1: 3, b2: 3, b3: 3 }));
@@ -58,7 +58,7 @@ test('lesson with sim setup pre-assembles and pre-wires the board', async ({ pag
   await page.reload();
   await page.waitForTimeout(1000);
   await page.evaluate(() => document.getElementById('overlay-start')?.click());
-  await page.click('#learn-btn');
+  await page.click('#g-lessons');
   await page.click('[data-lesson="b4"]');
   await page.waitForTimeout(1000);
   // setup should have fully built + wired the robot

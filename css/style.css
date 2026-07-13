@@ -168,6 +168,19 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
 /* ── right panel ── */
 /* min-height:0 lets the flex child shrink so CodeMirror can scroll to the end */
 #editor-container { flex: 1 1 0; min-height: 0; overflow: hidden; }
+
+/* progressive disclosure: the firmware is demoted (not hidden) until the board
+   is wired, so a cold-start user leads with Build → Wire, not a wall of code. */
+#editor-container, #serial { transition: opacity var(--t-med) var(--ease-out); }
+#right-panel.demoted #editor-container,
+#right-panel.demoted #serial { opacity: 0.4; }
+#fw-hint {
+  display: flex; align-items: center; gap: 8px;
+  margin: 8px 12px 0; padding: 8px 10px;
+  background: var(--accent-soft); border: 1px solid var(--accent-dim);
+  border-radius: var(--r-sm); color: var(--accent); font-size: var(--fs-sm);
+}
+#fw-hint svg { width: 14px; height: 14px; flex-shrink: 0; }
 #upload-btn {
   display: flex; align-items: center; justify-content: center; gap: 9px;
   margin: 10px 12px;
@@ -512,15 +525,6 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
   font-family: var(--ui); font-size: 12px; border-radius: var(--r); cursor: pointer;
 }
 #overlay .tour:hover { border-color: var(--accent); }
-
-/* ── learn button ──────────────────────────────────────────── */
-#learn-btn {
-  position: absolute; bottom: 14px; left: 86px; z-index: 6;
-  width: 30px; height: 30px; border-radius: 50%;
-  background: var(--overlay); border: 1px solid var(--border); color: var(--text-dim);
-  display: flex; align-items: center; justify-content: center; cursor: pointer; backdrop-filter: blur(4px);
-}
-#learn-btn:hover { border-color: var(--accent); color: var(--accent); }
 
 /* ── lesson browser (rendered inline in the Guide rail) ────── */
 .learn-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--sp-3); }

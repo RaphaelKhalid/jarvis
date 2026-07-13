@@ -6,6 +6,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { activeRobot } from './robots/index.js';
+import { isLowQuality } from './app/quality.js';
 
 // Vertical lift applied to the assembly rig (chassis deck, parts, slot ghosts)
 // so the motors' wheels rest on the workbench floor instead of clipping through
@@ -13,8 +14,11 @@ import { activeRobot } from './robots/index.js';
 export const ASSEMBLY_LIFT = 2.1;
 
 export function createScene(canvas) {
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  const lowQ = isLowQuality();
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: !lowQ });
+  // pixel ratio is the biggest GPU lever and also drives the bloom pass's
+  // internal resolution — cap it lower on weak devices.
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, lowQ ? 1 : 2));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -207,7 +211,8 @@ export function createScene(canvas) {
   composer.addPass(new RenderPass(scene, camera));
   // higher threshold so only genuinely bright emissives glow — lit metal and
   // wood no longer bloom into white hotspots.
-  const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.5, 0.6, 0.92);
+  // soften bloom slightly on low-quality devices (cheaper, still glows)
+  const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), lowQ ? 0.38 : 0.5, lowQ ? 0.5 : 0.6, 0.92);
   composer.addPass(bloom);
   composer.addPass(new OutputPass());
 

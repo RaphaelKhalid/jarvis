@@ -102,12 +102,24 @@ if (activeRobot().sketch) cm.setValue(activeRobot().sketch);
   if (ff && activeRobot().sketchFile) ff.textContent = activeRobot().sketchFile;
 }
 // any checklist refresh (placement, wiring, clear) marks the state dirty
+// progressive disclosure: demote the firmware panel until the board is wired,
+// so a cold-start user leads with Build → Wire instead of a wall of code.
+const rightPanel = document.getElementById('right-panel');
+const fwHint = document.getElementById('fw-hint');
+function updateFirmwareDisclosure() {
+  const demote = state.mode === 'assembly' && !wiring.allRequiredDone();
+  rightPanel?.classList.toggle('demoted', demote);
+  fwHint?.classList.toggle('hidden', !demote);
+}
+updateFirmwareDisclosure();
+
 {
   const origRefresh = hud.refreshChecklist;
   hud.refreshChecklist = (...a) => {
     origRefresh(...a);
     guide.refresh();
     saveApi.persist();
+    updateFirmwareDisclosure();
     // funnel milestones — first part placed, then all wiring done
     if (assemblyApi.getPlacedCount() > 0) trackOnce(EVENTS.PLACE, { robot: activeRobot().id });
     if (wiring.allRequiredDone()) trackOnce(EVENTS.WIRE, { robot: activeRobot().id });
@@ -123,7 +135,9 @@ function setSketchGains({ Kp, Ki, Kd }) {
   cm.setValue(v);
 }
 const curriculum = initCurriculum({ sim, wiring, assemblyApi, hud, setSketchGains, guide });
-document.getElementById('learn-btn').addEventListener('click', () => curriculum.openOverlay());
+// single help/learn surface: the Guide rail. "?" expands it; its own "Lessons"
+// button opens the curriculum. (The old floating learn-btn was redundant.)
+document.getElementById('help-btn').addEventListener('click', () => guide.expand());
 guide.onLessons(() => curriculum.openOverlay());
 window.__lab = { assemblyApi, wiring, curriculum, hud };   // debug/testing hook
 track(EVENTS.LOAD, { robot: activeRobot().id });   // funnel entry — app booted

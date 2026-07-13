@@ -16,11 +16,11 @@
 <meta property="og:title" content="SelfBalance Lab — build a balancing robot in your browser">
 <meta property="og:description" content="Wire an MPU6050, tune a real PID loop, and watch the physics. A zero-install robotics assembly lab.">
 <meta property="og:url" content="https://selfbalance-lab.vercel.app/">
-<meta property="og:image" content="https://selfbalance-lab.vercel.app/og-cover.svg">
+<meta property="og:image" content="https://selfbalance-lab.vercel.app/og-cover.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="SelfBalance Lab — build a balancing robot in your browser">
 <meta name="twitter:description" content="Wire an MPU6050, tune a real PID loop, and watch the physics. A zero-install robotics assembly lab.">
-<meta name="twitter:image" content="https://selfbalance-lab.vercel.app/og-cover.svg">
+<meta name="twitter:image" content="https://selfbalance-lab.vercel.app/og-cover.png">
 <!-- modern typography: Inter for UI chrome, JetBrains Mono for code/data -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -73,8 +73,7 @@
     <div id="workspace-hud">
       <span id="hud-status" role="status" aria-live="polite">Drag parts from the tray onto the chassis</span>
     </div>
-    <button id="help-btn" title="How it works" aria-label="How it works">?</button>
-    <button id="learn-btn" title="Lessons" aria-label="Lessons"><i data-lucide="graduation-cap"></i></button>
+    <button id="help-btn" title="Show the guide" aria-label="Show the guide">?</button>
     <button id="sound-btn" title="Toggle sound" aria-label="Toggle sound"><i data-lucide="volume-2"></i></button>
     <div id="controls-legend">
       <div class="lg-title">CONTROLS</div>
@@ -90,6 +89,7 @@
     <header class="panel-header">
       <span class="dot dot-green"></span> FIRMWARE — <span id="firmware-file">balance_bot.ino</span>
     </header>
+    <div id="fw-hint" class="hidden"><i data-lucide="arrow-left"></i> Build &amp; wire the robot first — you’ll tune this next.</div>
     <div id="editor-container"></div>
     <div id="serial">
       <div id="serial-head"><span><i data-lucide="terminal"></i> SERIAL MONITOR</span><span class="baud">115200 baud</span></div>
@@ -105,12 +105,12 @@
 <div id="overlay" class="hidden">
   <div class="card">
     <div class="ov-mark"><span aria-hidden="true">◐</span> GYRO</div>
-    <h1>Self-Balance Lab</h1>
-    <div class="tagline">Build a real robot in your browser — wire it, code it, watch the physics.</div>
+    <h1>Feel how control systems work</h1>
+    <div class="tagline">Wire up a real robot, tune a live PID loop, and watch it fight to stay upright — no install, right in your browser.</div>
     <div class="ov-beats">
-      <div class="ov-beat"><span class="ov-n">01</span><b>Build</b><p>Drag parts onto the chassis and wire the pins.</p></div>
-      <div class="ov-beat"><span class="ov-n">02</span><b>Program</b><p>Tune the Arduino PID controller.</p></div>
-      <div class="ov-beat"><span class="ov-n">03</span><b>Play</b><p>Upload and drive it with W A S D.</p></div>
+      <div class="ov-beat"><span class="ov-n">01</span><b>Build</b><p>Drag parts onto the chassis and connect the pins.</p></div>
+      <div class="ov-beat"><span class="ov-n">02</span><b>Tune</b><p>Nudge the PID gains and feel the robot respond.</p></div>
+      <div class="ov-beat"><span class="ov-n">03</span><b>Drive</b><p>Upload and take it for a spin with W A S D.</p></div>
     </div>
     <button class="start" id="overlay-start">Start building →</button>
     <button class="tour" id="overlay-tour">New here? Follow the guided walkthrough</button>

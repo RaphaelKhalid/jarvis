@@ -61,6 +61,18 @@ const MAX_YAW_RATE = 7;       // rad/s cap on yaw
 const LEAN_ACCEL_STYLE = 0.02;// rad of stylistic pitch lean per (units/s²) of accel
 const MAX_DRIVE_LEAN = 0.22;  // cap on the stylistic lean
 const LEAN_SLEW = 1.4;        // rad/s max change of the lean setpoint
+// ── inner balance model (BalanceSim only; RoverSim leaves this.balances=false) ──
+// A lightweight inverted-pendulum tilt error that the live PID actually
+// stabilizes, so the Kp/Ki/Kd sliders (and the Balance lessons) visibly change
+// how the bot stands: weak Kp sags, low Kd rings, Ki=0 leaves a steady lean, and
+// gutting the gains topples it. Kinematic (it feeds the applied lean) — not full
+// Rapier dynamics, which would need re-tuning the whole arcade feel.
+const BAL_G = 8;             // toppling accel per rad of tilt (unstable → needs control)
+const BAL_BIAS = 0.4;        // constant "uneven weight" torque — what Ki exists to cancel
+const BAL_KI = 0.02;         // integral scale (kept equal to the old telemetry term)
+const BAL_FALL = 0.62;       // |tilt| (rad ≈ 35°) beyond which it topples over
+const BAL_NUDGE = 1.1;       // angular-rate kick from the Nudge button (spikes, recovers)
+const BAL_NOISE = 0.5;       // tiny process noise so a stable bot still micro-wobbles
 // jumping / airborne / falling
 const AIR_G = 55;             // gravity for the ballistic jump arc (tuned, not real g)
 const JUMP_V = 30;            // upward velocity of a Space jump
@@ -171,6 +183,10 @@ export class BalanceSim {
     this.onTelemetry = null;
     this._accum = 0;
     this.input = { fwd: 0, turn: 0, brake: false };
+    // inner balance model (see BAL_* constants). RoverSim sets balances=false.
+    this.balances = true;
+    this.balPhi = 0; this.balPhiDot = 0; this.balInteg = 0;
+    this.pidTerms = { p: 0, i: 0, d: 0, out: 0, pwm: 0 };
   }
 
   setGains(g) { this.gains = { ...g }; }
@@ -453,6 +469,7 @@ export class BalanceSim {
 
     this.integral = 0;
     this.prevError = 0;
+    this.balPhi = 0; this.balPhiDot = 0; this.balInteg = 0;
     this.fallen = false;
     this.vel = 0; this._prevVel = 0; this._lean = 0; this._wobble = 0;
     this._airborne = false; this._airVy = 0; this._airY = 0; this._prevGroundY = undefined;
@@ -478,9 +495,10 @@ export class BalanceSim {
 
   nudge() {
     if (!this.bodies.chassis) return;
-    // a poke it has to *recover* from: kick the lean setpoint (the PID must catch
-    // it) plus a real angular impulse so the body physically lurches.
-    this._wobble = (this._wobble || 0) + (Math.random() < 0.5 ? -1 : 1) * 0.45;
+    // a poke the PID has to *recover* from: kick the balance-error rate (the inner
+    // loop must catch it) plus a real angular impulse so the body physically lurches.
+    if (this.balances) this.balPhiDot += (Math.random() < 0.5 ? -1 : 1) * BAL_NUDGE;
+    this._wobble = (this._wobble || 0) + (Math.random() < 0.5 ? -1 : 1) * 0.2;
     const f = this.forwardDir().multiplyScalar(14);
     const c = this.bodies.chassis.translation();
     this.bodies.chassis.applyImpulseAtPoint(
@@ -577,11 +595,32 @@ export class BalanceSim {
     const headDir = new THREE.Vector3(Math.sin(this.heading), 0, Math.cos(this.heading));
     const rightDir = new THREE.Vector3(Math.cos(this.heading), 0, -Math.sin(this.heading));
 
-    // stylistic lean + decaying nudge wobble
+    // ── inner balance loop: the live PID actually stabilizes an inverted
+    // pendulum tilt error (balPhi). Skipped for the rover (balances=false) and
+    // while airborne. This is what makes the Kp/Ki/Kd sliders do something.
+    if (this.balances && !this._airborne) {
+      this.balInteg = THREE.MathUtils.clamp(this.balInteg + this.balPhi * FIXED_DT, -3, 3);
+      const u = Kp * this.balPhi + Ki * BAL_KI * this.balInteg + Kd * this.balPhiDot;   // PID torque
+      const phiddot = BAL_G * Math.sin(this.balPhi) + BAL_BIAS - u + (Math.random() - 0.5) * BAL_NOISE;
+      this.balPhiDot += phiddot * FIXED_DT;
+      this.balPhi += this.balPhiDot * FIXED_DT;
+      this.pidTerms = {
+        p: Kp * this.balPhi, i: Ki * BAL_KI * this.balInteg, d: Kd * this.balPhiDot,
+        out: u, pwm: Math.round(THREE.MathUtils.clamp(Math.abs(u) / 40 * 255, 0, 255)),
+      };
+      if (Math.abs(this.balPhi) > BAL_FALL) {   // the PID lost it — topple
+        this._startTumble(headDir.clone().multiplyScalar(Math.sign(this.balPhi) || 1));
+        this.world.step();
+        if (this.onTelemetry) this.onTelemetry({ tiltDeg: this.tiltDeg, fallen: true });
+        return;
+      }
+    }
+
+    // stylistic lean + decaying nudge wobble + the balance error (the PID's job)
     const targetLean = THREE.MathUtils.clamp(LEAN_ACCEL_STYLE * accel, -MAX_DRIVE_LEAN, MAX_DRIVE_LEAN);
     const prevLean = this._lean || 0;
     this._lean = prevLean + THREE.MathUtils.clamp(targetLean - prevLean, -LEAN_SLEW * FIXED_DT, LEAN_SLEW * FIXED_DT);
-    const desiredLean = this._lean + (this._wobble || 0);
+    const desiredLean = this._lean + (this._wobble || 0) + (this.balances ? this.balPhi : 0);
     this._wobble = (this._wobble || 0) * 0.94;
 
     let nx = THREE.MathUtils.clamp(cpos.x + headDir.x * this.vel * FIXED_DT, -R, R);
@@ -632,13 +671,8 @@ export class BalanceSim {
     }
     this._prevGroundY = terrGroundY;
 
-    // PID terms for the serial telemetry (pitch is set kinematically above)
-    const error = theta;
-    this.integral = THREE.MathUtils.clamp(this.integral + error * FIXED_DT, -1.5, 1.5);
-    const deriv = (error - this.prevError) / FIXED_DT;
-    this.prevError = error;
-    const pTerm = Kp * error, iTerm = Ki * 0.02 * this.integral, dTerm = Kd * deriv;
-    this.pidTerms = { p: pTerm, i: iTerm, d: dTerm, out: pTerm + iTerm + dTerm, pwm: Math.round(THREE.MathUtils.clamp(Math.abs(this.vel) / MAX_SPEED * 255, 0, 255)) };
+    // pidTerms is set by the inner balance loop above (real Kp/Ki/Kd terms);
+    // airborne frames just carry the last grounded value.
     this.debug = { vel: +this.vel.toFixed(1), air: this._airborne, tilt: +this.tiltDeg.toFixed(1) };
 
     this.world.step();
@@ -689,6 +723,7 @@ export class BalanceSim {
     this.bodies.chassis.setAngvel({ x: 0, y: 0, z: 0 }, true);
     this._wobble = 0.25;   // little pop as it springs upright
     this.prevError = 0; this.integral = 0;
+    this.balPhi = 0; this.balPhiDot = 0; this.balInteg = 0;   // fresh balance state
   }
 
   jumpOrRecover() { this.fallen ? this.recover() : this.jump(); }
@@ -840,6 +875,11 @@ function makeRobotVisual(chassisH) {
 // with the exact same feel as the self-balancer minus the balancing. See
 // js/robots/rover.js (the def) and js/robots/sim-registry.js (the simKey wiring).
 export class RoverSim extends BalanceSim {
+  constructor(scene) {
+    super(scene);
+    this.balances = false;   // four wheels, no inverted-pendulum balance loop
+  }
+
   build() {
     this.world = new RAPIER.World({ x: 0, y: -GRAVITY, z: 0 });
     this.group.clear();

@@ -8,7 +8,7 @@ import { state } from './state.js';
 import { activeRobot } from '../robots/index.js';
 import { compInfo } from '../glossary.js';
 
-export function initGuide({ wiring, assemblyApi, getGains }) {
+export function initGuide({ wiring, assemblyApi, getGains, onWire }) {
   const workspace = document.getElementById('workspace');
 
   // the parts checklist is derived from the active robot's slots, so the guide
@@ -80,8 +80,8 @@ export function initGuide({ wiring, assemblyApi, getGains }) {
     },
     {
       key: 'wire', num: 2, label: 'Wire',
-      text: 'Connect the pins: click a pin then its matching target, or drag from one to the other. Hover a pin to learn what it is.',
-      tip: 'In a hurry? Hit <b>Auto-wire</b> in the tray to finish the loom.',
+      text: 'Each row below is one connection. <b>Tap it to wire it</b> — or find the two <span style="color:var(--accent)">glowing pins</span> in the 3D view and click them yourself.',
+      tip: 'Stuck? <b>Auto-wire</b> in the tray finishes the whole loom at once.',
       checklist: () => wiring.status().map(s => ({ label: s.label, done: s.done })),
       done: () => wiring.allRequiredDone(),
     },
@@ -125,17 +125,42 @@ export function initGuide({ wiring, assemblyApi, getGains }) {
     return 2;
   }
 
+  // tap a connection row → wire it (touch- and keyboard-accessible path). The
+  // wiring onChange fires hud.refreshChecklist → guide.refresh(), which re-renders.
+  function connectRow(idx) {
+    const req = wiring.required[idx];
+    if (!req) return;
+    const res = wiring.tryConnect(req.a, req.b);
+    onWire?.(res, req);
+  }
+
   // ── walkthrough render ────────────────────────────────────────
   function renderWalk() {
     const cur = currentIndex();
     walk.innerHTML = phases.map((ph, i) => {
       const stateCls = i < cur ? 'done' : i === cur ? 'open' : 'future';
       const mark = i < cur ? '✓' : ph.num;
+      let checkHtml = '';
+      if (i === cur) {
+        const items = ph.checklist();
+        if (ph.key === 'wire') {
+          // interactive connection list: each row wires that pair on tap; the
+          // first unwired row is the highlighted "next" step.
+          let nextSeen = false;
+          checkHtml = items.map((c, idx) => {
+            const isNext = !c.done && !nextSeen;
+            if (isNext) nextSeen = true;
+            return `<button class="gp-wire ${c.done ? 'done' : ''} ${isNext ? 'next' : ''}" data-wireidx="${idx}" ${c.done ? 'disabled' : ''} type="button">
+              <span class="gp-box">${c.done ? '☑' : '☐'}</span><span class="gpw-label">${c.label}</span>${isNext ? '<span class="gpw-next">tap to wire ›</span>' : ''}</button>`;
+          }).join('');
+        } else {
+          checkHtml = items.map(c => `<div class="gp-item ${c.done ? 'done' : ''}"><span class="gp-box">${c.done ? '☑' : '☐'}</span>${c.label}</div>`).join('');
+        }
+      }
       const body = i === cur ? `
         <div class="gp-body">
           <p class="gp-text">${ph.text}</p>
-          <div class="gp-check">${ph.checklist().map(c => `
-            <div class="gp-item ${c.done ? 'done' : ''}"><span class="gp-box">${c.done ? '☑' : '☐'}</span>${c.label}</div>`).join('')}</div>
+          <div class="gp-check">${checkHtml}</div>
           ${ph.tip ? `<p class="gp-tip">${ph.tip}</p>` : ''}
         </div>` : '';
       return `<div class="gp ${stateCls}">
@@ -143,12 +168,23 @@ export function initGuide({ wiring, assemblyApi, getGains }) {
           ${body}
         </div>`;
     }).join('');
+    for (const btn of walk.querySelectorAll('.gp-wire:not(.done)')) {
+      btn.addEventListener('click', () => connectRow(+btn.dataset.wireidx));
+    }
+  }
+
+  // point the 3D view at the next connection: glow its two pins amber during Wire.
+  function updateWireGuide() {
+    const inWire = currentIndex() === 1 && state.mode === 'assembly';
+    const next = inWire ? wiring.nextRequired() : null;
+    wiring.setGuidePins(next ? [next.a, next.b] : []);
   }
 
   // full refresh (called on any state change + polled)
   function refresh() {
-    if (walk.classList.contains('hidden')) return;   // lesson/browser view owns the panel
+    if (walk.classList.contains('hidden')) { wiring.setGuidePins([]); return; }   // lesson/browser view owns the panel
     renderWalk();
+    updateWireGuide();
   }
 
   renderWalk();

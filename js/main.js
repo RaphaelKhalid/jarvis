@@ -72,7 +72,14 @@ const hud = initHud({
 });
 const assemblyApi = initAssembly({ canvas, scene, camera, controls, slotMeshes, wiring, hud });
 // education-first Guide rail: always-visible instructions that advance with state
-const guide = initGuide({ wiring, assemblyApi, getGains: () => state.gains });
+const guide = initGuide({
+  wiring, assemblyApi, getGains: () => state.gains,
+  onWire: (res, req) => {
+    if (res.state === 'valid') { hud.flash(`✓ ${req.label}`, 'ok'); audio.connect(); }
+    else if (res.state === 'duplicate') { audio.ui(); }
+    track('wire_guided', { label: req.label });
+  },
+});
 const input = initInput({ canvas, sim });
 initTouch({ sim });   // no-op on fine-pointer devices
 

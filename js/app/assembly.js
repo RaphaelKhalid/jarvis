@@ -9,6 +9,7 @@ import { connectionBlurb } from '../glossary.js';
 import { audio } from '../audio.js';
 import { state } from './state.js';
 import { KIND_LABEL } from './hud.js';
+import { track, trackOnce } from './analytics.js';
 
 // ── tweezers cursor (open normally, closes while right-dragging the view) ──
 const tweezersSvg = (dx) => `<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'>` +
@@ -212,6 +213,7 @@ export function initAssembly({ canvas, scene, camera, controls, slotMeshes, wiri
 
   async function autoWire(stepByStep) {
     if (autoBusy || state.mode !== 'assembly') return;
+    track('wire_autowire', { mode: stepByStep ? 'step' : 'instant' });
     autoBusy = true;
     const gen = autoGen;   // clearBoard bumps autoGen → every await below aborts
     autoInstant.disabled = autoStep.disabled = true;
@@ -327,7 +329,7 @@ export function initAssembly({ canvas, scene, camera, controls, slotMeshes, wiri
     if (!pin) return;
     const id = pin.userData.endpointId;
     const res = wiring.handlePinClick(id);
-    if (res.state === 'armed') { hud.setStatus(`Selected ${id} — now click its target`); audio.ui(); }
+    if (res.state === 'armed') { hud.setStatus(`Selected ${id} — now click its target`); audio.ui(); trackOnce('wire_attempt'); }
     else connectFeedback(res);
   });
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -337,7 +339,7 @@ export function initAssembly({ canvas, scene, camera, controls, slotMeshes, wiri
     if (res.state === 'valid') { hud.flash(`✓ ${res.label}`, 'ok'); audio.connect(); }
     else if (res.state === 'invalid') {
       const want = res.suggestion ? ` — ${res.idA.split('.')[1]} should go to ${res.suggestion}` : '';
-      hud.flash(`✗ wrong pin${want}`, 'bad'); audio.error();
+      hud.flash(`✗ wrong pin${want}`, 'bad'); audio.error(); track('wire_wrong_pin');
     } else if (res.state === 'duplicate') { hud.flash('already wired', 'bad'); audio.error(); }
   }
 
@@ -390,11 +392,28 @@ export function initAssembly({ canvas, scene, camera, controls, slotMeshes, wiri
     }
   }
 
+  const SNAP_PX = 26;   // screen-space pin snap radius (trackpad + touch friendly)
+  const _pv = new THREE.Vector3();
   function pickPin() {
     const pinMeshes = [];
     for (const ep of wiring.endpoints.values()) pinMeshes.push(ep.obj);
     const hit = raycaster.intersectObjects(pinMeshes, false)[0];
-    return hit ? hit.object : null;
+    if (hit) return hit.object;
+    // snap: nearest pin within a screen-space threshold, so tiny pins on a
+    // trackpad or a finger on glass don't require a pixel-perfect hit.
+    const r = canvas.getBoundingClientRect();
+    const px = ((pointer.x + 1) / 2) * r.width;
+    const py = ((1 - pointer.y) / 2) * r.height;
+    let best = null, bestD = SNAP_PX;
+    for (const m of pinMeshes) {
+      m.getWorldPosition(_pv); _pv.project(camera);
+      if (_pv.z > 1) continue;   // behind the camera
+      const sx = ((_pv.x + 1) / 2) * r.width;
+      const sy = ((1 - _pv.y) / 2) * r.height;
+      const d = Math.hypot(sx - px, sy - py);
+      if (d < bestD) { bestD = d; best = m; }
+    }
+    return best;
   }
 
   // ── clear board ───────────────────────────────────────────────

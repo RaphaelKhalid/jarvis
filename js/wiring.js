@@ -260,6 +260,36 @@ export class WiringManager {
     this.onChange();
   }
 
+  // The first still-unwired required connection (drives the guided-wiring rail).
+  nextRequired() {
+    const done = new Set(this.wires.filter(w => w.req).map(w => w.req.label));
+    return this.required.find(r => !done.has(r.label)) || null;
+  }
+
+  // Steadily glow a set of endpoint ids amber to point at the "next" connection.
+  // Idempotent: restores previously-glowed pins first (no material-clone stacking).
+  setGuidePins(ids = []) {
+    for (const id of this._guidePins || []) {
+      const ep = this.endpoints.get(id);
+      if (ep && ep.obj.userData._guideOrig) {
+        ep.obj.material = ep.obj.userData._guideOrig;
+        delete ep.obj.userData._guideOrig;
+        ep.obj.scale.setScalar(1);
+      }
+    }
+    this._guidePins = [];
+    for (const id of ids) {
+      const ep = this.endpoints.get(id);
+      if (!ep || ep.obj.userData._guideOrig) continue;
+      ep.obj.userData._guideOrig = ep.obj.material;
+      ep.obj.material = ep.obj.material.clone();
+      ep.obj.material.emissive = new THREE.Color(0xffb000);
+      ep.obj.material.emissiveIntensity = 1.4;
+      ep.obj.scale.setScalar(1.5);
+      this._guidePins.push(id);
+    }
+  }
+
   // Which required connections are satisfied.
   status() {
     const done = new Set();

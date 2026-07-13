@@ -2,6 +2,10 @@
 // objective predicates each frame, awards stars, persists progress.
 import { LESSONS, TRACKS } from './lessons.js';
 import { state } from '../app/state.js';
+import { activeRobot } from '../robots/index.js';
+
+// a lesson belongs to a robot (default the self-balancer for the original set)
+const lessonRobot = (l) => l.robot || 'self-balancer';
 
 const PROGRESS_KEY = 'sbl-progress-v1';
 
@@ -32,7 +36,7 @@ export function initCurriculum({ sim, wiring, assemblyApi, hud, setSketchGains, 
           .filter(p => (o.part === 'motor' ? p.compType.startsWith('motor') : p.compType === o.part)).length;
         return count >= n;
       }
-      case 'placeAll': return assemblyApi.getPlacedCount() >= 6;
+      case 'placeAll': return assemblyApi.getPlacedCount() >= activeRobot().slots.length;
       case 'wire': return wiring.wires.some(w => w.valid && w.req && w.req.label === o.label);
       case 'wireAll': return wiring.allRequiredDone();
       case 'gain': {
@@ -67,7 +71,8 @@ export function initCurriculum({ sim, wiring, assemblyApi, hud, setSketchGains, 
 
     const s = lesson.setup || {};
     if (s.clear) assemblyApi.clearBoard();
-    if (s.assemble) for (const t of ['arduino', 'mpu6050', 'l298n', 'motor', 'motor', 'battery']) assemblyApi.placeByType(t);
+    // build the ACTIVE robot's full board (self-balancer: 6 parts; rover: 8)
+    if (s.assemble) for (const def of activeRobot().parts) for (let i = 0; i < def.count; i++) assemblyApi.placeByType(def.type);
     if (s.wire) autoWireAll();
     if (s.gains) setSketchGains(s.gains);
 
@@ -79,9 +84,9 @@ export function initCurriculum({ sim, wiring, assemblyApi, hud, setSketchGains, 
     hud.refreshChecklist();
   }
 
-  async function autoWireAll() {
-    const { REQUIRED } = await import('../wiring.js');
-    for (const r of REQUIRED) {
+  function autoWireAll() {
+    // wire the active robot's own loom (self-balancer or rover), not a fixed set
+    for (const r of activeRobot().required) {
       const exists = wiring.wires.some(w => w.req && w.req.label === r.label);
       if (!exists) wiring.tryConnect(r.a, r.b);
     }
@@ -198,14 +203,19 @@ export function initCurriculum({ sim, wiring, assemblyApi, hud, setSketchGains, 
 
   function openOverlay() {
     guide.showView('browser');
+    const robotId = state.activeRobotId;
+    // only this robot's lessons (self-balancer and rover have distinct tracks)
+    const visibleTracks = TRACKS.filter(t => LESSONS.some(l => l.track === t.id && lessonRobot(l) === robotId));
+    const otherHasLessons = LESSONS.some(l => lessonRobot(l) !== robotId);
     browser.innerHTML = `
       <div class="learn-head"><h2>Lessons</h2><button id="learn-close" aria-label="Back to guide">✕</button></div>
-      ${TRACKS.map(t => `
+      ${otherHasLessons ? `<div class="lt-blurb learn-switch-hint">Switch robots in the top bar to see the other robot’s lessons.</div>` : ''}
+      ${visibleTracks.map(t => `
         <div class="learn-track">
           <div class="lt-name">${t.name}</div>
           <div class="lt-blurb">${t.blurb}</div>
           <div class="lt-lessons">
-            ${trackLessons(t.id).map(l => {
+            ${trackLessons(t.id).filter(l => lessonRobot(l) === robotId).map(l => {
               const unlocked = isUnlocked(l);
               const st = starsFor(l.id);
               return `<button class="lt-lesson ${unlocked ? '' : 'locked'}" data-lesson="${l.id}" ${unlocked ? '' : 'disabled'}>

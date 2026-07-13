@@ -92,7 +92,7 @@ export function initHud({ wiring, sim, getPlacedCount, getGains, onExitSim, onGa
     try { localStorage.setItem('sbl-seen', '1'); } catch {}
   }
   document.getElementById('overlay-start').addEventListener('click', closeOverlay);
-  document.getElementById('help-btn').addEventListener('click', () => overlay.classList.remove('hidden'));
+  // help-btn is wired in main.js to expand the Guide rail (the single help surface)
   let seen = false;
   try { seen = localStorage.getItem('sbl-seen') === '1'; } catch {}
   // overlay starts hidden in markup (no flash on repeat visits); reveal for newcomers

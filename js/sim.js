@@ -2,6 +2,7 @@
 // A JS PID loop keeps it upright; WASD shifts the lean setpoint / yaws it.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { isLowQuality } from './app/quality.js';
 
 let RAPIER = null;
 
@@ -176,7 +177,9 @@ export class BalanceSim {
 
   buildArena() {
     const RB = RAPIER.RigidBodyDesc, CO = RAPIER.ColliderDesc;
-    const size = (ARENA_HALF + 8) * 2, seg = 180;
+    // terrain mesh + trimesh collider density — the biggest CPU/GPU cost in the
+    // arena, so drop it on low-quality devices (still hilly, just coarser).
+    const size = (ARENA_HALF + 8) * 2, seg = isLowQuality() ? 110 : 180;
 
     // ── dusk sky dome (gradient: deep blue → warm horizon) ──
     const sky = new THREE.Mesh(

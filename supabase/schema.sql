@@ -50,6 +50,28 @@ alter table class_members enable row level security;
 alter table documents enable row level security;
 alter table assignments enable row level security;
 
+-- Membership checks run as SECURITY DEFINER so they DON'T re-invoke RLS. Without
+-- this, a policy on `classes` that reads `class_members` (and vice-versa) forms
+-- an infinite-recursion loop (Postgres 42P17) that breaks reads of classes,
+-- class_members AND documents (its teacher-read policy joins both). These helpers
+-- break the cycle. `stable` + explicit search_path are required for definer fns.
+create or replace function public.is_class_member(cid uuid)
+returns boolean language sql security definer stable set search_path = public as $$
+  select exists (select 1 from class_members where class_id = cid and student_id = auth.uid());
+$$;
+
+create or replace function public.is_class_teacher(cid uuid)
+returns boolean language sql security definer stable set search_path = public as $$
+  select exists (select 1 from classes where id = cid and teacher_id = auth.uid());
+$$;
+
+create or replace function public.teaches_student(student uuid)
+returns boolean language sql security definer stable set search_path = public as $$
+  select exists (
+    select 1 from class_members m join classes c on c.id = m.class_id
+    where m.student_id = student and c.teacher_id = auth.uid());
+$$;
+
 create policy "own profile" on profiles
   for all using (auth.uid() = id) with check (auth.uid() = id);
 
@@ -60,32 +82,24 @@ create policy "teacher manages own classes" on classes
   for all using (auth.uid() = teacher_id) with check (auth.uid() = teacher_id);
 
 create policy "members see their classes" on classes
-  for select using (exists (
-    select 1 from class_members m where m.class_id = id and m.student_id = auth.uid()));
+  for select using (public.is_class_member(id));
 
 create policy "student joins/leaves own membership" on class_members
   for all using (auth.uid() = student_id) with check (auth.uid() = student_id);
 
 create policy "teacher sees class members" on class_members
-  for select using (exists (
-    select 1 from classes c where c.id = class_id and c.teacher_id = auth.uid()));
+  for select using (public.is_class_teacher(class_id));
 
 -- teacher may read progress documents of students in their classes
 create policy "teacher reads student progress" on documents
-  for select using (
-    kind = 'progress' and exists (
-      select 1 from class_members m
-      join classes c on c.id = m.class_id
-      where m.student_id = documents.user_id and c.teacher_id = auth.uid()));
+  for select using (kind = 'progress' and public.teaches_student(documents.user_id));
 
 create policy "class members see assignments" on assignments
-  for select using (exists (
-    select 1 from class_members m where m.class_id = assignments.class_id and m.student_id = auth.uid())
-    or exists (select 1 from classes c where c.id = assignments.class_id and c.teacher_id = auth.uid()));
+  for select using (
+    public.is_class_member(assignments.class_id) or public.is_class_teacher(assignments.class_id));
 
 create policy "teacher manages assignments" on assignments
-  for insert with check (exists (
-    select 1 from classes c where c.id = class_id and c.teacher_id = auth.uid()));
+  for insert with check (public.is_class_teacher(class_id));
 
 -- ── auto-provision a profile on signup ──────────────────────────
 -- classes/class_members/documents all FK to profiles(id). Without this trigger,

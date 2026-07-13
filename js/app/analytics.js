@@ -40,3 +40,28 @@ export function trackOnce(event, props = {}) {
   fired.add(event);
   track(event, props);
 }
+
+// ── PostHog destination (privacy-locked for an app used by minors) ──
+// Publishable project key — safe client-side. Loaded from the CDN import map
+// and attached as the sink; a load failure is swallowed (analytics is optional).
+const POSTHOG_KEY = 'phc_ycRR256Tj6aiwzgrng3pHmsZ7pNaLxZioej4sCvVuANo';
+const POSTHOG_HOST = 'https://us.i.posthog.com';
+
+export async function initAnalytics() {
+  if (!POSTHOG_KEY) return;
+  try {
+    const { default: posthog } = await import('posthog-js');
+    posthog.init(POSTHOG_KEY, {
+      api_host: POSTHOG_HOST,
+      persistence: 'localStorage',       // cookieless
+      autocapture: false,                // no incidental DOM/PII capture
+      capture_pageview: false,           // we send an explicit LOAD event
+      capture_pageleave: false,
+      disable_session_recording: true,   // never record minors' screens
+      person_profiles: 'identified_only',// we never identify → anonymous events only
+    });
+    setAnalyticsSink((entry) => { try { posthog.capture(entry.event, entry.props); } catch { /* ignore */ } });
+    // replay anything captured before the async import resolved (e.g. LOAD)
+    for (const e of buffer) posthog.capture(e.event, e.props);
+  } catch { /* CDN blocked / offline — stay on the no-op sink */ }
+}

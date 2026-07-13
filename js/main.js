@@ -20,9 +20,10 @@ import { initCurriculum } from './curriculum/engine.js';
 import { initPerf } from './app/perf.js';
 import { initTopbar } from './app/topbar.js';
 import { installErrorBoundary, isWebGLAvailable, showFatal } from './app/errors.js';
-import { track, trackOnce, EVENTS } from './app/analytics.js';
+import { track, trackOnce, EVENTS, initAnalytics } from './app/analytics.js';
 
 installErrorBoundary();  // global error/rejection reporting + fatal fallback wiring
+initAnalytics();         // attach the PostHog sink (privacy-locked; buffers until ready)
 if (!isWebGLAvailable()) {
   // 3D can't run at all — show the friendly fallback instead of a blank canvas.
   showFatal();

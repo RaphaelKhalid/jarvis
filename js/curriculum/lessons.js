@@ -9,6 +9,8 @@ export const TRACKS = [
   { id: 'balance', name: 'Balance & PID', icon: 'activity', blurb: 'The controller that keeps the robot upright.' },
   { id: 'driving', name: 'Driving', icon: 'gauge', blurb: 'Master the terrain: ice, hills, ramps and air.' },
   { id: 'engineering', name: 'Engineering', icon: 'wrench', blurb: 'Capstone challenges that combine everything.' },
+  // Rover track — only shown while the Rover is the active robot (see engine.js).
+  { id: 'rover', name: 'Rover School', icon: 'car', blurb: 'Build and drive the four-wheel skid-steer rover.' },
 ];
 
 export const LESSONS = [
@@ -245,5 +247,60 @@ export const LESSONS = [
       { type: 'reach', x: 0, z: 0, r: 12, text: 'Return home' },
     ],
     debrief: 'Assembly, wiring, control, navigation, recovery — that’s the full robotics stack. You built all of it.',
+  },
+
+  // ── ROVER SCHOOL (robot: 'rover') ────────────────────────────
+  {
+    id: 'rv1', track: 'rover', robot: 'rover', title: 'Build the Rover',
+    brief: 'The rover has no balance sensor — it rolls on four wheels. Place all eight parts (a brain, two L298N drivers, four motors, a battery) and wire the full skid-steer loom. Auto-wire is there if you get stuck.',
+    setup: { clear: true },
+    objectives: [
+      { type: 'placeAll', text: 'Place all 8 parts on the chassis' },
+      { type: 'wireAll', text: 'Complete every connection' },
+    ],
+    debrief: 'Two drivers, four motors: the left pair shares one set of signal lines, the right pair another. Drive them together and you have a tank — no steering wheel needed.',
+  },
+  {
+    id: 'rv2', track: 'rover', robot: 'rover', title: 'Roll Out', par: 45,
+    brief: 'No balancing to worry about — just power and go. Upload, then get the rover up to speed with W.',
+    setup: { assemble: true, wire: true },
+    objectives: [
+      { type: 'sim', text: 'Upload and boot the rover' },
+      { type: 'speed', min: 18, secs: 2, text: 'Hold 18+ u/s for 2 seconds' },
+    ],
+    debrief: 'A four-wheeled rover is statically stable — it stands still on its own. All the firmware does is set wheel speed, no PID required.',
+  },
+  {
+    id: 'rv3', track: 'rover', robot: 'rover', title: 'Tank Turn', par: 60,
+    brief: 'Skid-steer turns by driving the left and right wheels at different speeds — exactly like a tank. Carve at least two full circles of turning.',
+    setup: { assemble: true, wire: true },
+    objectives: [
+      { type: 'sim', text: 'Upload and boot the rover' },
+      { type: 'turns', rad: 12.5, text: 'Turn ~2 full circles (while moving)' },
+    ],
+    debrief: 'With no steering axle, a skid-steer literally skids the wheels sideways to rotate. Tight turns, but they scrub the tyres — you can see the tracks it leaves.',
+  },
+  {
+    id: 'rv4', track: 'rover', robot: 'rover', title: 'Off-Road', par: 100,
+    brief: 'Four-wheel drive shrugs off terrain a balancer would fear. Find the ice patch, cross it, then climb out to the north ramp.',
+    setup: { assemble: true, wire: true },
+    objectives: [
+      { type: 'sim', text: 'Upload and boot the rover' },
+      { type: 'material', name: 'ice', text: 'Drive onto the ice patch' },
+      { type: 'reach', x: 0, z: 52, r: 16, text: 'Reach the north ramp' },
+    ],
+    debrief: 'Low centre of gravity + four contact patches = grip a two-wheeler can’t match. This is why rovers, not balancers, go exploring.',
+  },
+  {
+    id: 'rv5', track: 'rover', robot: 'rover', title: 'Rover Rally', par: 150,
+    brief: 'Everything together: reach the north ramp, catch some air, and race back to the start. Beat the clock for three stars.',
+    setup: { assemble: true, wire: true },
+    objectives: [
+      { type: 'sim', text: 'Upload and boot the rover' },
+      { type: 'reach', x: 0, z: 52, r: 16, text: 'Reach the north ramp' },
+      { type: 'jumps', n: 2, text: 'Catch air twice (ramps or SPACE at speed)' },
+      { type: 'reach', x: 0, z: 0, r: 12, text: 'Race back to the start' },
+    ],
+    debrief: 'You built it, wired it, and drove it across everything the arena has. That’s the whole engineering loop — on a second robot the platform now supports.',
   },
 ];

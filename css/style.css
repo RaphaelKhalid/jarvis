@@ -488,6 +488,36 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
 #guide-scrim { position: absolute; inset: 0; z-index: 7; background: rgba(0, 0, 0, 0.5); }
 #guide-scrim.hidden { display: none; }
 
+/* ── minimizable panels (tray + firmware) — collapse to their header so you
+   can hand the whole screen to the robot, esp. on phones ── */
+.panel-min {
+  margin-left: auto; width: 24px; height: 22px; flex-shrink: 0;
+  background: none; border: 1px solid var(--border); border-radius: var(--r-sm);
+  color: var(--text-dim); cursor: pointer; font-size: 12px; line-height: 1;
+}
+.panel-min:hover { border-color: var(--accent); color: var(--accent); }
+#left-panel.min > *:not(:first-child),
+#right-panel.min > *:not(:first-child) { display: none; }
+#left-panel.min, #right-panel.min { max-height: none; min-height: 0; flex: 0 0 auto; }
+.min > .panel-header .panel-min { transform: rotate(180deg); }
+
+/* ── phone reflow (≤600px): fill the viewport, workspace flexes, panels cap +
+   scroll internally and can be minimized to hand the screen to the robot ── */
+@media (max-width: 600px) {
+  body { overflow: hidden; }
+  #app {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(120px, 1fr) auto;
+    height: calc(100vh - 46px);
+  }
+  #workspace { height: auto; min-height: 120px; }
+  #left-panel, #right-panel { max-height: 40vh; overflow-y: auto; }
+  #sim-hud { width: min(240px, 80vw); font-size: 11px; top: 8px; right: 8px; }
+  #mission-hud { display: none; }
+  #guide { max-width: 92vw; }
+  #workspace-hud { max-width: calc(100% - 24px); font-size: 10.5px; }
+}
+
 /* ── fatal fallback (WebGL unavailable / boot crash) + noscript ─ */
 #fatal {
   position: fixed; inset: 0; z-index: 400;

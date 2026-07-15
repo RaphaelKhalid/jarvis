@@ -5,6 +5,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { activeRobot } from './robots/index.js';
 import { isLowQuality } from './app/quality.js';
 
@@ -188,6 +189,11 @@ export function createScene(canvas) {
   const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), lowQ ? 0.38 : 0.5, lowQ ? 0.5 : 0.6, 0.92);
   composer.addPass(bloom);
   composer.addPass(new OutputPass());
+  // SMAA anti-aliasing — display-space, so it goes AFTER OutputPass. The composer
+  // renders to a non-MSAA target, so without this the emissive/bloom edges shimmer
+  // (the single loudest "unfinished 3D" tell). Cheap enough to run on both tiers.
+  const smaa = new SMAAPass(1, 1);
+  composer.addPass(smaa);
 
   function resize() {
     const w = canvas.clientWidth, h = canvas.clientHeight;

@@ -4,25 +4,49 @@
    `data-theme="light"` on <html> reskins the DOM shell. */
 
 :root {
-  /* color — surfaces */
-  --bg: #0a0d12;
-  --panel: #0f131b;
-  --panel-2: #151a24;
-  --panel-3: #1b212d;
+  /* ── neutral ramp (blue-slate) — Radix-style 12-step. Elevation in dark mode
+     is *lightness*, not shadow: each panel layer steps up the ramp. ───────── */
+  --gray-1:  #0a0d12;  /* app bg            */
+  --gray-2:  #0f131b;  /* subtle bg / panel */
+  --gray-3:  #151a24;  /* component bg      */
+  --gray-4:  #1b212d;  /* component hover   */
+  --gray-5:  #212936;  /* component active  */
+  --gray-6:  #2a3342;  /* border subtle     */
+  --gray-7:  #333e50;  /* border normal     */
+  --gray-8:  #435066;  /* border focus/hover*/
+  --gray-9:  #5b6b82;  /* solid (rare in dark UI) */
+  --gray-10: #6b7688;  /* solid hover / faint text */
+  --gray-11: #99a3b3;  /* low-contrast text (AA on 1–3) */
+  --gray-12: #e4e9f1;  /* high-contrast text */
+
+  /* color — surfaces (aliases → ramp; legacy names preserved) */
+  --bg: var(--gray-1);
+  --panel: var(--gray-2);
+  --panel-2: var(--gray-3);
+  --panel-3: var(--gray-4);
+  --panel-4: var(--gray-5);            /* 4th elevation: popovers/menus */
   --overlay: rgba(11, 14, 19, 0.78);
   --overlay-strong: rgba(16, 20, 28, 0.92);
 
   /* color — lines & text */
-  --border: #232b3a;
-  --border-2: #2e3849;
-  --text: #d3dce9;
-  --text-dim: #868fa0;   /* muted, but ≥4.5:1 (WCAG AA) on every surface incl. --panel-3 */
+  --border: var(--gray-6);
+  --border-2: var(--gray-7);
+  --border-focus: var(--gray-8);       /* interactive borders brighten on hover/focus */
+  --text: var(--gray-12);
+  --text-dim: var(--gray-11);   /* muted, but ≥4.5:1 (WCAG AA) on every surface incl. --panel-4 */
+  --text-faint: var(--gray-10); /* 3:1 — large text / placeholders / captions only */
 
   /* color — semantic
      Lab-Instrument identity: amber-phosphor is the signature accent (CRT/nixie).
-     green is reserved for connected/success, red for fault. */
-  --accent: #ffb000;
-  --accent-dim: #3a2a05;
+     amber ramp lets borders/tints share the hue; green = connected, red = fault. */
+  --amber-5:  #3a2a05;  --amber-6: #4d3808;  --amber-7: #6b4f0a;
+  --amber-9:  #ffb000;  /* SOLID accent (signature phosphor) */
+  --amber-10: #ffbe2e;  /* accent hover */
+  --amber-11: #ffc94d;  /* amber *text*/links on dark (AA ~9:1) — softer than #ffb000 in runs */
+  --accent: var(--amber-9);
+  --accent-hover: var(--amber-10);
+  --accent-text: var(--amber-11);
+  --accent-dim: var(--amber-5);
   --accent-glow: rgba(255, 176, 0, 0.32);
   --accent-soft: rgba(255, 176, 0, 0.09);   /* faint fill for active regions */
   --green: #46e08f;
@@ -31,6 +55,9 @@
   --ok-bg: rgba(70, 224, 143, 0.14);
   --warn-bg: rgba(255, 209, 102, 0.14);
   --bad-bg: rgba(255, 107, 107, 0.16);
+  --ok-border: rgba(70, 224, 143, 0.35);
+  --warn-border: rgba(255, 209, 102, 0.35);
+  --bad-border: rgba(255, 107, 107, 0.38);
 
   /* PID oscilloscope trace palette — a multi-series scope legitimately needs
      distinct hues, but they belong to the instrument system (phosphor cyan/
@@ -52,7 +79,7 @@
   /* type */
   --ui: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: "JetBrains Mono", "Cascadia Code", "Fira Code", Consolas, monospace;
-  --display: "Space Grotesk", "Inter", system-ui, sans-serif;  /* product frame / headers */
+  --display: "Clash Display", "Space Grotesk", "Inter", system-ui, sans-serif;  /* product frame / headers */
   --fs-xs: 10px;
   --fs-sm: 11.5px;
   --fs-md: 13px;
@@ -72,35 +99,56 @@
   --r: 8px;
   --r-lg: 12px;
   --r-pill: 999px;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 1px rgba(0, 0, 0, 0.3);
   --shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
   --shadow-lg: 0 24px 70px rgba(0, 0, 0, 0.6);
+  /* the inset top highlight is what reads as a lit "2025 glass panel" edge */
+  --edge-hi: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  --ring: 0 0 0 1px var(--border);              /* resting hairline */
+  --ring-accent: 0 0 0 2px var(--accent-glow);  /* focus glow */
+  --glass-blur: saturate(140%) blur(14px);
 
-  /* motion */
-  --t-fast: 0.15s;
-  --t-med: 0.25s;
-  --t-slow: 0.4s;
-  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);      /* decelerate — entrances */
+  /* motion — durations are perceptual tiers, eases are named by intent */
+  --t-instant: 0.09s;   /* press feedback, taps */
+  --t-fast: 0.15s;      /* hover, small state */
+  --t-med: 0.25s;       /* panels, toasts */
+  --t-slow: 0.4s;       /* hero / phase change */
+  --t-slower: 0.6s;     /* upload→drive reveal */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);        /* decelerate — entrances */
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);    /* symmetric — moves/reflows */
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1); /* slight overshoot — pops */
+  --ease-spring-lg: cubic-bezier(0.22, 1.4, 0.36, 1); /* bigger overshoot — celebratory */
+  --ease-snap: cubic-bezier(0.5, 0, 0.1, 1);        /* quick in, firm settle — buttons */
 
   color-scheme: dark;
 }
 
 /* light shell (the 3D canvas keeps its own scene lighting) */
 :root[data-theme="light"] {
-  --bg: #eef1f6;
-  --panel: #ffffff;
-  --panel-2: #f4f6fa;
-  --panel-3: #e9edf4;
+  --gray-1: #f7f9fc;  --gray-2: #ffffff;  --gray-3: #f4f6fa;  --gray-4: #e9edf4;
+  --gray-5: #dfe4ee;  --gray-6: #d5dbe6;  --gray-7: #c2cad9;  --gray-8: #a7b1c4;
+  --gray-9: #8a94a6;  --gray-10: #6b7688; --gray-11: #5c6878; --gray-12: #1c2430;
+  --bg: var(--gray-1);
+  --panel: var(--gray-2);
+  --panel-2: var(--gray-3);
+  --panel-3: var(--gray-4);
+  --panel-4: var(--gray-5);
   --overlay: rgba(244, 246, 250, 0.85);
   --overlay-strong: rgba(255, 255, 255, 0.94);
-  --border: #d5dbe6;
-  --border-2: #c2cad9;
-  --text: #1c2430;
-  --text-dim: #5c6878;
-  --accent: #a15c00;                        /* burnt amber, ~5:1 on white */
+  --border: var(--gray-6);
+  --border-2: var(--gray-7);
+  --border-focus: var(--gray-8);
+  --text: var(--gray-12);
+  --text-dim: var(--gray-11);
+  --text-faint: #7a8698;
+  --accent: #a15c00;                        /* burnt amber, ~5:1 on white — text/icon safe */
+  --accent-hover: #b56b0a;
+  --accent-text: #8a4f00;
+  --amber-9: #ffb000;                       /* bright amber kept for solid fills / 3D */
   --accent-dim: #ffedcc;
   --accent-glow: rgba(161, 92, 0, 0.22);
   --accent-soft: rgba(161, 92, 0, 0.10);
+  --edge-hi: inset 0 1px 0 rgba(255, 255, 255, 0.6);
   --btn-accent-grad: linear-gradient(180deg, #fff3dd, #ffe9c4);
   --btn-accent-grad-hover: linear-gradient(180deg, #ffe9c4, #ffdfa8);
   --btn-go-grad: linear-gradient(180deg, #e7f7ee, #d6f0e0);
@@ -111,8 +159,13 @@
   --ok-bg: rgba(20, 128, 60, 0.12);
   --warn-bg: rgba(154, 103, 0, 0.12);
   --bad-bg: rgba(207, 34, 46, 0.12);
+  --ok-border: rgba(20, 128, 60, 0.30);
+  --warn-border: rgba(154, 103, 0, 0.30);
+  --bad-border: rgba(207, 34, 46, 0.30);
+  --shadow-1: 0 1px 2px rgba(30, 40, 60, 0.08);
   --shadow: 0 8px 30px rgba(30, 40, 60, 0.15);
   --shadow-lg: 0 24px 70px rgba(30, 40, 60, 0.2);
+  --glass-blur: saturate(120%) blur(12px);
   /* darker trace hues so the scope stays legible on the light HUD surface */
   --trace-tilt: #14803c;
   --trace-p: #0a7d8a;
@@ -123,11 +176,14 @@
   color-scheme: light;
 }
 
-/* motion sensitivity: kill spinners/transitions for users who ask */
+/* motion sensitivity: kill vestibular motion, but keep safe opacity crossfades */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
+  /* opacity fades are non-vestibular and still communicate state */
+  .toast, #overlay, #tooltip { transition-duration: var(--t-fast) !important; }
 }

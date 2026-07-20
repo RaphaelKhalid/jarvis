@@ -8,7 +8,7 @@
 
 import { emptyDoc, cloneDoc, validate as validateDoc, splitEndpoint, netForEndpoint } from '../model/doc.js';
 import { DocHistory } from '../model/patch.js';
-import { LIBRARY, defaultParams, pinsFor, isKnownType, baseType } from '../model/library.js';
+import { defaultParams, pinsFor, isKnownType, baseType } from '../model/library.js';
 import { solveCircuit } from '../sim/circuit.js';
 
 const ok = (changed = true, extra = {}) => ({ ok: true, changed, errors: [], ...extra });

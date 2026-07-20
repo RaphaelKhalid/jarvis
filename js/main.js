@@ -11,12 +11,12 @@ import { Serial } from './serial.js';
 import { audio } from './audio.js';
 import { state, set } from './app/state.js';
 import { initHud } from './app/hud.js';
-import { initGuide } from './app/guide.js';
 import { initAssembly, TW_OPEN } from './app/assembly.js';
 import { initInput } from './app/input.js';
 import { initSave } from './app/save.js';
 import { initTouch } from './app/touch.js';
-import { initCurriculum } from './curriculum/engine.js';
+import { createApi } from './api/index.js';
+import { emptyDoc } from './model/doc.js';
 import { initPerf } from './app/perf.js';
 import { initTopbar } from './app/topbar.js';
 import { installErrorBoundary, isWebGLAvailable, showFatal } from './app/errors.js';
@@ -74,15 +74,6 @@ const hud = initHud({
   onGains: (g) => setSketchGains(g),   // live PID sliders write back into the .ino sketch
 });
 const assemblyApi = initAssembly({ canvas, scene, camera, controls, slotMeshes, wiring, hud });
-// education-first Guide rail: always-visible instructions that advance with state
-const guide = initGuide({
-  wiring, assemblyApi, getGains: () => state.gains,
-  onWire: (res, req) => {
-    if (res.state === 'valid') { hud.flash(`✓ ${req.label}`, 'ok'); audio.connect(); }
-    else if (res.state === 'duplicate') { audio.ui(); }
-    track('wire_guided', { label: req.label });
-  },
-});
 const input = initInput({ canvas, sim });
 initTouch({ sim });   // no-op on fine-pointer devices
 
@@ -129,7 +120,6 @@ updateFirmwareDisclosure();
   const origRefresh = hud.refreshChecklist;
   hud.refreshChecklist = (...a) => {
     origRefresh(...a);
-    guide.refresh();
     saveApi.persist();
     updateFirmwareDisclosure();
     // funnel milestones — first part placed, then all wiring done
@@ -138,7 +128,7 @@ updateFirmwareDisclosure();
   };
 }
 
-// ── curriculum (Learn mode) ─────────────────────────────────────
+// ── live PID sliders → .ino sketch (kept; editor + sim slice) ───
 function setSketchGains({ Kp, Ki, Kd }) {
   let v = cm.getValue();
   if (Kp != null) v = v.replace(/\bKp\s*=\s*-?\d+(?:\.\d+)?/, `Kp = ${Kp}`);
@@ -146,18 +136,26 @@ function setSketchGains({ Kp, Ki, Kd }) {
   if (Kd != null) v = v.replace(/\bKd\s*=\s*-?\d+(?:\.\d+)?/, `Kd = ${Kd}`);
   cm.setValue(v);
 }
-const curriculum = initCurriculum({
-  sim, wiring, assemblyApi, hud, setSketchGains, guide,
-  onProgress: (p) => { pushDocument('progress', p).catch(() => {}); },   // cloud sync (queued if signed out)
-  onUpgrade: (lesson) => {   // Pro CTA — measure intent now; Stripe checkout lands here later
-    track('upgrade_click', { lesson: lesson?.id || null });
-    hud.flash('GYRO Pro is launching soon — thanks for the interest!', 'ok');
+
+// ── scriptable API (window.__api) — the single mutation authority ─
+// UI actions and tests both drive this; the DOM layer holds no mutation logic.
+const api = createApi({
+  doc: emptyDoc(state.activeRobotId),
+  hooks: {
+    sim: {
+      run: () => enterSim(),
+      stop: () => exitSim(),
+      reset: () => sim.reset?.(),
+      running: () => state.mode === 'sim',
+    },
+    telemetry: () => ({ tiltDeg: sim.tiltDeg, speed: sim.driveSpeed || 0 }),
   },
 });
-// single help/learn surface: the Guide rail. "?" expands it; its own "Lessons"
-// button opens the curriculum. (The old floating learn-btn was redundant.)
-document.getElementById('help-btn').addEventListener('click', () => guide.expand());
-guide.onLessons(() => curriculum.openOverlay());
+window.__api = api;
+
+document.getElementById('help-btn')?.addEventListener('click', () => {
+  document.getElementById('overlay')?.classList.remove('hidden');
+});
 
 // ── share build ─────────────────────────────────────────────────
 document.getElementById('share-btn').addEventListener('click', async () => {
@@ -178,28 +176,21 @@ document.getElementById('share-btn').addEventListener('click', async () => {
 for (const btn of document.querySelectorAll('.panel-min')) {
   btn.addEventListener('click', () => document.getElementById(btn.dataset.panel)?.classList.toggle('min'));
 }
-window.__lab = { assemblyApi, wiring, curriculum, hud, saveApi };   // debug/testing hook
+window.__lab = { assemblyApi, wiring, api, hud, saveApi };   // debug/testing hook
 track(EVENTS.LOAD, { robot: activeRobot().id });   // funnel entry — app booted
 
 // ── cloud account + sync ─────────────────────────────────────────
-// On sign-in: pull the cloud progress/save, merge locally (progress = max stars
-// per lesson so nothing is lost; save applies only onto an empty board), push
-// our local-only state back up, then flush any queued offline writes.
+// Lesson/progress sync was removed in the pivot; only the build document
+// (kind:'save') syncs now. profiles.tier is still read (Jarvis quota later).
+// The classroom shell stays dormant (teams/edu payer path).
 const classroom = initClassroom();
 const account = initAccount({
   onClassroom: () => classroom.open(),
-  onSignOut: () => { curriculum.setTier('free'); },   // note: fires synchronously at init (account is in TDZ) — don't touch it here
+  onSignOut: () => {},
   onSignIn: async () => {
     try {
-      // entitlement: read the paid tier from the profile (default free)
       const prof = await getProfile();
-      const tier = (prof && prof.tier) || 'free';
-      curriculum.setTier(tier);
-      account.setTier(tier);
-      // sync: pull + merge progress/save, push local-only state, flush the queue
-      const rp = await pullDocument('progress', 0);
-      if (rp) curriculum.applyRemoteProgress(rp);
-      pushDocument('progress', curriculum.getProgress()).catch(() => {});
+      account.setTier((prof && prof.tier) || 'free');
       const rs = await pullDocument('save', 0);
       if (rs) saveApi.applyRemote(rs);
       await flushQueue();
@@ -208,15 +199,13 @@ const account = initAccount({
   },
 });
 
-// ── onboarding → Guide rail ─────────────────────────────────────
-// The always-on Guide rail replaces the old spotlight tour: both onboarding
-// buttons just make sure the rail is open so new users start reading it.
-document.getElementById('overlay-start').addEventListener('click', () => guide.expand());
-document.getElementById('overlay-tour').addEventListener('click', () => {
-  document.getElementById('overlay').classList.add('hidden');
+// ── onboarding overlay ──────────────────────────────────────────
+function dismissOverlay() {
+  document.getElementById('overlay')?.classList.add('hidden');
   try { localStorage.setItem('sbl-seen', '1'); } catch {}
-  guide.expand();
-});
+}
+document.getElementById('overlay-start')?.addEventListener('click', dismissOverlay);
+document.getElementById('overlay-tour')?.addEventListener('click', dismissOverlay);
 
 // ── upload / simulation ─────────────────────────────────────────
 const uploadBtn = document.getElementById('upload-btn');
@@ -275,7 +264,7 @@ function enterSim() {
   });
   hud.enterSimMissions();
   hud.updateStepper();
-  guide.refresh();
+
 }
 
 function exitSim() {
@@ -299,7 +288,7 @@ function exitSim() {
   camera.fov = 45; camera.updateProjectionMatrix();
   hud.simHud.classList.add('hidden');
   hud.updateStepper();
-  guide.refresh();
+
 }
 
 // ── render loop ─────────────────────────────────────────────────
@@ -360,7 +349,7 @@ function animate() {
     hud.missionTick(dt);
   }
 
-  curriculum.tick(dt);
+
   composer.render();
 }
 animate();

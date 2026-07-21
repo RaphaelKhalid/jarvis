@@ -17,6 +17,7 @@ import { createApi } from './api/index.js';
 import { emptyDoc } from './model/doc.js';
 import { CreatorSim } from './sim/creator-sim.js';
 import { initDocSave } from './app/docsave.js';
+import { initInspector } from './app/inspector.js';
 import { initPerf } from './app/perf.js';
 import { initTopbar } from './app/topbar.js';
 import { installErrorBoundary, isWebGLAvailable, showFatal } from './app/errors.js';
@@ -142,7 +143,13 @@ const api = createApi({
       reset: () => sim.reset?.(),
       running: () => state.mode === 'sim',
     },
-    telemetry: () => ({ tiltDeg: sim.tiltDeg, speed: sim.driveSpeed || 0 }),
+    telemetry: () => {
+      // M1 telemetry is the creator body's per-motor ω (Inspector readout).
+      const t = creatorSim.telemetry ? creatorSim.telemetry() : {};
+      const omega = {};
+      for (const id in t) omega[id] = t[id].omega;
+      return { omega };
+    },
   },
 });
 window.__api = api;
@@ -150,6 +157,9 @@ window.__api = api;
 creatorSim.onOmega((tel) => api.setSimState(tel));
 // RobotDoc v2 persistence + shareable #build= link (v1 saves migrate on load)
 const docSave = initDocSave(api, { onFlash: (m, k) => hud.flash(m, k) });
+// Inspector: read-only DOM view of the live document + electrical solve (the M1
+// replacement for the Guide rail). Polls the API; owns no state of its own.
+initInspector(api, { getMode: () => state.mode });
 
 document.getElementById('help-btn')?.addEventListener('click', () => {
   document.getElementById('overlay')?.classList.remove('hidden');

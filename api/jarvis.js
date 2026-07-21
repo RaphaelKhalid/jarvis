@@ -1,20 +1,21 @@
-// Vercel Edge Function — the Jarvis backend (Milestone 2).
+// Vercel Edge Function — the Jarvis backend (Milestone 2), on the Gemini API.
 //
-// The browser never holds the Anthropic key. This endpoint takes the running
-// conversation + a snapshot of the current build, calls the Messages API with
-// the shared tool contract, and returns Claude's reply (text + any tool_use
-// blocks). The CLIENT executes tool calls against window.__api and loops back
-// with tool_result — so this function is stateless: one model turn per request.
+// The browser never holds the key. This endpoint takes the running conversation
+// (Gemini `contents`) + a snapshot of the current build, calls generateContent
+// with the shared tool contract, and returns the model's turn (text + any
+// functionCall parts). The CLIENT executes tool calls against window.__api and
+// loops back with functionResponse parts — so this function is stateless.
 //
-// Runtime: Edge (fast cold starts, streams-capable). No SDK — a single fetch to
-// keep the zero-dependency ethos. Set ANTHROPIC_API_KEY in the Vercel project.
-import { TOOL_SCHEMAS, SYSTEM_PROMPT } from '../js/api/tools.js';
+// Runtime: Edge. No SDK — a single fetch. Set GEMINI_API_KEY in the Vercel
+// project (a free-tier AI Studio key, format "AIza…"). GEMINI_MODEL optionally
+// overrides the model (default: gemini-2.5-flash-lite — the roomiest free tier:
+// 15 RPM / 1,000 requests-per-day).
+import { geminiFunctionDeclarations, SYSTEM_PROMPT } from '../js/api/tools.js';
 
 export const config = { runtime: 'edge' };
 
-const MODEL = 'claude-sonnet-5';
-const MAX_TOKENS = 1024;
-const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
+const DEFAULT_MODEL = 'gemini-2.5-flash-lite';
+const API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 const json = (obj, status = 200) =>
   new Response(JSON.stringify(obj), { status, headers: { 'content-type': 'application/json' } });
@@ -22,39 +23,35 @@ const json = (obj, status = 200) =>
 export default async function handler(req) {
   if (req.method !== 'POST') return json({ error: 'POST only' }, 405);
 
-  const key = process.env.ANTHROPIC_API_KEY;
+  const key = process.env.GEMINI_API_KEY;
   if (!key) return json({ error: 'Jarvis is not configured (no API key on the server).' }, 503);
+  const model = process.env.GEMINI_MODEL || DEFAULT_MODEL;
 
   let body;
   try { body = await req.json(); } catch { return json({ error: 'Bad JSON' }, 400); }
 
-  const { messages, document } = body || {};
-  if (!Array.isArray(messages) || messages.length === 0) {
-    return json({ error: '`messages` array required' }, 400);
+  const { contents, document } = body || {};
+  if (!Array.isArray(contents) || contents.length === 0) {
+    return json({ error: '`contents` array required' }, 400);
   }
   // Guardrail: cap conversation size so a runaway client can't rack up tokens.
-  if (messages.length > 40) return json({ error: 'Conversation too long' }, 413);
+  if (contents.length > 40) return json({ error: 'Conversation too long' }, 413);
 
-  // Give the model a compact view of the current build as extra system context.
   const system = document
     ? `${SYSTEM_PROMPT}\n\nCurrent build (RobotDoc):\n${JSON.stringify(summarize(document))}`
     : SYSTEM_PROMPT;
 
   let upstream;
   try {
-    upstream = await fetch(ANTHROPIC_URL, {
+    upstream = await fetch(`${API_BASE}/${model}:generateContent`, {
       method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': key,
-        'anthropic-version': '2023-06-01',
-      },
+      headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
       body: JSON.stringify({
-        model: MODEL,
-        max_tokens: MAX_TOKENS,
-        system,
-        tools: TOOL_SCHEMAS,
-        messages,
+        systemInstruction: { parts: [{ text: system }] },
+        tools: [{ functionDeclarations: geminiFunctionDeclarations() }],
+        // keep the model terse + cheap; it should call tools, not monologue
+        generationConfig: { temperature: 0.2, maxOutputTokens: 1024 },
+        contents,
       }),
     });
   } catch (e) {
@@ -63,16 +60,21 @@ export default async function handler(req) {
 
   if (!upstream.ok) {
     const detail = await upstream.text().catch(() => '');
-    return json({ error: 'Anthropic API error', status: upstream.status, detail }, 502);
+    // surface Gemini's 429 (rate/quota) distinctly so the client can back off
+    return json({ error: 'Gemini API error', status: upstream.status, detail }, upstream.status === 429 ? 429 : 502);
   }
 
   const data = await upstream.json();
-  // Return only what the client agent loop needs: the assistant turn.
+  const cand = data.candidates && data.candidates[0];
+  if (!cand || !cand.content) {
+    const reason = (data.promptFeedback && data.promptFeedback.blockReason) || cand?.finishReason || 'no candidate';
+    return json({ error: `Jarvis produced no reply (${reason})` }, 502);
+  }
+  // Return only the client-relevant slice: the model turn.
   return json({
-    role: data.role,
-    content: data.content,
-    stop_reason: data.stop_reason,
-    usage: data.usage,
+    content: cand.content,          // { role:'model', parts:[ {text} | {functionCall} ] }
+    finishReason: cand.finishReason,
+    usage: data.usageMetadata,
   });
 }
 

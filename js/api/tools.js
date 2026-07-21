@@ -59,13 +59,13 @@ export const TOOL_SCHEMAS = [
   },
   {
     name: 'set_param',
-    description: 'Set a numeric/parameter value on a component (e.g. a battery\'s voltsNominal).',
+    description: 'Set a numeric parameter on a component (e.g. a battery\'s voltsNominal or a motor\'s resistance).',
     input_schema: {
       type: 'object',
       properties: {
         id: { type: 'string' },
         key: { type: 'string' },
-        value: {},
+        value: { type: 'number' },
       },
       required: ['id', 'key', 'value'],
     },
@@ -93,6 +93,25 @@ export const TOOL_SCHEMAS = [
 ];
 
 export const TOOL_NAMES = TOOL_SCHEMAS.map(t => t.name);
+
+// Gemini `functionDeclarations` shape: { name, description, parameters }, where
+// parameters is an OpenAPI object schema. We derive them from the same canonical
+// TOOL_SCHEMAS so the two backends can't drift. No-arg tools omit `parameters`
+// entirely (Gemini rejects an empty properties object).
+export function geminiFunctionDeclarations() {
+  return TOOL_SCHEMAS.map((t) => {
+    const props = t.input_schema.properties || {};
+    const decl = { name: t.name, description: t.description };
+    if (Object.keys(props).length > 0) {
+      decl.parameters = {
+        type: 'object',
+        properties: props,
+        ...(t.input_schema.required ? { required: t.input_schema.required } : {}),
+      };
+    }
+    return decl;
+  });
+}
 
 // Map a tool_use onto the live api. Every executor returns a JSON-serializable
 // result that becomes the tool_result content the model sees on the next turn.

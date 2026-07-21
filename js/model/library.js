@@ -41,6 +41,16 @@ export const LIBRARY = {
     // closed = conducts; open = breaks the circuit. Toggle it in the sim.
     params: { closed: false, maxCurrent: 30 },
   },
+  led: {
+    label: 'LED',
+    // polar: anode (A, long leg) → cathode (K). Only lights when A is positive.
+    pins: [
+      { name: 'A', role: 'power+' },
+      { name: 'K', role: 'power-' },
+    ],
+    // forwardVoltage = Vf drop; resistance = Ron; maxCurrent = burn-out limit.
+    params: { forwardVoltage: 2.0, resistance: 12, maxCurrent: 0.03 },
+  },
 };
 
 // Base type for instanced parts (motorL/motorR → motor).

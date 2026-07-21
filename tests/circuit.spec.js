@@ -117,6 +117,38 @@ test('editing a resistor param in the Inspector re-solves the current', async ({
   expect(after).toBe(10);
 });
 
+test('an LED conducts forward, blocks reverse, and its current is Vf-limited', async ({ page }) => {
+  await openApp(page);
+  await placeBatteryMotor(page);
+  const r = await page.evaluate(() => {
+    const api = window.__api;
+    // fresh doc: battery → 220Ω → LED → back to battery
+    api.loadDocument({ v: 2, robotId: 'self-balancer', name: 't', components: [], nets: [],
+      code: null, sim: { gravity: -9.81, seed: 42 }, meta: { revision: 0 } });
+    api.place_component({ type: 'battery', id: 'bat1' });
+    api.place_component({ type: 'resistor', id: 'r1' });
+    api.set_param({ id: 'r1', key: 'resistance', value: 220 });
+    api.place_component({ type: 'led', id: 'd1' });   // Vf 2.0, Ron 12
+    // forward: bat+ → r.A, r.B → d.A(anode), d.K → bat−
+    api.connect({ from: 'bat1.+', to: 'r1.A' });
+    api.connect({ from: 'r1.B', to: 'd1.A' });
+    api.connect({ from: 'bat1.-', to: 'd1.K' });
+    const fwd = api.read_electrical().current.d1;
+    // reverse it: swap the LED's ends
+    api.disconnect({ from: 'r1.B', to: 'd1.A' });
+    api.disconnect({ from: 'bat1.-', to: 'd1.K' });
+    api.connect({ from: 'r1.B', to: 'd1.K' });
+    api.connect({ from: 'bat1.-', to: 'd1.A' });
+    const rev = api.read_electrical().current.d1;
+    return { fwd, rev };
+  });
+  // forward current ≈ (7.4 − 2.0) / (0.4 + 220 + 12) ≈ 0.0233 A
+  expect(r.fwd).toBeGreaterThan(0.015);
+  expect(r.fwd).toBeLessThan(0.030);
+  // reverse-biased → diode is open → ~0 A
+  expect(Math.abs(r.rev)).toBeLessThan(1e-6);
+});
+
 test('short raises a violation and the solve is not ok', async ({ page }) => {
   await openApp(page);
   await placeBatteryMotor(page);

@@ -58,6 +58,18 @@ export const COMPONENT_ELECTRICAL = {
       maxCurrent: num(c.params?.maxCurrent, 30),
     };
   },
+  // LED: a piecewise-linear diode. Conducts anode(A)→cathode(K) as a forward-
+  // voltage drop (Vf) plus series Ron when forward-biased; open otherwise. The
+  // solver resolves the on/off state by iteration (MNA itself stays linear).
+  led(c) {
+    const vf = Math.max(num(c.params?.forwardVoltage, 2.0), 0);
+    const ron = Math.max(num(c.params?.resistance, 12), 1e-3);
+    return {
+      pins: ['A', 'K'],
+      elements: [{ kind: 'D', a: 'A', b: 'K', vf, ron }],
+      maxCurrent: num(c.params?.maxCurrent, 0.03),
+    };
+  },
 };
 
 function num(v, d) { return (typeof v === 'number' && isFinite(v)) ? v : d; }
@@ -121,6 +133,7 @@ export function solveCircuit(doc, stateOf = {}) {
   // Gather elements with resolved node indices.
   const resistors = [];   // {a,b,g,comp}
   const vsources = [];     // {a,b,v,series,comp,meter}
+  const diodes = [];       // {a,b,vf,ron,comp} — nonlinear, PWL-iterated
   const specs = {};        // compId -> resolved spec (for meters / limits)
 
   for (const c of doc.components) {
@@ -141,6 +154,8 @@ export function solveCircuit(doc, stateOf = {}) {
         resistors.push({ a: node(el.a), b: node(el.b), g: 1 / Math.max(el.r, 1e-9), comp: c.id });
       } else if (el.kind === 'V') {
         vsources.push({ a: node(el.a), b: node(el.b), v: el.v, series: el.series || 0, comp: c.id, meter: el.meter });
+      } else if (el.kind === 'D') {
+        diodes.push({ a: node(el.a), b: node(el.b), vf: el.vf, ron: Math.max(el.ron, 1e-3), comp: c.id });
       }
     }
   }
@@ -153,54 +168,82 @@ export function solveCircuit(doc, stateOf = {}) {
     }
   }
 
-  // MNA assembly. Ground = node 0. Unknowns: node voltages 1..n-1, then one
-  // branch current per voltage source. A source's series resistance is modeled
-  // by an internal node so the source itself stays ideal.
-  // Expand series resistors into internal nodes first.
-  let n = nNodes;
-  const branches = [];      // ideal V-sources: {p, m}
-  for (const s of vsources) {
-    if (s.series > 0) {
-      const mid = n++;                                   // internal node
-      resistors.push({ a: mid, b: s.b, g: 1 / s.series, comp: s.comp });
-      branches.push({ p: s.a, m: mid, v: s.v, comp: s.comp, meter: s.meter });
-    } else {
-      branches.push({ p: s.a, m: s.b, v: s.v, comp: s.comp, meter: s.meter });
+  // MNA assembly (linear) for a fixed diode on/off assignment. Ground = node 0.
+  // Unknowns: node voltages 1..n-1, then one branch current per voltage source.
+  // A source's series resistance is modeled by an internal node so the source
+  // itself stays ideal. A conducting diode is just a Vf source + series Ron.
+  function assemble(diodeOn) {
+    let n = nNodes;
+    const res = resistors.slice();
+    const branches = [];                  // ideal V-sources: {p, m, v, comp, meter}
+    const addSource = (s) => {
+      if (s.series > 0) {
+        const mid = n++;                                 // internal node
+        res.push({ a: mid, b: s.b, g: 1 / s.series, comp: s.comp });
+        branches.push({ p: s.a, m: mid, v: s.v, comp: s.comp, meter: s.meter });
+      } else {
+        branches.push({ p: s.a, m: s.b, v: s.v, comp: s.comp, meter: s.meter });
+      }
+    };
+    for (const s of vsources) addSource(s);
+    // conducting diodes append after the vsource branches, in diode order
+    diodes.forEach((d, i) => {
+      if (diodeOn[i]) addSource({ a: d.a, b: d.b, v: d.vf, series: d.ron, comp: d.comp, meter: d.a });
+    });
+
+    const nV = Math.max(n - 1, 0);        // node-voltage unknowns (excl. ground)
+    const size = nV + branches.length;
+    const nodeV = new Array(n).fill(0);
+    const cur = {};
+    const diodeI = new Array(diodes.length).fill(0);
+    if (size === 0) return { nodeV, cur, diodeI };
+
+    const A = Array.from({ length: size }, () => new Array(size).fill(0));
+    const rhs = new Array(size).fill(0);
+    const vi = (node) => node - 1;        // matrix index for a node (ground = -1 → skip)
+
+    for (const r of res) {
+      const { a, b, g } = r;
+      if (a > 0) A[vi(a)][vi(a)] += g;
+      if (b > 0) A[vi(b)][vi(b)] += g;
+      if (a > 0 && b > 0) { A[vi(a)][vi(b)] -= g; A[vi(b)][vi(a)] -= g; }
     }
+    branches.forEach((br, k) => {
+      const row = nV + k;
+      if (br.p > 0) { A[vi(br.p)][row] += 1; A[row][vi(br.p)] += 1; }
+      if (br.m > 0) { A[vi(br.m)][row] -= 1; A[row][vi(br.m)] -= 1; }
+      rhs[row] = br.v;
+    });
+
+    const x = solveLinear(A, rhs);
+    for (let node = 1; node < n; node++) nodeV[node] = x[vi(node)] || 0;
+    branches.forEach((br, k) => { cur[br.comp] = (cur[br.comp] || 0) + (x[nV + k] || 0); });
+    // diode branch currents live right after the vsource branches
+    let k = vsources.length;
+    diodes.forEach((d, i) => { if (diodeOn[i]) diodeI[i] = x[nV + k++] || 0; });
+    return { nodeV, cur, diodeI };
   }
 
-  const nV = Math.max(n - 1, 0);          // node-voltage unknowns (excl. ground)
-  const m = branches.length;
-  const size = nV + m;
-  if (size === 0) return { nodeV: [], current, violations, ok: true };
-
-  const A = Array.from({ length: size }, () => new Array(size).fill(0));
-  const rhs = new Array(size).fill(0);
-  const vi = (node) => node - 1;   // matrix index for a node (ground = -1 → skip)
-
-  for (const r of resistors) {
-    const { a, b, g } = r;
-    if (a > 0) A[vi(a)][vi(a)] += g;
-    if (b > 0) A[vi(b)][vi(b)] += g;
-    if (a > 0 && b > 0) { A[vi(a)][vi(b)] -= g; A[vi(b)][vi(a)] -= g; }
+  // PWL diode iteration: start all-on, flip any diode whose state is
+  // inconsistent (on but reverse current, or off but forward-biased past Vf),
+  // re-solve until stable. Converges in a couple of passes for simple circuits.
+  const diodeOn = diodes.map(() => true);
+  let result = assemble(diodeOn);
+  for (let iter = 0; iter < 2 * diodes.length + 2 && diodes.length; iter++) {
+    let changed = false;
+    diodes.forEach((d, i) => {
+      if (diodeOn[i]) {
+        if (result.diodeI[i] < -1e-9) { diodeOn[i] = false; changed = true; }
+      } else {
+        const vd = (result.nodeV[d.a] || 0) - (result.nodeV[d.b] || 0);
+        if (vd > d.vf + 1e-9) { diodeOn[i] = true; changed = true; }
+      }
+    });
+    if (!changed) break;
+    result = assemble(diodeOn);
   }
-  branches.forEach((br, k) => {
-    const row = nV + k;
-    if (br.p > 0) { A[vi(br.p)][row] += 1; A[row][vi(br.p)] += 1; }
-    if (br.m > 0) { A[vi(br.m)][row] -= 1; A[row][vi(br.m)] -= 1; }
-    rhs[row] = br.v;
-  });
-
-  const x = solveLinear(A, rhs);
-  const nodeV = new Array(n).fill(0);
-  for (let node = 1; node < n; node++) nodeV[node] = x[vi(node)] || 0;
-
-  // Branch currents (through each ideal source) → component current.
-  branches.forEach((br, k) => {
-    const i = x[nV + k] || 0;   // current from p to m through the source
-    // meter convention: positive current flows out of the source's '+'/'A' pin
-    current[br.comp] = (current[br.comp] || 0) + i;
-  });
+  const nodeV = result.nodeV;
+  Object.assign(current, result.cur);
 
   // Passive elements (resistor, closed switch) aren't branch unknowns — meter
   // their current straight from the solved node voltages: i = (V_a − V_b)/R,

@@ -15,6 +15,7 @@ const PARAM_META = {
   voltsNominal: { label: 'Volts', step: 0.1, unit: 'V' },
   internalResistance: { label: 'Int. R', step: 0.1, unit: 'Ω' },
   resistance: { label: 'R', step: 1, unit: 'Ω' },
+  forwardVoltage: { label: 'Vꜰ', step: 0.1, unit: 'V' },
   ke: { label: 'Kᴇ', step: 0.01, unit: '' },
   friction: { label: 'Friction', step: 0.001, unit: '' },
   maxCurrent: { label: 'I max', step: 1, unit: 'A' },

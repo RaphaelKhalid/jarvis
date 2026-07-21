@@ -28,6 +28,8 @@ const CARD = {
     help: 'Limits current. Put one in series with the motor and it draws less — the motor spins slower. Non-polar: either lead works.' },
   switch: { name: 'Switch', swatch: '#7bd88f', desc: 'Break / make the loop',
     help: 'Click the switch body to open or close the circuit. Open = no current = the motor stops.' },
+  led: { name: 'LED', swatch: '#ff5566', desc: 'Lights when current flows',
+    help: 'Polar: current only flows anode (A, long leg) → cathode (K). Wire it the right way and it glows; backwards it stays dark. Needs a resistor in series or it burns out.' },
 };
 
 // A motor mesh whose two terminals are named A / B (to match the library),
@@ -105,7 +107,36 @@ function updateSwitchVisual(group, closed) {
   });
 }
 
-const FACTORY = { battery: makeBattery, motor: makeMotorAB, resistor: makeResistorMesh, switch: makeSwitchMesh };
+// LED: a domed lens (role 'led-lens', glows with current) on two legs (A = long
+// anode leg, K = short cathode leg). The dome catches the bloom pass when lit.
+function makeLedMesh() {
+  const g = new THREE.Group();
+  g.userData = { type: 'led', pins: [] };
+  const lens = new THREE.Mesh(
+    new THREE.SphereGeometry(0.8, 20, 16, 0, Math.PI * 2, 0, Math.PI * 0.62),
+    new THREE.MeshStandardMaterial({ color: 0xff5566, emissive: 0xff2233,
+      emissiveIntensity: 0, roughness: 0.25, metalness: 0.1,
+      transparent: true, opacity: 0.9 }));
+  lens.position.y = 1.5; lens.userData.role = 'led-lens'; lens.castShadow = true;
+  g.add(lens);
+  const collar = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.82, 0.82, 0.5, 20),
+    new THREE.MeshStandardMaterial({ color: 0xcc3344, roughness: 0.4 }));
+  collar.position.y = 1.05; g.add(collar);
+  addLeadPin(g, 'A', -0.4, 0.0, 0);   // long leg = anode
+  addLeadPin(g, 'K', 0.4, 0.0, 0);    // short leg = cathode
+  return g;
+}
+
+// brightness ∝ current toward its rated max; dark when reverse-biased / off.
+function updateLedVisual(group, amps, maxCurrent) {
+  const frac = Math.max(0, Math.min(1, Math.abs(amps || 0) / Math.max(maxCurrent || 0.03, 1e-6)));
+  group.traverse((o) => {
+    if (o.userData?.role === 'led-lens') o.material.emissiveIntensity = frac * 2.4;
+  });
+}
+
+const FACTORY = { battery: makeBattery, motor: makeMotorAB, resistor: makeResistorMesh, switch: makeSwitchMesh, led: makeLedMesh };
 
 const KIND_COLOR = { power: 0xff4d4d, ground: 0x2a2f3a, data: 0xffd166 };
 const TW_OPEN = 'crosshair';
@@ -209,6 +240,9 @@ export function initCreatorAssembly({ canvas, scene, camera, controls, api, hud 
   function sync() {
     const doc = api.get_document();
     const live = new Set(doc.components.map(c => c.id));
+    // solved currents drive live glows (LED brightness); best-effort.
+    let elec = null;
+    try { elec = api.read_electrical(); } catch { /* ignore */ }
 
     // add / move component meshes
     for (const c of doc.components) {
@@ -228,6 +262,7 @@ export function initCreatorAssembly({ canvas, scene, camera, controls, api, hud 
       g.position.set(p[0], p[1], p[2]);
       g.rotation.set(r[0], r[1], r[2]);
       if (baseType(c.type) === 'switch') updateSwitchVisual(g, c.params?.closed === true);
+      if (baseType(c.type) === 'led') updateLedVisual(g, elec?.current?.[c.id], c.params?.maxCurrent);
     }
     // remove meshes for deleted components
     for (const [id, g] of meshes) {

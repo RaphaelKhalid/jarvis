@@ -206,6 +206,20 @@ export function makeMotor(side = 1) {
   hub.rotation.z = Math.PI / 2;
   hub.position.set(side * 3.1, 1.0, -0.6);
   g.add(hub);
+  // bright cross-spokes on the tyre faces so the wheel's rotation is *visible*
+  // when it spins (a smooth cylinder looks static). Children of the tyre, so
+  // they inherit its spin. Tyre local Y = axle; faces sit at local y = ±0.65.
+  const spokeMat = mat(0xff7a3c);
+  spokeMat.emissive = new THREE.Color(0xff3a10);
+  spokeMat.emissiveIntensity = 0.5;
+  for (const fy of [0.68, -0.68]) {
+    for (let s = 0; s < 2; s++) {
+      const spoke = new THREE.Mesh(new THREE.BoxGeometry(6.2, 0.28, 0.7), spokeMat);
+      spoke.position.y = fy;
+      spoke.rotation.y = s * Math.PI / 2;
+      tire.add(spoke);
+    }
+  }
   g.userData.wheelMeshes = [tire, hub];
 
   // solder-tab terminals on the motor can

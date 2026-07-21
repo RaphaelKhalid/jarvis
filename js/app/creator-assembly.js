@@ -230,8 +230,9 @@ export function initCreatorAssembly({ canvas, scene, camera, controls, api, hud 
     drag = null;
     const rect = canvas.getBoundingClientRect();
     if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) return;
-    // project the drop point onto the y=1 build plane, spread parts a little
-    const pos = dropPoint(e) || [0, 1, 0];
+    // project the drop point onto the y=1 build plane, then push it clear of
+    // any part already there (collisions) so nothing spawns overlapping.
+    const pos = separate(dropPoint(e) || [0, 1, 0], type, null);
     const res = api.place_component({ type, transform: { pos, rot: [0, 0, 0] } });
     if (res.ok) { audio.place(); trackOnce('place', { type }); }
     sync();
@@ -247,6 +248,44 @@ export function initCreatorAssembly({ canvas, scene, camera, controls, api, hud 
     const hit = new THREE.Vector3();
     if (!raycaster.ray.intersectPlane(_plane, hit)) return null;
     return [hit.x, 1, hit.z];
+  }
+
+  // ── collisions: parts can't overlap on the bench ──────────────
+  // Rough XZ footprint radius per component; used to push placed/dragged parts
+  // out of each other so they behave like solid objects, not ghosts.
+  const FOOTPRINT = { battery: 3.4, motor: 5.4, resistor: 2.2, switch: 2.4, led: 1.8 };
+  const footprint = (type) => FOOTPRINT[baseType(type)] || 2.6;
+  function separate(pos, myType, excludeId) {
+    const me = footprint(myType);
+    let x = pos[0], z = pos[2];
+    const comps = api.get_document().components;
+    for (let it = 0; it < 12; it++) {
+      let hit = false;
+      for (const c of comps) {
+        if (c.id === excludeId) continue;
+        const p = c.transform?.pos || [0, 1, 0];
+        let dx = x - p[0], dz = z - p[2];
+        let d = Math.hypot(dx, dz);
+        const min = me + footprint(c.type);
+        if (d < min) {
+          if (d < 1e-3) { dx = Math.random() - 0.5; dz = Math.random() - 0.5; d = Math.hypot(dx, dz) || 1; }
+          const k = (min - d) / d;
+          x += dx * k; z += dz * k; hit = true;
+        }
+      }
+      if (!hit) break;
+    }
+    return [x, pos[1] ?? 1, z];
+  }
+
+  // rotate a placed part about Y (R key / scroll while grabbing)
+  function rotateComp(id, delta) {
+    const c = api.get_document().components.find(x => x.id === id);
+    if (!c) return;
+    const rot = [...(c.transform?.rot || [0, 0, 0])];
+    rot[1] += delta;
+    api.move_component({ id, pos: c.transform?.pos, rot });
+    audio.ui();
   }
 
   // ── sync: reconcile the 3D world with the document ────────────
@@ -269,11 +308,13 @@ export function initCreatorAssembly({ canvas, scene, camera, controls, api, hud 
         }
         group.add(g);
         meshes.set(c.id, g);
+        g.userData._settle = 6;   // drop it onto the bench (gravity feel)
       }
       const p = c.transform?.pos || [0, 1, 0];
       const r = c.transform?.rot || [0, 0, 0];
       g.position.set(p[0], p[1], p[2]);
       g.rotation.set(r[0], r[1], r[2]);
+      g.userData._restY = p[1];
       if (baseType(c.type) === 'switch') updateSwitchVisual(g, c.params?.closed === true);
       if (baseType(c.type) === 'led') updateLedVisual(g, elec?.current?.[c.id], c.params?.maxCurrent);
     }
@@ -403,15 +444,22 @@ export function initCreatorAssembly({ canvas, scene, camera, controls, api, hud 
   let hoveredWire = null;
   let moving = null;          // { id, moved } while dragging a placed part
   let suppressClick = false;  // set after a real drag so the click is ignored
+  let hoveredCompId = null;   // whole part currently under the pointer (for R-rotate)
   canvas.addEventListener('pointermove', (e) => {
     if (state.mode !== 'assembly') return;
     updatePointer(e);
     raycaster.setFromCamera(pointer, camera);
 
-    // dragging a placed part → reposition it live (wires follow via sync)
+    // dragging a placed part → reposition it live, pushed clear of other parts
+    // (collisions) so you can't drag one through another. Wires follow via sync.
     if (moving) {
-      const pos = dropPoint(e);
-      if (pos) { moving.moved = true; api.move_component({ id: moving.id, pos }); }
+      const raw = dropPoint(e);
+      if (raw) {
+        const c = api.get_document().components.find(x => x.id === moving.id);
+        const pos = separate(raw, c?.type, moving.id);
+        moving.moved = true;
+        api.move_component({ id: moving.id, pos, rot: c?.transform?.rot });
+      }
       hud.hideTooltip();
       return;
     }
@@ -421,7 +469,8 @@ export function initCreatorAssembly({ canvas, scene, camera, controls, api, hud 
 
     const pin = pickPin();
     // pin → wire it; else a body is grab/removable; else orbit the camera
-    const overBody = !pin && !!pickComponent();
+    hoveredCompId = pin ? null : pickComponent();
+    const overBody = !!hoveredCompId;
     controls.enabled = !pin && !overBody;
     canvas.style.cursor = pin ? 'pointer' : overBody ? 'grab' : TW_OPEN;
     if (pin) {
@@ -431,10 +480,27 @@ export function initCreatorAssembly({ canvas, scene, camera, controls, api, hud 
     } else if (hoveredPinId) { hoveredPinId = null; hud.hideTooltip(); }
   });
   canvas.addEventListener('pointerleave', () => {
-    hoveredPinId = null; hoveredWire = null; hud.hideTooltip();
+    hoveredPinId = null; hoveredWire = null; hoveredCompId = null; hud.hideTooltip();
     if (state.mode === 'assembly') controls.enabled = true;
   });
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+  // R rotates the part under the pointer (or the one being dragged); Shift+R
+  // the other way. Scroll while grabbing a part also rotates it.
+  window.addEventListener('keydown', (e) => {
+    if (state.mode !== 'assembly') return;
+    if (e.key !== 'r' && e.key !== 'R') return;
+    const id = moving?.id || hoveredCompId;
+    if (!id) return;
+    rotateComp(id, e.shiftKey ? -Math.PI / 12 : Math.PI / 12);
+    e.preventDefault();
+  });
+  canvas.addEventListener('wheel', (e) => {
+    if (state.mode !== 'assembly' || !moving) return;
+    rotateComp(moving.id, (e.deltaY > 0 ? 1 : -1) * Math.PI / 24);
+    moving.moved = true;
+    e.preventDefault();
+  }, { passive: false });
 
   canvas.addEventListener('pointerdown', (e) => {
     if (state.mode !== 'assembly') return;
@@ -544,12 +610,22 @@ export function initCreatorAssembly({ canvas, scene, camera, controls, api, hud 
     const powered = elec?.ok !== false;
     const doc = api.get_document();
 
+    // drop-to-bench settle on placement (a bit of gravity feel)
+    for (const [, g] of meshes) {
+      const s = g.userData._settle;
+      if (s > 0 && g.userData._restY != null) {
+        const ns = Math.max(0, s - dt * 22);
+        g.userData._settle = ns;
+        g.position.y = g.userData._restY + ns;
+      }
+    }
+
     // motors physically spin from their solved current — direction follows sign
     for (const c of doc.components) {
       if (baseType(c.type) !== 'motor') continue;
       const wheels = meshes.get(c.id)?.userData.wheelMeshes;
       if (!wheels) continue;
-      const spin = (powered ? (cur[c.id] || 0) : 0) * dt * 1.4;
+      const spin = (powered ? (cur[c.id] || 0) : 0) * dt * 2.4;
       if (spin) for (const w of wheels) w.rotateOnAxis(_spinAxis, spin);
     }
 

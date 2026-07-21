@@ -16,6 +16,7 @@ import { emptyDoc } from './model/doc.js';
 import { CreatorSim } from './sim/creator-sim.js';
 import { initDocSave } from './app/docsave.js';
 import { initInspector } from './app/inspector.js';
+import { initJarvis } from './app/jarvis.js';
 import { initPerf } from './app/perf.js';
 import { initTopbar } from './app/topbar.js';
 import { installErrorBoundary, isWebGLAvailable, showFatal } from './app/errors.js';
@@ -162,6 +163,15 @@ const docSave = initDocSave(api, { onFlash: (m, k) => hud.flash(m, k) });
 // Inspector: read-only DOM view of the live document + electrical solve (the M1
 // replacement for the Guide rail). Polls the API; owns no state of its own.
 initInspector(api, { getMode: () => state.mode });
+// Jarvis: natural-language build assistant (M2). Acts only through the API.
+const jarvis = initJarvis({ api, onFlash: (m, k) => hud.flash(m, k) });
+{
+  const jv = document.getElementById('jarvis');
+  document.getElementById('jarvis-toggle')?.addEventListener('click', () => {
+    jv?.classList.toggle('collapsed');
+    if (!jv?.classList.contains('collapsed')) document.getElementById('jarvis-input')?.focus();
+  });
+}
 
 document.getElementById('help-btn')?.addEventListener('click', () => {
   document.getElementById('overlay')?.classList.remove('hidden');
@@ -186,7 +196,7 @@ document.getElementById('share-btn').addEventListener('click', async () => {
 for (const btn of document.querySelectorAll('.panel-min')) {
   btn.addEventListener('click', () => document.getElementById(btn.dataset.panel)?.classList.toggle('min'));
 }
-window.__lab = { assemblyApi, api, hud };   // debug/testing hook
+window.__lab = { assemblyApi, api, hud, jarvis };   // debug/testing hook
 track(EVENTS.LOAD, { robot: activeRobot().id });   // funnel entry — app booted
 
 // ── cloud account + sync ─────────────────────────────────────────

@@ -24,4 +24,21 @@ export default [
       'no-undef': 'error',
     },
   },
+  {
+    // Vercel Edge Functions — web-standard runtime globals (fetch/Request/Response)
+    // plus process.env for secrets.
+    files: ['api/**/*.js'],
+    languageOptions: {
+      ecmaVersion: 2024,
+      sourceType: 'module',
+      globals: {
+        fetch: 'readonly', Request: 'readonly', Response: 'readonly',
+        process: 'readonly', console: 'readonly', URL: 'readonly',
+      },
+    },
+    rules: {
+      'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      'no-undef': 'error',
+    },
+  },
 ];

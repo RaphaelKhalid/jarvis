@@ -96,6 +96,18 @@
       <div><b>Left-drag</b> rotate · <b>Right-click</b> a wire to delete it</div>
     </div>
     <canvas id="three-canvas"></canvas>
+    <!-- Jarvis: natural-language build assistant (M2). Talks to /api/jarvis;
+         acts only through window.__api. -->
+    <div id="jarvis" class="collapsed">
+      <button id="jarvis-toggle" aria-label="Toggle Jarvis"><i data-lucide="sparkles"></i><span>Jarvis</span></button>
+      <div id="jarvis-panel">
+        <div id="jarvis-log"><div class="jv-msg jv-bot">Hi — I'm Jarvis. Tell me what to build, e.g. “wire the battery to the motor and run it.”</div></div>
+        <form id="jarvis-form">
+          <input id="jarvis-input" type="text" placeholder="Ask Jarvis…" autocomplete="off" />
+          <button type="submit" aria-label="Send"><i data-lucide="arrow-up"></i></button>
+        </form>
+      </div>
+    </div>
   </main>
 
   <!-- RIGHT: code editor -->

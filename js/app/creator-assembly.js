@@ -12,6 +12,7 @@
 import * as THREE from 'three';
 import { LIBRARY, pinsFor, baseType } from '../model/library.js';
 import { makeBattery, makeMotor } from '../parts.js';
+import { makeFlatLabel } from '../labels.js';
 import { pinInfo } from '../glossary.js';
 import { audio } from '../audio.js';
 import { state } from './state.js';
@@ -38,8 +39,20 @@ function makeMotorAB() {
   const g = makeMotor(1);
   g.userData.type = 'motor';
   const names = ['A', 'B'];
-  g.userData.pins.forEach((p, i) => { p.name = names[i] || p.name; });
-  return g;
+  g.userData.pins.forEach((p, i) => {
+    p.name = names[i] || p.name;
+    // the motor geometry labels its terminals M+/M-; the library names them A/B.
+    // swap the visible flat label so the pin you click matches its tooltip id.
+    const old = p.obj.userData.labelMesh;
+    const lp = p.obj.userData.labelPos;
+    if (old && lp) {
+      g.remove(old); old.geometry?.dispose?.();
+      const fresh = makeFlatLabel(p.name, 0.32, { color: '#e8eef5' });
+      fresh.position.set(lp.x, lp.y + 0.02, lp.z + 0.34 * lp.side);
+      g.add(fresh); p.obj.userData.labelMesh = fresh;
+    }
+  });
+  return g;   // g.userData.wheelMeshes (tire+hub) carries through for build-mode spin
 }
 // small gold lead-pin, registered as an endpoint on the group.
 function addLeadPin(g, name, x, y, z) {
@@ -355,14 +368,21 @@ export function initCreatorAssembly({ canvas, scene, camera, controls, api, hud 
   }
   // nearest switch component under the pointer (for click-to-toggle).
   function pickSwitch() {
+    const swIds = new Set(api.get_document().components
+      .filter(c => baseType(c.type) === 'switch').map(c => c.id));
+    const id = pickComponent();
+    return swIds.has(id) ? id : null;
+  }
+  // nearest whole component under the pointer (its body OR pins) — for
+  // right-click-to-remove and drag-to-move. Returns the compId or null.
+  function pickComponent() {
     const targets = [];
     for (const c of api.get_document().components) {
-      if (baseType(c.type) !== 'switch') continue;
       const g = meshes.get(c.id);
-      if (g) g.traverse(o => { if (o.isMesh) { o.userData._swId = c.id; targets.push(o); } });
+      if (g) g.traverse(o => { if (o.isMesh) { o.userData._compId = c.id; targets.push(o); } });
     }
     const hit = raycaster.intersectObjects(targets, false)[0];
-    return hit ? hit.object.userData._swId : null;
+    return hit ? hit.object.userData._compId : null;
   }
   function highlightPin(id, on) {
     const obj = endpoints.get(id);
@@ -381,16 +401,29 @@ export function initCreatorAssembly({ canvas, scene, camera, controls, api, hud 
   // ── hover + click-to-wire ─────────────────────────────────────
   let hoveredPinId = null;
   let hoveredWire = null;
+  let moving = null;          // { id, moved } while dragging a placed part
+  let suppressClick = false;  // set after a real drag so the click is ignored
   canvas.addEventListener('pointermove', (e) => {
     if (state.mode !== 'assembly') return;
     updatePointer(e);
     raycaster.setFromCamera(pointer, camera);
 
+    // dragging a placed part → reposition it live (wires follow via sync)
+    if (moving) {
+      const pos = dropPoint(e);
+      if (pos) { moving.moved = true; api.move_component({ id: moving.id, pos }); }
+      hud.hideTooltip();
+      return;
+    }
+
     const wireHit = raycaster.intersectObjects(wires.map(w => w.mesh), false)[0];
     hoveredWire = wireHit ? wireHit.object : null;
 
     const pin = pickPin();
-    controls.enabled = !pin;
+    // pin → wire it; else a body is grab/removable; else orbit the camera
+    const overBody = !pin && !!pickComponent();
+    controls.enabled = !pin && !overBody;
+    canvas.style.cursor = pin ? 'pointer' : overBody ? 'grab' : TW_OPEN;
     if (pin) {
       const id = pin.userData.endpointId;
       if (id !== hoveredPinId) { hoveredPinId = id; hud.showTooltip(e, pinTooltipHtml(id)); }
@@ -405,15 +438,40 @@ export function initCreatorAssembly({ canvas, scene, camera, controls, api, hud 
 
   canvas.addEventListener('pointerdown', (e) => {
     if (state.mode !== 'assembly') return;
-    if (e.button === 2 && hoveredWire) {          // right-click deletes a wire
-      const [a, b] = hoveredWire.userData.ids;
-      api.disconnect({ from: a, to: b });
-      audio.ui(); sync(); hud.refreshChecklist();
+    updatePointer(e);
+    raycaster.setFromCamera(pointer, camera);
+    if (e.button === 2) {                          // right-click removes things
+      if (hoveredWire) {                           // …a wire
+        const [a, b] = hoveredWire.userData.ids;
+        api.disconnect({ from: a, to: b });
+        audio.ui(); sync(); hud.refreshChecklist();
+      } else {
+        const id = pickComponent();                // …or a whole part
+        if (id) {
+          api.remove_component({ id });
+          hud.flash(`Removed ${id}`, 'ok'); audio.ui();
+          sync(); hud.refreshChecklist();
+        }
+      }
       e.preventDefault();
+      return;
     }
+    // left-press on a part body (not a pin) begins a move-drag
+    if (e.button === 0 && !pickPin()) {
+      const id = pickComponent();
+      if (id) { moving = { id, moved: false }; controls.enabled = false; canvas.style.cursor = 'grabbing'; }
+    }
+  });
+  window.addEventListener('pointerup', () => {
+    if (!moving) return;
+    suppressClick = moving.moved;   // a real drag shouldn't also fire click
+    moving = null;
+    canvas.style.cursor = TW_OPEN;
+    if (state.mode === 'assembly') { sync(); hud.refreshChecklist(); }
   });
   canvas.addEventListener('click', (e) => {
     if (state.mode !== 'assembly') return;
+    if (suppressClick) { suppressClick = false; return; }
     updatePointer(e);
     raycaster.setFromCamera(pointer, camera);
     const pin = pickPin();
@@ -459,32 +517,68 @@ export function initCreatorAssembly({ canvas, scene, camera, controls, api, hud 
   // the old auto-wire buttons don't apply to free-form building — hide them
   document.getElementById('auto-bar')?.classList.add('hidden');
 
-  // ── flow animation: charges travel along wired nets (visual) ──
+  // ── live electronics → motion (build mode) ────────────────────
+  // Everything here is driven by the real circuit solve, so wiring a loop has a
+  // visible consequence *before* you hit RUN: powered wires carry moving charge
+  // (speed ∝ current), a powered motor's wheel actually spins, and dead wires
+  // stay dark. Together with the LED glow this is the "circuit does something".
+  const _spinAxis = new THREE.Vector3(0, 1, 0);   // motor wheel's own axle (local y)
   let flowT = 0;
   const charges = new Map();   // wire mesh -> [spheres]
+
+  // current magnitude carried by a wire ≈ the larger current of the two
+  // components it bridges (a series wire carries that component's current).
+  function wireCurrent(ids, cur) {
+    let mag = 0;
+    for (const ep of ids) {
+      const compId = ep.split('.')[0];
+      mag = Math.max(mag, Math.abs(cur[compId] || 0));
+    }
+    return mag;
+  }
+
   function animate(dt) {
-    flowT = (flowT + dt * 0.5) % 1;
+    let elec = null;
+    try { elec = api.read_electrical(); } catch { /* ignore */ }
+    const cur = elec?.current || {};
+    const powered = elec?.ok !== false;
+    const doc = api.get_document();
+
+    // motors physically spin from their solved current — direction follows sign
+    for (const c of doc.components) {
+      if (baseType(c.type) !== 'motor') continue;
+      const wheels = meshes.get(c.id)?.userData.wheelMeshes;
+      if (!wheels) continue;
+      const spin = (powered ? (cur[c.id] || 0) : 0) * dt * 1.4;
+      if (spin) for (const w of wheels) w.rotateOnAxis(_spinAxis, spin);
+    }
+
     const liveMeshes = new Set(wires.map(w => w.mesh));
     for (const [mesh, cs] of charges) {
       if (liveMeshes.has(mesh)) continue;
       for (const c of cs) { wireGroup.remove(c); c.geometry.dispose(); }
       charges.delete(mesh);
     }
+    // flow rate scales with the strongest wire current in the circuit
+    const iRef = Math.max(0, ...wires.map(w => wireCurrent(w.ids, cur)));
+    flowT = (flowT + dt * (0.15 + Math.min(iRef, 4) * 0.5)) % 1;
+
     for (const w of wires) {
       let cs = charges.get(w.mesh);
       if (!cs) {
         cs = [];
         for (let i = 0; i < 3; i++) {
-          const s = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 8),
+          const s = new THREE.Mesh(new THREE.SphereGeometry(0.24, 8, 8),
             new THREE.MeshBasicMaterial({ color: w.mesh.material.color }));
           wireGroup.add(s); cs.push(s);
         }
         charges.set(w.mesh, cs);
       }
       const curve = w.mesh.geometry.parameters?.path;
+      const flowing = powered && wireCurrent(w.ids, cur) > 1e-3;   // dead wires stay dark
       cs.forEach((s, i) => {
-        s.visible = w.mesh.visible && !!curve;
-        if (curve) s.position.copy(curve.getPointAt((flowT + i / cs.length) % 1));
+        s.visible = w.mesh.visible && !!curve && flowing;
+        if (curve && flowing) s.position.copy(curve.getPointAt((flowT + i / cs.length) % 1));
       });
     }
   }

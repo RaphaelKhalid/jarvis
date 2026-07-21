@@ -54,6 +54,31 @@ test('the tray offers the M1 library and a doc mutation renders 3D meshes', asyn
   expect(after).toEqual({ placed: 0, comps: 0 });
 });
 
+test('a placed part can be moved and removed (keeping wires consistent)', async ({ page }) => {
+  await openApp(page);
+  const r = await page.evaluate(() => {
+    const api = window.__api;
+    api.loadDocument({ v: 2, robotId: 'self-balancer', name: 't', components: [], nets: [],
+      code: null, sim: { gravity: -9.81, seed: 42 }, meta: { revision: 0 } });
+    api.place_component({ type: 'battery', id: 'bat1' });
+    api.place_component({ type: 'motor', id: 'motor1' });
+    api.connect({ from: 'bat1.+', to: 'motor1.A' });
+    api.connect({ from: 'bat1.-', to: 'motor1.B' });
+    // move the motor — the document transform updates, meshes stay in sync
+    api.move_component({ id: 'motor1', pos: [8, 1, -4] });
+    const moved = api.get_document().components.find(c => c.id === 'motor1').transform.pos;
+    // remove the battery — its two edges must be dropped, leaving no nets
+    api.remove_component({ id: 'bat1' });
+    const doc = api.get_document();
+    return { moved, comps: doc.components.length, nets: doc.nets.length,
+             meshes: window.__lab.assemblyApi.getPlacedCount() };
+  });
+  expect(r.moved).toEqual([8, 1, -4]);
+  expect(r.comps).toBe(1);       // only the motor remains
+  expect(r.nets).toBe(0);        // wires to the removed battery are gone
+  expect(r.meshes).toBe(1);      // the 3D view reconciled
+});
+
 test('the inspector renders the live document + solved current in the DOM', async ({ page }) => {
   await openApp(page);
   await page.evaluate(() => {

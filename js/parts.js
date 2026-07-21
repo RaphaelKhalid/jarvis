@@ -26,6 +26,8 @@ function addPin(group, name, x, y, z, labelSide = 1) {
   const label = makeFlatLabel(name, 0.32, { color: '#e8eef5' });
   label.position.set(x, y + 0.02, z + 0.34 * labelSide);
   group.add(label);
+  pin.userData.labelMesh = label;
+  pin.userData.labelPos = { x, y, z, side: labelSide };
 
   group.userData.pins.push({ name, obj: pin });
   return pin;

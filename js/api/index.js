@@ -63,6 +63,17 @@ export function createApi({ doc, hooks = {} } = {}) {
     return ok();
   }
 
+  function move_component({ id, pos, rot, transform } = {}, { dryRun = false } = {}) {
+    const comp = history.get().components.find(c => c.id === id);
+    if (!comp) return fail(`No component "${id}"`);
+    const t = transform || {
+      pos: pos || comp.transform?.pos || [0, 1, 0],
+      rot: rot || comp.transform?.rot || [0, 0, 0],
+    };
+    history.commit([{ op: 'set-transform', id, transform: t }], { dryRun });
+    return ok();
+  }
+
   function connect({ from, to } = {}, { dryRun = false } = {}) {
     if (!from || !to) return fail('connect needs `from` and `to` endpoints');
     if (from === to) return fail('Cannot connect an endpoint to itself');
@@ -128,7 +139,7 @@ export function createApi({ doc, hooks = {} } = {}) {
 
   return {
     // tool-schema surface
-    place_component, remove_component, connect, disconnect, set_param, set_name,
+    place_component, remove_component, move_component, connect, disconnect, set_param, set_name,
     run_sim, stop_sim, reset_sim, undo, redo,
     get_document, read_telemetry, read_electrical, validate,
     // internal wiring

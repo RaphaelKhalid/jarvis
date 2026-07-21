@@ -28,6 +28,23 @@ test('loads without console errors and exposes window.__api', async ({ page }) =
   expect(errors).toEqual([]);
 });
 
+test('the inspector renders the live document + solved current in the DOM', async ({ page }) => {
+  await openApp(page);
+  await page.evaluate(() => {
+    const api = window.__api;
+    api.loadDocument({ v: 2, robotId: 'self-balancer', name: 't', components: [], nets: [],
+      code: null, sim: { gravity: -9.81, seed: 42 }, meta: { revision: 0 } });
+    api.place_component({ type: 'battery', id: 'bat1' });
+    api.place_component({ type: 'motor', id: 'motor1' });
+    api.connect({ from: 'bat1.+', to: 'motor1.A' });
+    api.connect({ from: 'bat1.-', to: 'motor1.B' });
+  });
+  // the panel polls (~400ms) — wait for the component id and its amps to appear
+  await expect(page.locator('#inspector .insp-id', { hasText: 'motor1' })).toBeVisible({ timeout: 5000 });
+  await expect(page.locator('#inspector')).toContainText(/A\b/);   // a current reading
+  await expect(page.locator('#inspector')).toContainText('Circuit OK');
+});
+
 test('place → connect → run spins the motor from the solved circuit', async ({ page }) => {
   await openApp(page);
   await page.evaluate(() => {

@@ -164,7 +164,15 @@ const docSave = initDocSave(api, { onFlash: (m, k) => hud.flash(m, k) });
 // replacement for the Guide rail). Polls the API; owns no state of its own.
 initInspector(api, { getMode: () => state.mode });
 // Jarvis: natural-language build assistant (M2). Acts only through the API.
-const jarvis = initJarvis({ api, onFlash: (m, k) => hud.flash(m, k) });
+// Free/anon users are quota-capped (protects the shared Gemini free key); pro
+// (profiles.tier) is uncapped. currentTier is updated on sign-in below.
+let currentTier = 'free';
+const jarvis = initJarvis({
+  api,
+  onFlash: (m, k) => hud.flash(m, k),
+  getTier: () => currentTier,
+  onUpgrade: () => { track('upgrade_click', { from: 'jarvis' }); hud.flash('Upgrade for unlimited Jarvis — coming soon', 'ok'); },
+});
 {
   const jv = document.getElementById('jarvis');
   document.getElementById('jarvis-toggle')?.addEventListener('click', () => {
@@ -210,7 +218,8 @@ const account = initAccount({
   onSignIn: async () => {
     try {
       const prof = await getProfile();
-      account.setTier((prof && prof.tier) || 'free');
+      currentTier = (prof && prof.tier) || 'free';
+      account.setTier(currentTier);   // Jarvis quota lifts for pro
       // pull the build document (kind:'save'); load it if it's a v2 RobotDoc
       const rs = await pullDocument('save', 0);
       if (rs && rs.v === 2 && Array.isArray(rs.components)) api.loadDocument(rs);

@@ -13,4 +13,6 @@ assembly.png
 test-results/
 playwright-report/
 .env
+.env.*
+!.env.example
 .firecrawl/

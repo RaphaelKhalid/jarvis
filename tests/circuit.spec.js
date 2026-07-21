@@ -93,6 +93,30 @@ test('an open switch breaks the loop; closing it lets current flow', async ({ pa
   expect(r.closed).toBeGreaterThan(3.0);           // closed → full loop ≈ 3.08 A
 });
 
+test('editing a resistor param in the Inspector re-solves the current', async ({ page }) => {
+  await openApp(page);
+  await placeBatteryMotor(page);
+  await page.evaluate(() => {
+    const api = window.__api;
+    api.place_component({ type: 'resistor', id: 'r1' });
+    api.connect({ from: 'bat1.+', to: 'r1.A' });
+    api.connect({ from: 'r1.B', to: 'motor1.A' });
+    api.connect({ from: 'bat1.-', to: 'motor1.B' });
+  });
+  // find the Inspector's resistance field for r1 and change it
+  const field = page.locator('#inspector input[data-comp="r1"][data-key="resistance"]');
+  await expect(field).toHaveValue('100');
+  const before = await page.evaluate(() => window.__api.read_electrical().current.motor1);
+  await field.fill('10');
+  await field.blur();
+  await page.waitForFunction((b) => {
+    const i = window.__api.read_electrical().current.motor1;
+    return Math.abs(i) > Math.abs(b) * 2;   // 10Ω lets ~10x more through than 100Ω
+  }, before, { timeout: 5000 });
+  const after = await page.evaluate(() => window.__api.get_document().components.find(c => c.id === 'r1').params.resistance);
+  expect(after).toBe(10);
+});
+
 test('short raises a violation and the solve is not ok', async ({ page }) => {
   await openApp(page);
   await placeBatteryMotor(page);

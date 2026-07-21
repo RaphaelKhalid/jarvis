@@ -190,6 +190,13 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
 .insp-amps { color: var(--accent-text); font-variant-numeric: tabular-nums; }
 .insp-dir { opacity: .8; margin-right: 2px; }
 .insp-omega { color: var(--green); font-variant-numeric: tabular-nums; }
+.insp-params { display: flex; flex-wrap: wrap; gap: 4px 10px; padding: 2px 0 6px 4px; }
+.insp-pfield { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-dim); }
+.insp-pfield input[type=number] { width: 52px; background: var(--panel-2, #1a1a1a); color: var(--text);
+  border: 1px solid var(--border, #333); border-radius: 3px; padding: 1px 4px;
+  font: inherit; font-size: 11px; font-variant-numeric: tabular-nums; }
+.insp-pfield input[type=number]:focus { outline: 1px solid var(--accent, #d4af37); }
+.insp-pfield i { font-style: normal; opacity: .6; }
 .insp-net { display: flex; align-items: center; gap: 6px; padding: 2px 0; color: var(--text-dim); }
 .insp-swatch { width: 9px; height: 9px; border-radius: 2px; flex-shrink: 0; }
 .insp-eps { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

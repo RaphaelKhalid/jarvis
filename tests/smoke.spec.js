@@ -28,6 +28,32 @@ test('loads without console errors and exposes window.__api', async ({ page }) =
   expect(errors).toEqual([]);
 });
 
+test('the tray offers the M1 library and a doc mutation renders 3D meshes', async ({ page }) => {
+  await openApp(page);
+  // tray is built from the component library (battery + motor), not the old slots
+  await expect(page.locator('#parts-tray .part-card[data-type="battery"]')).toBeVisible();
+  await expect(page.locator('#parts-tray .part-card[data-type="motor"]')).toBeVisible();
+
+  // placing through the API syncs the 3D view (onDocChange → assembly.sync)
+  const meshCount = await page.evaluate(() => {
+    const api = window.__api;
+    api.loadDocument({ v: 2, robotId: 'self-balancer', name: 't', components: [], nets: [],
+      code: null, sim: { gravity: -9.81, seed: 42 }, meta: { revision: 0 } });
+    api.place_component({ type: 'battery', id: 'bat1' });
+    api.place_component({ type: 'motor', id: 'motor1' });
+    return window.__lab.assemblyApi.getPlacedCount();
+  });
+  expect(meshCount).toBe(2);
+
+  // clearing removes them — still through the API
+  const after = await page.evaluate(() => {
+    window.__lab.assemblyApi.clearBoard();
+    return { placed: window.__lab.assemblyApi.getPlacedCount(),
+             comps: window.__api.get_document().components.length };
+  });
+  expect(after).toEqual({ placed: 0, comps: 0 });
+});
+
 test('the inspector renders the live document + solved current in the DOM', async ({ page }) => {
   await openApp(page);
   await page.evaluate(() => {

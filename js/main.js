@@ -1,7 +1,6 @@
 // Orchestrator: creates the scene + core systems, wires the app modules
 // together (assembly, hud, input), owns Upload/back transitions + render loop.
 import { createScene } from './scene.js';
-import { WiringManager } from './wiring.js';
 import { initEditor } from './editor.js';
 import { loadRapier, loadRobotModel } from './sim.js';
 import { createSimBody } from './robots/sim-registry.js';
@@ -9,9 +8,8 @@ import { activeRobot, bootActiveRobot } from './robots/index.js';
 import { audio } from './audio.js';
 import { state, set } from './app/state.js';
 import { initHud } from './app/hud.js';
-import { initAssembly, TW_OPEN } from './app/assembly.js';
+import { initCreatorAssembly } from './app/creator-assembly.js';
 import { initInput } from './app/input.js';
-import { initSave } from './app/save.js';
 import { initTouch } from './app/touch.js';
 import { createApi } from './api/index.js';
 import { emptyDoc } from './model/doc.js';
@@ -24,7 +22,7 @@ import { installErrorBoundary, isWebGLAvailable, showFatal } from './app/errors.
 import { track, trackOnce, EVENTS, initAnalytics } from './app/analytics.js';
 import { initAccount } from './app/account.js';
 import { initClassroom } from './app/classroom.js';
-import { pushDocument, pullDocument, flushQueue, getProfile } from './app/cloud.js';
+import { pullDocument, flushQueue, getProfile } from './app/cloud.js';
 
 installErrorBoundary();  // global error/rejection reporting + fatal fallback wiring
 initAnalytics();         // attach the PostHog sink (privacy-locked; buffers until ready)
@@ -51,48 +49,47 @@ try {
   showFatal();
   throw e;
 }
-const { renderer, scene, camera, controls, slotMeshes, resize, composer, floorUniforms, assemblyDecor } = sceneBits;
+const { scene, camera, controls, resize, composer, floorUniforms, assemblyDecor } = sceneBits;
 
-const wiring = new WiringManager(scene, camera, renderer, () => hud.refreshChecklist());
 const sim = createSimBody(activeRobot().simKey, scene);   // legacy balance body (unused in M1; kept for hud refs)
 const creatorSim = new CreatorSim(scene);                 // M1 doc-driven motor body
 window.__sim = creatorSim;   // debug/testing hook — tests poll motor ω here
 
 const controlsLegend = document.getElementById('controls-legend');
 
+// forward-declared: the fused build surface is created after the API (below),
+// but hud/adapters close over it — a null-initialized binding avoids the TDZ.
+let assemblyApi = null;
+
+// checklist/stepper adapter: hud reads "wiring status" off the live document
+// (the fused assembly is the authority; created just below).
+const wiringAdapter = {
+  status: () => (assemblyApi ? assemblyApi.wireStatus() : []),
+  allRequiredDone: () => (assemblyApi ? assemblyApi.allWired() : false),
+};
+
 // hud is created first with lazy getters into the not-yet-created assembly module
 const hud = initHud({
-  wiring, sim,
+  wiring: wiringAdapter, sim,
   getPlacedCount: () => (assemblyApi ? assemblyApi.getPlacedCount() : 0),
   getGains: () => state.gains,
   onExitSim: () => exitSim(),
   onGains: (g) => setSketchGains(g),   // live PID sliders write back into the .ino sketch
 });
-const assemblyApi = initAssembly({ canvas, scene, camera, controls, slotMeshes, wiring, hud });
 const input = initInput({ canvas, sim });
 initTouch({ sim });   // no-op on fine-pointer devices
 
 sim.onTelemetry = ({ tiltDeg }) => hud.pushTilt(tiltDeg);
 
-// ── editor ──────────────────────────────────────────────────────
+// ── editor (firmware panel; inert in M1 — no sketch execution) ──
 const cm = initEditor(document.getElementById('editor-container'), (g) => {
   set('gains', g);
   sim.setGains(g);
   const gr = document.getElementById('gains-readout');
   if (gr) gr.textContent = `Kp ${g.Kp}  Ki ${g.Ki}  Kd ${g.Kd}`;
-  saveApi?.persist();
-});
-
-// ── save/load (schema v1, localStorage) ─────────────────────────
-const saveApi = initSave({
-  assemblyApi, wiring,
-  getSketch: () => cm.getValue(),
-  setSketch: (s) => cm.setValue(s),
-  onPersist: (doc) => { pushDocument('save', doc).catch(() => {}); },   // cloud sync (queued if signed out)
 });
 // each robot ships its own starter sketch (self-balancer's === the editor
-// default). Done after saveApi exists so the editor's change handler, which
-// calls saveApi.persist(), isn't hit during the temporal dead zone.
+// default). The sketch is inert in M1 (display/parse only, not executed).
 if (activeRobot().sketch) cm.setValue(activeRobot().sketch);
 // firmware panel header reflects the active robot's sketch file
 {
@@ -105,7 +102,7 @@ if (activeRobot().sketch) cm.setValue(activeRobot().sketch);
 const rightPanel = document.getElementById('right-panel');
 const fwHint = document.getElementById('fw-hint');
 function updateFirmwareDisclosure() {
-  const demote = state.mode === 'assembly' && !wiring.allRequiredDone();
+  const demote = state.mode === 'assembly' && !wiringAdapter.allRequiredDone();
   rightPanel?.classList.toggle('demoted', demote);
   fwHint?.classList.toggle('hidden', !demote);
 }
@@ -115,11 +112,10 @@ updateFirmwareDisclosure();
   const origRefresh = hud.refreshChecklist;
   hud.refreshChecklist = (...a) => {
     origRefresh(...a);
-    saveApi.persist();
     updateFirmwareDisclosure();
     // funnel milestones — first part placed, then all wiring done
     if (assemblyApi.getPlacedCount() > 0) trackOnce(EVENTS.PLACE, { robot: activeRobot().id });
-    if (wiring.allRequiredDone()) trackOnce(EVENTS.WIRE, { robot: activeRobot().id });
+    if (wiringAdapter.allRequiredDone()) trackOnce(EVENTS.WIRE, { robot: activeRobot().id });
   };
 }
 
@@ -137,6 +133,9 @@ function setSketchGains({ Kp, Ki, Kd }) {
 const api = createApi({
   doc: emptyDoc(state.activeRobotId),
   hooks: {
+    // any document change (drag, wire, clear, undo, redo, a script, a #build=
+    // load) re-syncs the 3D view — the doc is the single source of truth.
+    onDocChange: () => { assemblyApi?.sync(); },
     sim: {
       run: () => enterSim(),
       stop: () => exitSim(),
@@ -153,6 +152,9 @@ const api = createApi({
   },
 });
 window.__api = api;
+// the fused build surface: placement + wiring as a pure view over api.get_document().
+// Created after the API so its onDocChange → sync loop is wired both ways.
+assemblyApi = initCreatorAssembly({ canvas, scene, camera, controls, api, hud });
 // live ω from the running sim → the solver's back-EMF input (Inspector readout)
 creatorSim.onOmega((tel) => api.setSimState(tel));
 // RobotDoc v2 persistence + shareable #build= link (v1 saves migrate on load)
@@ -184,7 +186,7 @@ document.getElementById('share-btn').addEventListener('click', async () => {
 for (const btn of document.querySelectorAll('.panel-min')) {
   btn.addEventListener('click', () => document.getElementById(btn.dataset.panel)?.classList.toggle('min'));
 }
-window.__lab = { assemblyApi, wiring, api, hud, saveApi };   // debug/testing hook
+window.__lab = { assemblyApi, api, hud };   // debug/testing hook
 track(EVENTS.LOAD, { robot: activeRobot().id });   // funnel entry — app booted
 
 // ── cloud account + sync ─────────────────────────────────────────
@@ -199,8 +201,9 @@ const account = initAccount({
     try {
       const prof = await getProfile();
       account.setTier((prof && prof.tier) || 'free');
+      // pull the build document (kind:'save'); load it if it's a v2 RobotDoc
       const rs = await pullDocument('save', 0);
-      if (rs) saveApi.applyRemote(rs);
+      if (rs && rs.v === 2 && Array.isArray(rs.components)) api.loadDocument(rs);
       await flushQueue();
       hud.flash('Synced to your account', 'ok');
     } catch { /* sync is best-effort */ }
@@ -245,8 +248,7 @@ async function enterSim() {
     return;
   }
   set('mode', 'sim');
-  assemblyApi.group.visible = false;
-  wiring.setVisible(false);
+  assemblyApi.group.visible = false;   // hides parts + wires (both live under the group)
   for (const d of assemblyDecor) d.visible = false;
   canvas.style.cursor = 'default';
   controlsLegend.classList.add('hidden');
@@ -270,9 +272,8 @@ function exitSim() {
   audio.stopMotor();
   creatorSim.hide();
   assemblyApi.group.visible = true;
-  wiring.setVisible(true);
   for (const d of assemblyDecor) d.visible = true;
-  canvas.style.cursor = TW_OPEN;
+  canvas.style.cursor = 'crosshair';
   controlsLegend.classList.remove('hidden');
   controls.enabled = true;
   controls.target.set(0, 2, 1);
@@ -293,7 +294,7 @@ function animate() {
   if (state.mode === 'assembly') {
     controls.update();
     floorUniforms.uTime.value += dt;
-    wiring.animateFlow(dt, wiring.allRequiredDone());
+    assemblyApi.animate(dt);   // current-flow charges along wired nets
   }
 
   if (state.mode === 'sim') {

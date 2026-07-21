@@ -15,8 +15,8 @@ import { DEFAULT_SKETCH } from '../editor.js';
 
 export const selfBalancer = {
   id: 'self-balancer',
-  name: 'Self-Balancer',
-  blurb: 'A two-wheeled robot that balances on its own with a PID controller.',
+  name: 'Motor Bench',
+  blurb: 'Wire a battery to a motor and watch the solved circuit spin it. The starter build.',
   difficulty: 'Start here',
   available: true,
   simKey: 'balance',        // which sim.js body/controller this robot uses

@@ -49,7 +49,7 @@ export function initTopbar() {
     const driving = state.mode === 'sim';
     chip.classList.toggle('driving', driving);
     bar.querySelector('#tb-robot-name').textContent =
-      activeRobot().name + (driving ? ' — driving' : '');
+      activeRobot().name + (driving ? ' — running' : '');
   }
   subscribe('mode', refreshChip);
   subscribe('activeRobotId', refreshChip);

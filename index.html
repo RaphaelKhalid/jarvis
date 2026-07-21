@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SelfBalance Lab — Robot Assembly Simulator</title>
-<meta name="description" content="Assemble, wire, and program a self-balancing robot in your browser — then tune a real PID loop and feel the physics. A zero-install robotics lab.">
+<title>Jarvis — Robotics Creator</title>
+<meta name="description" content="Build a robot from real components in your browser, wire the circuit, and watch a physics simulation run it. A natural-language assistant builds alongside you. Zero install.">
 <meta name="theme-color" content="#0a0d12">
 <link rel="canonical" href="https://selfbalance-lab.vercel.app/">
 <!-- favicon + installable manifest -->
@@ -110,19 +110,20 @@
     </div>
   </main>
 
-  <!-- RIGHT: code editor -->
+  <!-- RIGHT: run panel (M1: the firmware editor is inert — no MCU in the
+       battery→motor world — so it's hidden; this panel is just Run + Serial) -->
   <aside id="right-panel">
     <header class="panel-header">
-      <span class="dot dot-green"></span> FIRMWARE — <span id="firmware-file">balance_bot.ino</span>
-      <button class="panel-min" data-panel="right-panel" aria-label="Minimize firmware panel" title="Minimize">▾</button>
+      <span class="dot dot-green"></span> SIMULATE — <span id="firmware-file">battery → motor</span>
+      <button class="panel-min" data-panel="right-panel" aria-label="Minimize panel" title="Minimize">▾</button>
     </header>
-    <div id="fw-hint" class="hidden"><i data-lucide="arrow-left"></i> Build &amp; wire the robot first — you’ll tune this next.</div>
-    <div id="editor-container"></div>
-    <div id="serial">
+    <div id="run-hint">Place a <b>battery</b> and a <b>motor</b>, wire <span class="mono">+→A</span> and <span class="mono">−→B</span>, then hit <b>Run</b> to watch it spin. The Inspector (left) shows the solved current.</div>
+    <div id="editor-container" class="hidden"></div>
+    <div id="serial" class="hidden">
       <div id="serial-head"><span><i data-lucide="terminal"></i> SERIAL MONITOR</span><span class="baud">115200 baud</span></div>
       <div id="serial-log"><div class="ser-line dim">// Serial output appears here after Upload.</div></div>
     </div>
-    <button id="upload-btn" disabled><i data-lucide="cpu"></i><span>UPLOAD</span></button>
+    <button id="upload-btn"><i data-lucide="play"></i><span>RUN</span></button>
   </aside>
 
 </div>
@@ -131,7 +132,7 @@
 <!-- onboarding (hidden by default; hud.js reveals it for first-time visitors so it never paints-then-hides) -->
 <div id="overlay" class="hidden">
   <div class="card">
-    <div class="ov-mark"><span aria-hidden="true">◐</span> GYRO</div>
+    <div class="ov-mark"><span aria-hidden="true">◐</span> JARVIS</div>
     <h1>Feel how control systems work</h1>
     <div class="tagline">Wire up a real robot, tune a live PID loop, and watch it fight to stay upright — no install, right in your browser.</div>
     <div class="ov-beats">

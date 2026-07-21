@@ -229,6 +229,17 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
 #jarvis-form button svg { width: 15px; height: 15px; }
 #jarvis-form button:disabled { opacity: .5; cursor: default; }
 
+/* ── M1 run panel + sim title ── */
+#run-hint {
+  margin: 12px; padding: 12px 14px; flex: 0 0 auto;
+  background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--r-sm);
+  color: var(--text-dim); font-size: 12.5px; line-height: 1.6;
+}
+#run-hint b { color: var(--text); }
+#run-hint .mono { font-family: var(--mono); color: var(--accent-text); }
+.sim-title { font-family: var(--display, inherit); font-size: 12px; letter-spacing: .08em;
+  color: var(--accent-text); margin-bottom: 6px; }
+
 /* ── workspace HUD ── */
 #workspace-hud {
   position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); z-index: 5;

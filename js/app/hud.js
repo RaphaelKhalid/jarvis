@@ -8,7 +8,7 @@ import { state, set, subscribe } from './state.js';
 
 export const KIND_LABEL = { power: 'POWER', ground: 'GROUND', data: 'SIGNAL' };
 
-export function initHud({ wiring, sim, getPlacedCount, getGains, onExitSim, onGains }) {
+export function initHud({ wiring, sim, getPlacedCount, getGains, onExitSim, onGains, onReset }) {
   const tooltip = document.getElementById('tooltip');
   const hudStatus = document.getElementById('hud-status');
   const checklistEl = document.getElementById('checklist');
@@ -121,12 +121,14 @@ export function initHud({ wiring, sim, getPlacedCount, getGains, onExitSim, onGa
     </div>
     <div class="sim-drive">W/S drive · A/D steer · Space jump</div>`;
   document.getElementById('workspace').appendChild(simHud);
-  // the rover has no balance loop: hide the PID tuning sliders + the tilt/PID
-  // sparkline (they'd only ever read ~0). Per-frame readouts already show speed.
-  if (activeRobot().simKey !== 'balance') {
-    for (const sel of ['#sim-pid', '#sparkline', '.spark-legend']) simHud.querySelector(sel)?.classList.add('hidden');
+  // M1 is a doc-driven motor test — there is no balance loop, tilt, PID, or WASD
+  // driving. Hide all of that; the Inspector shows the live current + ω. What's
+  // left is a compact "motor test" card with Reset + back-to-Assembly.
+  for (const sel of ['#sim-pid', '#sparkline', '.spark-legend', '#tilt-readout', '#sim-state', '.sim-drive']) {
+    simHud.querySelector(sel)?.classList.add('hidden');
   }
-  document.getElementById('reset-btn').addEventListener('click', () => { sim.setGains(getGains()); sim.reset(); clearGraph(); });
+  { const t = document.createElement('div'); t.className = 'sim-title'; t.textContent = 'MOTOR TEST'; simHud.insertBefore(t, simHud.firstChild); }
+  document.getElementById('reset-btn').addEventListener('click', () => { onReset ? onReset() : (sim.setGains(getGains()), sim.reset()); clearGraph(); });
   document.getElementById('back-btn').addEventListener('click', () => onExitSim());
 
   // ── live PID sliders (drive the sim + editor sketch in real time) ──

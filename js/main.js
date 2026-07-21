@@ -76,6 +76,7 @@ const hud = initHud({
   getGains: () => state.gains,
   onExitSim: () => exitSim(),
   onGains: (g) => setSketchGains(g),   // live PID sliders write back into the .ino sketch
+  onReset: () => creatorSim.reset(),   // M1 Reset re-zeroes the spinning wheel
 });
 const input = initInput({ canvas, sim });
 initTouch({ sim });   // no-op on fine-pointer devices
@@ -92,11 +93,8 @@ const cm = initEditor(document.getElementById('editor-container'), (g) => {
 // each robot ships its own starter sketch (self-balancer's === the editor
 // default). The sketch is inert in M1 (display/parse only, not executed).
 if (activeRobot().sketch) cm.setValue(activeRobot().sketch);
-// firmware panel header reflects the active robot's sketch file
-{
-  const ff = document.getElementById('firmware-file');
-  if (ff && activeRobot().sketchFile) ff.textContent = activeRobot().sketchFile;
-}
+// M1: the firmware panel is the "Simulate" panel (editor hidden); its subtitle
+// stays "battery → motor" from index.html — no per-robot sketch file shown.
 // any checklist refresh (placement, wiring, clear) marks the state dirty
 // progressive disclosure: demote the firmware panel until the board is wired,
 // so a cold-start user leads with Build → Wire instead of a wall of code.
@@ -244,10 +242,10 @@ uploadBtn.addEventListener('click', async () => {
   if (uploadBtn.disabled) return;
   trackOnce(EVENTS.UPLOAD, { robot: activeRobot().id });
   uploadBtn.classList.add('loading');
-  uploadLabel.textContent = 'COMPILING…';
+  uploadLabel.textContent = 'STARTING…';
   await enterSim();   // loads Rapier + builds the doc-driven body
   uploadBtn.classList.remove('loading');
-  uploadLabel.textContent = 'UPLOAD';
+  uploadLabel.textContent = 'RUN';
 });
 
 // M1 Run: build the doc-driven motor body from the current document and spin it

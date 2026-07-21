@@ -16,8 +16,8 @@ export function initTopbar() {
   bar.innerHTML = `
     <div class="tb-brand">
       <span class="tb-mark" aria-hidden="true">◐</span>
-      <span class="tb-name">GYRO</span>
-      <span class="tb-sub">Self-Balance Lab</span>
+      <span class="tb-name">JARVIS</span>
+      <span class="tb-sub">Robotics Creator</span>
     </div>
     <button class="tb-robot" id="tb-robot" title="Switch robot"><span class="tb-dot"></span><span id="tb-robot-name">Self-Balancer</span><span class="tb-caret">▾</span></button>
     <div class="tb-actions">

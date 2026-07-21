@@ -57,9 +57,8 @@ export function initHud({ wiring, sim, getPlacedCount, getGains, onExitSim, onGa
       st.map(s => `<div class="check-item ${s.done ? 'done' : ''}">
           <span class="box">${s.done ? '☑' : '☐'}</span>${s.label}</div>`).join('');
 
-    const ready = wiring.allRequiredDone();
-    uploadBtn.disabled = !ready;
-    if (ready && state.mode === 'assembly') hudStatus.textContent = '✓ Wiring complete — hit UPLOAD to run the robot';
+    // M1: Run is always enabled — violations surface in the sim, not as a gate.
+    uploadBtn.disabled = false;
     clearBtn.disabled = state.mode === 'sim' || getPlacedCount() === 0;
     updateStepper();
   }

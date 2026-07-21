@@ -85,9 +85,13 @@ export function initDocSave(api, { onFlash } = {}) {
     }
   }
 
-  // persist on every doc change (debounced)
+  // persist on every doc change (debounced). Chain the existing handler (the
+  // API's onDocChange → 3D re-sync) rather than replacing it.
+  const history = api.getHistory();
+  const prevOnChange = history.onChange;
   let timer = null;
-  api.getHistory().onChange = (doc) => {
+  history.onChange = (doc) => {
+    prevOnChange?.(doc);
     clearTimeout(timer);
     timer = setTimeout(() => { try { localStorage.setItem(DOC_KEY, JSON.stringify(doc)); } catch {} }, 200);
   };

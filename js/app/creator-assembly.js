@@ -24,6 +24,10 @@ const CARD = {
     help: 'The power source. Its + and − terminals push current through whatever you wire across them.' },
   motor: { name: 'DC Gear Motor', swatch: '#f0c020', desc: 'Geared motor + wheel',
     help: 'Current through A→B makes it spin. Reverse the wires and it spins the other way.' },
+  resistor: { name: 'Resistor', swatch: '#d8c9a0', desc: '100 Ω, in series',
+    help: 'Limits current. Put one in series with the motor and it draws less — the motor spins slower. Non-polar: either lead works.' },
+  switch: { name: 'Switch', swatch: '#7bd88f', desc: 'Break / make the loop',
+    help: 'Click the switch body to open or close the circuit. Open = no current = the motor stops.' },
 };
 
 // A motor mesh whose two terminals are named A / B (to match the library),
@@ -35,7 +39,73 @@ function makeMotorAB() {
   g.userData.pins.forEach((p, i) => { p.name = names[i] || p.name; });
   return g;
 }
-const FACTORY = { battery: makeBattery, motor: makeMotorAB };
+// small gold lead-pin, registered as an endpoint on the group.
+function addLeadPin(g, name, x, y, z) {
+  const pin = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.09, 0.09, 0.5, 8),
+    new THREE.MeshStandardMaterial({ color: 0xd4af37, metalness: 0.8, roughness: 0.35 }));
+  pin.position.set(x, y + 0.25, z);
+  g.userData.pins.push({ name, obj: pin });
+  g.add(pin);
+  return pin;
+}
+
+// passive resistor: beige body with colour bands + two leads (A, B).
+function makeResistorMesh() {
+  const g = new THREE.Group();
+  g.userData = { type: 'resistor', pins: [] };
+  const body = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.6, 0.6, 2.6, 16),
+    new THREE.MeshStandardMaterial({ color: 0xd8c9a0, roughness: 0.6 }));
+  body.rotation.z = Math.PI / 2; body.position.y = 1.2; body.castShadow = true;
+  g.add(body);
+  [0x8b4513, 0x111111, 0xaa2222, 0xc8a000].forEach((c, i) => {
+    const band = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.63, 0.63, 0.22, 16),
+      new THREE.MeshStandardMaterial({ color: c, roughness: 0.5 }));
+    band.rotation.z = Math.PI / 2; band.position.set(-0.7 + i * 0.42, 1.2, 0);
+    g.add(band);
+  });
+  addLeadPin(g, 'A', -1.7, 1.2, 0);
+  addLeadPin(g, 'B', 1.7, 1.2, 0);
+  return g;
+}
+
+// switch: base + tilting lever + indicator dot. Click the body to toggle (wired
+// in the click handler); the lever/indicator reflect params.closed via sync().
+function makeSwitchMesh() {
+  const g = new THREE.Group();
+  g.userData = { type: 'switch', pins: [] };
+  const base = new THREE.Mesh(
+    new THREE.BoxGeometry(2.6, 0.9, 1.8),
+    new THREE.MeshStandardMaterial({ color: 0x2a2f3a, roughness: 0.7, metalness: 0.2 }));
+  base.position.y = 0.45; base.castShadow = true;
+  g.add(base);
+  const lever = new THREE.Mesh(
+    new THREE.BoxGeometry(1.5, 0.35, 0.6),
+    new THREE.MeshStandardMaterial({ color: 0xb0b4bc, metalness: 0.6, roughness: 0.4 }));
+  lever.position.set(0, 1.05, 0); lever.rotation.z = 0.4;
+  lever.userData.role = 'sw-lever';
+  g.add(lever);
+  const ind = new THREE.Mesh(
+    new THREE.SphereGeometry(0.22, 12, 12),
+    new THREE.MeshStandardMaterial({ color: 0x333a33, emissive: 0x000000, emissiveIntensity: 1 }));
+  ind.position.set(0.95, 0.95, 0.95); ind.userData.role = 'sw-ind';
+  g.add(ind);
+  addLeadPin(g, 'A', -1.7, 0.9, 0);
+  addLeadPin(g, 'B', 1.7, 0.9, 0);
+  return g;
+}
+
+// reflect a switch component's closed state on its lever + indicator.
+function updateSwitchVisual(group, closed) {
+  group.traverse((o) => {
+    if (o.userData?.role === 'sw-lever') o.rotation.z = closed ? -0.4 : 0.4;
+    if (o.userData?.role === 'sw-ind') o.material.emissive.setHex(closed ? 0x2ecc71 : 0x000000);
+  });
+}
+
+const FACTORY = { battery: makeBattery, motor: makeMotorAB, resistor: makeResistorMesh, switch: makeSwitchMesh };
 
 const KIND_COLOR = { power: 0xff4d4d, ground: 0x2a2f3a, data: 0xffd166 };
 const TW_OPEN = 'crosshair';
@@ -157,6 +227,7 @@ export function initCreatorAssembly({ canvas, scene, camera, controls, api, hud 
       const r = c.transform?.rot || [0, 0, 0];
       g.position.set(p[0], p[1], p[2]);
       g.rotation.set(r[0], r[1], r[2]);
+      if (baseType(c.type) === 'switch') updateSwitchVisual(g, c.params?.closed === true);
     }
     // remove meshes for deleted components
     for (const [id, g] of meshes) {
@@ -247,6 +318,17 @@ export function initCreatorAssembly({ canvas, scene, camera, controls, api, hud 
     }
     return best;
   }
+  // nearest switch component under the pointer (for click-to-toggle).
+  function pickSwitch() {
+    const targets = [];
+    for (const c of api.get_document().components) {
+      if (baseType(c.type) !== 'switch') continue;
+      const g = meshes.get(c.id);
+      if (g) g.traverse(o => { if (o.isMesh) { o.userData._swId = c.id; targets.push(o); } });
+    }
+    const hit = raycaster.intersectObjects(targets, false)[0];
+    return hit ? hit.object.userData._swId : null;
+  }
   function highlightPin(id, on) {
     const obj = endpoints.get(id);
     if (!obj) return;
@@ -300,7 +382,18 @@ export function initCreatorAssembly({ canvas, scene, camera, controls, api, hud 
     updatePointer(e);
     raycaster.setFromCamera(pointer, camera);
     const pin = pickPin();
-    if (!pin) return;
+    if (!pin) {
+      // clicking a switch body toggles it open/closed (re-solves the circuit)
+      const swId = pickSwitch();
+      if (swId) {
+        const comp = api.get_document().components.find(c => c.id === swId);
+        const now = comp?.params?.closed === true;
+        api.set_param({ id: swId, key: 'closed', value: !now });
+        hud.flash(`${swId} ${!now ? 'closed' : 'opened'}`, 'ok'); audio.ui();
+        sync(); hud.refreshChecklist();
+      }
+      return;
+    }
     const id = pin.userData.endpointId;
     if (!pending) {
       pending = id; highlightPin(id, true); audio.ui();

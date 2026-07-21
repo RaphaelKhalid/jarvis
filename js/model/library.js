@@ -23,6 +23,24 @@ export const LIBRARY = {
     // resistance = armature R_a (ohms); ke = back-EMF / torque constant (V·s/rad).
     params: { resistance: 2.0, ke: 0.05, friction: 0.002, maxCurrent: 10 },
   },
+  resistor: {
+    label: 'Resistor',
+    // passive + non-polar: either pin can be A or B.
+    pins: [
+      { name: 'A', role: 'signal' },
+      { name: 'B', role: 'signal' },
+    ],
+    params: { resistance: 100, maxCurrent: 5 },
+  },
+  switch: {
+    label: 'Switch',
+    pins: [
+      { name: 'A', role: 'signal' },
+      { name: 'B', role: 'signal' },
+    ],
+    // closed = conducts; open = breaks the circuit. Toggle it in the sim.
+    params: { closed: false, maxCurrent: 30 },
+  },
 };
 
 // Base type for instanced parts (motorL/motorR → motor).

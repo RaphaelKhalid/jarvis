@@ -54,6 +54,45 @@ test('reversed polarity draws negative current', async ({ page }) => {
   expect(i).toBeLessThan(-3.0);
 });
 
+test('a resistor in series with the motor cuts the current', async ({ page }) => {
+  await openApp(page);
+  await placeBatteryMotor(page);
+  const i = await page.evaluate(() => {
+    const api = window.__api;
+    api.place_component({ type: 'resistor', id: 'r1' });   // default 100 Ω
+    // bat+ → r.A, r.B → motor.A, motor.B → bat−  (all in series)
+    api.connect({ from: 'bat1.+', to: 'r1.A' });
+    api.connect({ from: 'r1.B', to: 'motor1.A' });
+    api.connect({ from: 'bat1.-', to: 'motor1.B' });
+    const e = api.read_electrical();
+    return { motor: e.current.motor1, res: e.current.r1, ok: e.ok };
+  });
+  expect(i.ok).toBe(true);
+  // 7.4 / (0.4 + 100 + 2) ≈ 0.072 A — far below the direct-loop 3.08 A
+  expect(Math.abs(i.motor)).toBeLessThan(0.5);
+  expect(Math.abs(i.motor)).toBeGreaterThan(0.001);
+  // the resistor carries the same series current as the motor
+  expect(Math.abs(i.res)).toBeCloseTo(Math.abs(i.motor), 3);
+});
+
+test('an open switch breaks the loop; closing it lets current flow', async ({ page }) => {
+  await openApp(page);
+  await placeBatteryMotor(page);
+  const r = await page.evaluate(() => {
+    const api = window.__api;
+    api.place_component({ type: 'switch', id: 'sw1' });   // defaults open
+    api.connect({ from: 'bat1.+', to: 'sw1.A' });
+    api.connect({ from: 'sw1.B', to: 'motor1.A' });
+    api.connect({ from: 'bat1.-', to: 'motor1.B' });
+    const open = api.read_electrical().current.motor1;
+    api.set_param({ id: 'sw1', key: 'closed', value: true });
+    const closed = api.read_electrical().current.motor1;
+    return { open, closed };
+  });
+  expect(Math.abs(r.open)).toBeLessThan(1e-6);     // open → no current
+  expect(r.closed).toBeGreaterThan(3.0);           // closed → full loop ≈ 3.08 A
+});
+
 test('short raises a violation and the solve is not ok', async ({ page }) => {
   await openApp(page);
   await placeBatteryMotor(page);

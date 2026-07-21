@@ -40,6 +40,24 @@ export const COMPONENT_ELECTRICAL = {
       ke: Ke,
     };
   },
+  // passive resistor: a single R between A and B (limits current in series).
+  resistor(c) {
+    const r = Math.max(num(c.params?.resistance, 100), 1e-4);
+    return {
+      pins: ['A', 'B'],
+      elements: [{ kind: 'R', a: 'A', b: 'B', r }],
+      maxCurrent: num(c.params?.maxCurrent, 5),
+    };
+  },
+  // switch: a near-ideal wire when closed, an open (no element) when open.
+  switch(c) {
+    const closed = c.params?.closed === true || c.params?.closed === 1;
+    return {
+      pins: ['A', 'B'],
+      elements: closed ? [{ kind: 'R', a: 'A', b: 'B', r: 1e-3 }] : [],
+      maxCurrent: num(c.params?.maxCurrent, 30),
+    };
+  },
 };
 
 function num(v, d) { return (typeof v === 'number' && isFinite(v)) ? v : d; }
@@ -183,6 +201,18 @@ export function solveCircuit(doc, stateOf = {}) {
     // meter convention: positive current flows out of the source's '+'/'A' pin
     current[br.comp] = (current[br.comp] || 0) + i;
   });
+
+  // Passive elements (resistor, closed switch) aren't branch unknowns — meter
+  // their current straight from the solved node voltages: i = (V_a − V_b)/R,
+  // A → B reference. Components already metered as V-sources are left alone.
+  for (const c of doc.components) {
+    if (current[c.id] !== undefined) continue;
+    const rel = specs[c.id]?.elements.find(e => e.kind === 'R');
+    if (!rel) { current[c.id] = 0; continue; }
+    const na = nodeOf.get(`${c.id}.${rel.a}`) ?? 0;
+    const nb = nodeOf.get(`${c.id}.${rel.b}`) ?? 0;
+    current[c.id] = (nodeV[na] - nodeV[nb]) / Math.max(rel.r, 1e-9);
+  }
 
   // Over-current / short-by-magnitude checks.
   for (const c of doc.components) {

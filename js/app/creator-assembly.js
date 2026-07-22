@@ -13,6 +13,7 @@ import * as THREE from 'three';
 import { LIBRARY, pinsFor, baseType } from '../model/library.js';
 import { makeBattery, makeMotor } from '../parts.js';
 import { makeFlatLabel } from '../labels.js';
+import { loadRapier } from '../sim.js';
 import { pinInfo } from '../glossary.js';
 import { audio } from '../audio.js';
 import { state } from './state.js';
@@ -178,6 +179,66 @@ export function initCreatorAssembly({ canvas, scene, camera, controls, api, hud 
 
   canvas.style.cursor = TW_OPEN;
 
+  // ── bench physics: real Rapier gravity + collisions in the BUILD view ──
+  // Every placed part becomes a dynamic rigid body on a ground plane, so parts
+  // fall onto the bench, collide, and stack. Rotations are locked (parts stay
+  // upright at their authored yaw; R sets yaw via the doc) — position is the
+  // only thing physics owns. The doc transform stays the persisted "rest" pose;
+  // physics drives the live mesh position each frame and wires follow.
+  const GROUND_Y = 0;              // bench top; a box collider ½-height 1 rests a part origin at y=1
+  const BOUND = 26;                // low walls keep parts on the bench
+  const SPAWN_Y = 7;               // parts drop in from here
+  let phys = null;                 // { RAPIER, world, bodies:Map(id→body) }
+
+  initBenchPhysics();
+  async function initBenchPhysics() {
+    let RAPIER;
+    try { RAPIER = await loadRapier(); } catch { return; }   // stay static if Rapier fails
+    const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
+    // ground
+    const gb = world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(0, GROUND_Y - 1, 0));
+    world.createCollider(RAPIER.ColliderDesc.cuboid(BOUND + 6, 1, BOUND + 6).setFriction(0.9), gb);
+    // four walls
+    for (const [x, z, hx, hz] of [[BOUND, 0, 1, BOUND], [-BOUND, 0, 1, BOUND], [0, BOUND, BOUND, 1], [0, -BOUND, BOUND, 1]]) {
+      const wb = world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(x, GROUND_Y + 3, z));
+      world.createCollider(RAPIER.ColliderDesc.cuboid(hx, 4, hz), wb);
+    }
+    phys = { RAPIER, world, bodies: new Map() };
+    ensureBodies();   // parts placed before Rapier finished loading
+  }
+
+  // spawn a dynamic body for a component (box footprint, rotations locked)
+  function makeBody(c, dropIn) {
+    const { RAPIER, world } = phys;
+    const p = c.transform?.pos || [0, 1, 0];
+    // stagger the drop height by how many bodies already exist and add a little
+    // XZ jitter, so parts dropped on the same spot don't spawn perfectly
+    // coincident (which makes Rapier's overlap resolution launch them).
+    const jit = () => (Math.random() - 0.5) * 0.8;
+    const y = dropIn ? SPAWN_Y + phys.bodies.size * 2.5 : Math.max(p[1], 1);
+    const body = world.createRigidBody(
+      RAPIER.RigidBodyDesc.dynamic().setTranslation(p[0] + jit(), y, p[2] + jit())
+        .enabledRotations(false, false, false)      // stay upright; yaw is doc-driven
+        .setLinearDamping(0.4));
+    const f = footprint(c.type);
+    world.createCollider(
+      RAPIER.ColliderDesc.cuboid(f, 1, f).setFriction(0.9).setRestitution(0).setDensity(1), body);
+    phys.bodies.set(c.id, body);
+    return body;
+  }
+
+  // reconcile physics bodies with the doc (create new, drop removed)
+  function ensureBodies() {
+    if (!phys) return;
+    const live = new Set(api.get_document().components.map(c => c.id));
+    for (const [id, body] of phys.bodies) {
+      if (!live.has(id)) { phys.world.removeRigidBody(body); phys.bodies.delete(id); }
+    }
+    for (const c of api.get_document().components) {
+      if (!phys.bodies.has(c.id)) makeBody(c, true);
+    }
+  }
+
   // ── parts tray ────────────────────────────────────────────────
   const tray = document.getElementById('parts-tray');
   tray.innerHTML = '';
@@ -230,9 +291,9 @@ export function initCreatorAssembly({ canvas, scene, camera, controls, api, hud 
     drag = null;
     const rect = canvas.getBoundingClientRect();
     if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) return;
-    // project the drop point onto the y=1 build plane, then push it clear of
-    // any part already there (collisions) so nothing spawns overlapping.
-    const pos = separate(dropPoint(e) || [0, 1, 0], type, null);
+    // drop point on the y=1 plane; the part spawns above it and falls onto the
+    // bench under gravity, colliding with whatever's already there.
+    const pos = dropPoint(e) || [0, 1, 0];
     const res = api.place_component({ type, transform: { pos, rot: [0, 0, 0] } });
     if (res.ok) { audio.place(); trackOnce('place', { type }); }
     sync();
@@ -250,35 +311,13 @@ export function initCreatorAssembly({ canvas, scene, camera, controls, api, hud 
     return [hit.x, 1, hit.z];
   }
 
-  // ── collisions: parts can't overlap on the bench ──────────────
-  // Rough XZ footprint radius per component; used to push placed/dragged parts
-  // out of each other so they behave like solid objects, not ghosts.
-  const FOOTPRINT = { battery: 3.4, motor: 5.4, resistor: 2.2, switch: 2.4, led: 1.8 };
+  // XZ footprint half-extent per component — the box collider size that gives
+  // parts solidity (they collide/stack under Rapier gravity, below).
+  const FOOTPRINT = { battery: 3.4, motor: 5.0, resistor: 2.2, switch: 2.4, led: 1.8 };
   const footprint = (type) => FOOTPRINT[baseType(type)] || 2.6;
-  function separate(pos, myType, excludeId) {
-    const me = footprint(myType);
-    let x = pos[0], z = pos[2];
-    const comps = api.get_document().components;
-    for (let it = 0; it < 12; it++) {
-      let hit = false;
-      for (const c of comps) {
-        if (c.id === excludeId) continue;
-        const p = c.transform?.pos || [0, 1, 0];
-        let dx = x - p[0], dz = z - p[2];
-        let d = Math.hypot(dx, dz);
-        const min = me + footprint(c.type);
-        if (d < min) {
-          if (d < 1e-3) { dx = Math.random() - 0.5; dz = Math.random() - 0.5; d = Math.hypot(dx, dz) || 1; }
-          const k = (min - d) / d;
-          x += dx * k; z += dz * k; hit = true;
-        }
-      }
-      if (!hit) break;
-    }
-    return [x, pos[1] ?? 1, z];
-  }
 
-  // rotate a placed part about Y (R key / scroll while grabbing)
+  // rotate a placed part about Y (R key / scroll while grabbing). Rotations are
+  // physics-locked, so yaw lives in the doc and sync() applies it to the mesh.
   function rotateComp(id, delta) {
     const c = api.get_document().components.find(x => x.id === id);
     if (!c) return;
@@ -308,13 +347,13 @@ export function initCreatorAssembly({ canvas, scene, camera, controls, api, hud 
         }
         group.add(g);
         meshes.set(c.id, g);
-        g.userData._settle = 6;   // drop it onto the bench (gravity feel)
       }
       const p = c.transform?.pos || [0, 1, 0];
       const r = c.transform?.rot || [0, 0, 0];
-      g.position.set(p[0], p[1], p[2]);
+      // yaw is always doc-driven; position is owned by physics once a body
+      // exists (animate copies it), so only seed position when there's no body.
       g.rotation.set(r[0], r[1], r[2]);
-      g.userData._restY = p[1];
+      if (!phys?.bodies.has(c.id)) g.position.set(p[0], p[1], p[2]);
       if (baseType(c.type) === 'switch') updateSwitchVisual(g, c.params?.closed === true);
       if (baseType(c.type) === 'led') updateLedVisual(g, elec?.current?.[c.id], c.params?.maxCurrent);
     }
@@ -327,6 +366,7 @@ export function initCreatorAssembly({ canvas, scene, camera, controls, api, hud 
       for (const key of [...endpoints.keys()]) if (key.startsWith(id + '.')) endpoints.delete(key);
       if (pending && pending.startsWith(id + '.')) pending = null;
     }
+    ensureBodies();   // keep the physics world in step with the doc
     group.updateMatrixWorld(true);
     rebuildWires(doc.nets);
   }
@@ -450,15 +490,16 @@ export function initCreatorAssembly({ canvas, scene, camera, controls, api, hud 
     updatePointer(e);
     raycaster.setFromCamera(pointer, camera);
 
-    // dragging a placed part → reposition it live, pushed clear of other parts
-    // (collisions) so you can't drag one through another. Wires follow via sync.
+    // dragging a placed part → drive it as a kinematic body (it shoves other
+    // parts aside via physics); on release it drops back under gravity. Falls
+    // back to a plain doc move when Rapier isn't loaded.
     if (moving) {
       const raw = dropPoint(e);
       if (raw) {
-        const c = api.get_document().components.find(x => x.id === moving.id);
-        const pos = separate(raw, c?.type, moving.id);
         moving.moved = true;
-        api.move_component({ id: moving.id, pos, rot: c?.transform?.rot });
+        const body = phys?.bodies.get(moving.id);
+        if (body) body.setNextKinematicTranslation({ x: raw[0], y: 4, z: raw[2] });
+        else api.move_component({ id: moving.id, pos: raw });
       }
       hud.hideTooltip();
       return;
@@ -525,11 +566,26 @@ export function initCreatorAssembly({ canvas, scene, camera, controls, api, hud 
     // left-press on a part body (not a pin) begins a move-drag
     if (e.button === 0 && !pickPin()) {
       const id = pickComponent();
-      if (id) { moving = { id, moved: false }; controls.enabled = false; canvas.style.cursor = 'grabbing'; }
+      if (id) {
+        moving = { id, moved: false };
+        controls.enabled = false; canvas.style.cursor = 'grabbing';
+        const body = phys?.bodies.get(id);
+        if (body) body.setBodyType(phys.RAPIER.RigidBodyType.KinematicPositionBased, true);
+      }
     }
   });
   window.addEventListener('pointerup', () => {
     if (!moving) return;
+    const id = moving.id;
+    const body = phys?.bodies.get(id);
+    if (body) {
+      body.setBodyType(phys.RAPIER.RigidBodyType.Dynamic, true);
+      body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      // persist the rest pose (x,z) so the layout survives reload
+      const t = body.translation();
+      const rot = api.get_document().components.find(c => c.id === id)?.transform?.rot;
+      api.move_component({ id, pos: [t.x, 1, t.z], rot });
+    }
     suppressClick = moving.moved;   // a real drag shouldn't also fire click
     moving = null;
     canvas.style.cursor = TW_OPEN;
@@ -610,14 +666,21 @@ export function initCreatorAssembly({ canvas, scene, camera, controls, api, hud 
     const powered = elec?.ok !== false;
     const doc = api.get_document();
 
-    // drop-to-bench settle on placement (a bit of gravity feel)
-    for (const [, g] of meshes) {
-      const s = g.userData._settle;
-      if (s > 0 && g.userData._restY != null) {
-        const ns = Math.max(0, s - dt * 22);
-        g.userData._settle = ns;
-        g.position.y = g.userData._restY + ns;
+    // ── real gravity + collisions: step Rapier, copy bodies → meshes ──
+    if (phys) {
+      const steps = Math.min(4, Math.max(1, Math.round(dt / (1 / 60))));
+      for (let i = 0; i < steps; i++) phys.world.step();
+      let anyAwake = !!moving;
+      for (const [id, body] of phys.bodies) {
+        const g = meshes.get(id);
+        if (!g) continue;
+        if (!body.isSleeping()) anyAwake = true;
+        const t = body.translation();
+        g.position.set(t.x, t.y, t.z);   // physics owns position; yaw stays from the doc
       }
+      // only rebuild wires while something is actually moving (avoids per-frame
+      // tube churn once the bench has settled — sync() holds them otherwise).
+      if (anyAwake) { group.updateMatrixWorld(true); rebuildWires(doc.nets); }
     }
 
     // motors physically spin from their solved current — direction follows sign
@@ -668,6 +731,8 @@ export function initCreatorAssembly({ canvas, scene, camera, controls, api, hud 
     sync,
     refreshPositions: sync,
     animate,
+    // test/debug: live physics-driven mesh positions keyed by component id
+    debugPositions: () => { const o = {}; for (const [id, g] of meshes) o[id] = g.position.toArray(); return o; },
     // adapter so hud's checklist/stepper can read wiring status off the doc
     wireStatus: () => api.get_document().nets.map((n) => ({
       label: n.endpoints.join(' — '), done: true, kind: netKind(n),

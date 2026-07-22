@@ -79,6 +79,29 @@ test('a placed part can be moved and removed (keeping wires consistent)', async 
   expect(r.meshes).toBe(1);      // the 3D view reconciled
 });
 
+test('bench physics: parts dropped on one spot fall and stack under gravity', async ({ page }) => {
+  await openApp(page);
+  await page.evaluate(() => {
+    const api = window.__api;
+    api.loadDocument({ v: 2, robotId: 'self-balancer', name: 't', components: [], nets: [],
+      code: null, sim: { gravity: -9.81, seed: 42 }, meta: { revision: 0 } });
+    api.place_component({ type: 'battery', id: 'b1', transform: { pos: [0, 1, 0], rot: [0, 0, 0] } });
+    api.place_component({ type: 'battery', id: 'b2', transform: { pos: [0, 1, 0], rot: [0, 0, 0] } });
+    api.place_component({ type: 'battery', id: 'b3', transform: { pos: [0, 1, 0], rot: [0, 0, 0] } });
+  });
+  // wait for the stack to settle: bottom part on the bench, the others resting above
+  await page.waitForFunction(() => {
+    const d = window.__lab.assemblyApi.debugPositions?.();
+    if (!d || !d.b1 || !d.b3) return false;
+    const ys = [d.b1[1], d.b2[1], d.b3[1]].sort((a, b) => a - b);
+    return ys[0] < 1.4 && ys[1] > ys[0] + 1.4 && ys[2] > ys[1] + 1.4;
+  }, null, { timeout: 20_000 });
+  const d = await page.evaluate(() => window.__lab.assemblyApi.debugPositions());
+  const ys = [d.b1[1], d.b2[1], d.b3[1]].sort((a, b) => a - b);
+  expect(ys[0]).toBeLessThan(1.4);          // one part rests on the bench (~y=1)
+  expect(ys[2] - ys[0]).toBeGreaterThan(2.8); // the stack is genuinely stacked
+});
+
 test('the inspector renders the live document + solved current in the DOM', async ({ page }) => {
   await openApp(page);
   await page.evaluate(() => {

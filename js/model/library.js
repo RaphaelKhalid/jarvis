@@ -41,6 +41,16 @@ export const LIBRARY = {
     // closed = conducts; open = breaks the circuit. Toggle it in the sim.
     params: { closed: false, maxCurrent: 30 },
   },
+  potentiometer: {
+    label: 'Potentiometer',
+    // a rheostat (2-terminal variable resistor): the knob sets resistance from
+    // ~0 up to maxResistance. Turn it down and more current flows.
+    pins: [
+      { name: 'A', role: 'signal' },
+      { name: 'B', role: 'signal' },
+    ],
+    params: { resistance: 500, maxResistance: 1000, maxCurrent: 5 },
+  },
   led: {
     label: 'LED',
     // polar: anode (A, long leg) → cathode (K). Only lights when A is positive.

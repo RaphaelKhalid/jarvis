@@ -149,6 +149,23 @@ test('an LED conducts forward, blocks reverse, and its current is Vf-limited', a
   expect(Math.abs(r.rev)).toBeLessThan(1e-6);
 });
 
+test('a potentiometer varies the motor current as its resistance changes', async ({ page }) => {
+  await openApp(page);
+  await placeBatteryMotor(page);
+  const r = await page.evaluate(() => {
+    const api = window.__api;
+    api.place_component({ type: 'potentiometer', id: 'pot1' });   // default 500 Ω
+    api.connect({ from: 'bat1.+', to: 'pot1.A' });
+    api.connect({ from: 'pot1.B', to: 'motor1.A' });
+    api.connect({ from: 'bat1.-', to: 'motor1.B' });
+    const hi = api.read_electrical().current.motor1;   // 500 Ω → tiny current
+    api.set_param({ id: 'pot1', key: 'resistance', value: 5 });   // turn it down
+    const lo = api.read_electrical().current.motor1;   // ~5 Ω → much more current
+    return { hi: Math.abs(hi), lo: Math.abs(lo) };
+  });
+  expect(r.lo).toBeGreaterThan(r.hi * 5);   // lowering resistance lets far more through
+});
+
 test('short raises a violation and the solve is not ok', async ({ page }) => {
   await openApp(page);
   await placeBatteryMotor(page);

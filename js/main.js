@@ -17,6 +17,7 @@ import { CreatorSim } from './sim/creator-sim.js';
 import { initDocSave } from './app/docsave.js';
 import { initInspector } from './app/inspector.js';
 import { initJarvis } from './app/jarvis.js';
+import { initCoach } from './app/coach.js';
 import { initPerf } from './app/perf.js';
 import { initTopbar } from './app/topbar.js';
 import { installErrorBoundary, isWebGLAvailable, showFatal } from './app/errors.js';
@@ -161,6 +162,9 @@ const docSave = initDocSave(api, { onFlash: (m, k) => hud.flash(m, k) });
 // Inspector: read-only DOM view of the live document + electrical solve (the M1
 // replacement for the Guide rail). Polls the API; owns no state of its own.
 initInspector(api, { getMode: () => state.mode });
+// First-run onboarding coach — a 5-step build-your-first-circuit checklist that
+// advances by watching real API state; self-retires once done (persisted).
+initCoach(api);
 // Jarvis: natural-language build assistant (M2). Acts only through the API.
 // Free/anon users are quota-capped (protects the shared Gemini free key); pro
 // (profiles.tier) is uncapped. currentTier is updated on sign-in below.

@@ -58,6 +58,15 @@ export const COMPONENT_ELECTRICAL = {
       maxCurrent: num(c.params?.maxCurrent, 30),
     };
   },
+  // potentiometer (rheostat): a variable R between A and B set by its knob.
+  potentiometer(c) {
+    const r = Math.max(num(c.params?.resistance, 500), 1e-3);
+    return {
+      pins: ['A', 'B'],
+      elements: [{ kind: 'R', a: 'A', b: 'B', r }],
+      maxCurrent: num(c.params?.maxCurrent, 5),
+    };
+  },
   // LED: a piecewise-linear diode. Conducts anode(A)→cathode(K) as a forward-
   // voltage drop (Vf) plus series Ron when forward-biased; open otherwise. The
   // solver resolves the on/off state by iteration (MNA itself stays linear).

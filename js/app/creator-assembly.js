@@ -32,6 +32,8 @@ const CARD = {
     help: 'Click the switch body to open or close the circuit. Open = no current = the motor stops.' },
   led: { name: 'LED', swatch: '#ff5566', desc: 'Lights when current flows',
     help: 'Polar: current only flows anode (A, long leg) → cathode (K). Wire it the right way and it glows; backwards it stays dark. Needs a resistor in series or it burns out.' },
+  potentiometer: { name: 'Potentiometer', swatch: '#8fb3ff', desc: 'A knob you turn to vary resistance',
+    help: 'A variable resistor. Scroll on the knob (or edit R in the Inspector) to change its resistance live — turn it down and the motor speeds up / the LED brightens.' },
 };
 
 // A motor mesh whose two terminals are named A / B (to match the library),
@@ -150,7 +152,38 @@ function updateLedVisual(group, amps, maxCurrent) {
   });
 }
 
-const FACTORY = { battery: makeBattery, motor: makeMotorAB, resistor: makeResistorMesh, switch: makeSwitchMesh, led: makeLedMesh };
+// potentiometer: a body with a turnable knob (role 'pot-knob') + a pointer
+// notch, on two leads (A, B). The knob's angle reflects the resistance.
+function makePotMesh() {
+  const g = new THREE.Group();
+  g.userData = { type: 'potentiometer', pins: [] };
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(2.2, 0.9, 2.2),
+    new THREE.MeshStandardMaterial({ color: 0x2a3550, roughness: 0.7, metalness: 0.2 }));
+  body.position.y = 0.45; body.castShadow = true;
+  g.add(body);
+  const knob = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.8, 0.8, 0.8, 20),
+    new THREE.MeshStandardMaterial({ color: 0x8fb3ff, roughness: 0.4, metalness: 0.3 }));
+  knob.position.y = 1.2; knob.userData.role = 'pot-knob'; knob.castShadow = true;
+  const notch = new THREE.Mesh(
+    new THREE.BoxGeometry(0.16, 0.2, 0.7),
+    new THREE.MeshStandardMaterial({ color: 0x0a0f1a, roughness: 0.5 }));
+  notch.position.set(0, 0.5, 0.35);
+  knob.add(notch);
+  g.add(knob);
+  addLeadPin(g, 'A', -1.4, 0.45, 0);
+  addLeadPin(g, 'B', 1.4, 0.45, 0);
+  return g;
+}
+
+// rotate the knob to reflect the resistance fraction (0 = full CCW, 1 = full CW)
+function updatePotVisual(group, frac) {
+  const a = -Math.PI * 0.75 + Math.max(0, Math.min(1, frac)) * Math.PI * 1.5;
+  group.traverse((o) => { if (o.userData?.role === 'pot-knob') o.rotation.y = a; });
+}
+
+const FACTORY = { battery: makeBattery, motor: makeMotorAB, resistor: makeResistorMesh, switch: makeSwitchMesh, led: makeLedMesh, potentiometer: makePotMesh };
 
 const KIND_COLOR = { power: 0xff4d4d, ground: 0x2a2f3a, data: 0xffd166 };
 const TW_OPEN = 'crosshair';
@@ -188,8 +221,16 @@ export function initCreatorAssembly({ canvas, scene, camera, controls, api, hud 
   const GROUND_Y = 0;              // bench-top surface; parts rest with their base here
   const BOUND = 26;                // low walls keep parts on the bench
   let phys = null;                 // { RAPIER, world, bodies:Map(id→body) }
+  let physStarted = false;
 
-  initBenchPhysics();
+  // Lazily boot the physics world the first time a part exists — no reason to
+  // load Rapier at page open for a build that goes straight to RUN.
+  function maybeInitPhysics() {
+    if (physStarted || phys) return;
+    if (api.get_document().components.length === 0) return;
+    physStarted = true;
+    initBenchPhysics();
+  }
   async function initBenchPhysics() {
     let RAPIER;
     try { RAPIER = await loadRapier(); } catch { return; }   // stay static if Rapier fails
@@ -332,7 +373,7 @@ export function initCreatorAssembly({ canvas, scene, camera, controls, api, hud 
 
   // XZ footprint half-extent per component — the box collider size that gives
   // parts solidity (they collide/stack under Rapier gravity, below).
-  const FOOTPRINT = { battery: 3.4, motor: 5.0, resistor: 2.2, switch: 2.4, led: 1.8 };
+  const FOOTPRINT = { battery: 3.4, motor: 5.0, resistor: 2.2, switch: 2.4, led: 1.8, potentiometer: 1.6 };
   const footprint = (type) => FOOTPRINT[baseType(type)] || 2.6;
 
   // rotate a placed part about Y (R key / scroll while grabbing). Rotations are
@@ -375,6 +416,9 @@ export function initCreatorAssembly({ canvas, scene, camera, controls, api, hud 
       if (!phys?.bodies.has(c.id)) g.position.set(p[0], p[1], p[2]);
       if (baseType(c.type) === 'switch') updateSwitchVisual(g, c.params?.closed === true);
       if (baseType(c.type) === 'led') updateLedVisual(g, elec?.current?.[c.id], c.params?.maxCurrent);
+      if (baseType(c.type) === 'potentiometer') {
+        updatePotVisual(g, (c.params?.resistance || 0) / (c.params?.maxResistance || 1000));
+      }
     }
     // remove meshes for deleted components
     for (const [id, g] of meshes) {
@@ -385,7 +429,8 @@ export function initCreatorAssembly({ canvas, scene, camera, controls, api, hud 
       for (const key of [...endpoints.keys()]) if (key.startsWith(id + '.')) endpoints.delete(key);
       if (pending && pending.startsWith(id + '.')) pending = null;
     }
-    ensureBodies();   // keep the physics world in step with the doc
+    maybeInitPhysics();   // boot Rapier on first placement
+    ensureBodies();       // keep the physics world in step with the doc
     group.updateMatrixWorld(true);
     rebuildWires(doc.nets);
   }
@@ -556,10 +601,27 @@ export function initCreatorAssembly({ canvas, scene, camera, controls, api, hud 
     e.preventDefault();
   });
   canvas.addEventListener('wheel', (e) => {
-    if (state.mode !== 'assembly' || !moving) return;
-    rotateComp(moving.id, (e.deltaY > 0 ? 1 : -1) * Math.PI / 24);
-    moving.moved = true;
-    e.preventDefault();
+    if (state.mode !== 'assembly') return;
+    // scroll while dragging → rotate the part
+    if (moving) {
+      rotateComp(moving.id, (e.deltaY > 0 ? 1 : -1) * Math.PI / 24);
+      moving.moved = true;
+      e.preventDefault();
+      return;
+    }
+    // scroll over a potentiometer's knob → turn its resistance up/down
+    updatePointer(e);
+    raycaster.setFromCamera(pointer, camera);
+    const id = hoveredCompId || pickComponent();
+    const c = id && api.get_document().components.find(x => x.id === id);
+    if (c && baseType(c.type) === 'potentiometer') {
+      const maxR = c.params?.maxResistance || 1000;
+      const step = (e.deltaY > 0 ? 1 : -1) * maxR * 0.06;
+      const next = Math.max(1, Math.min(maxR, (c.params?.resistance || 0) + step));
+      api.set_param({ id, key: 'resistance', value: Math.round(next) });
+      audio.ui(); sync();
+      e.preventDefault();
+    }
   }, { passive: false });
 
   canvas.addEventListener('pointerdown', (e) => {

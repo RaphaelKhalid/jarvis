@@ -102,6 +102,28 @@ test('bench physics: parts dropped on one spot fall and stack under gravity', as
   expect(ys[2] - ys[0]).toBeGreaterThan(2.8); // the stack is genuinely stacked
 });
 
+test('the onboarding coach appears and advances as the circuit is built', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForFunction(() => !!window.__api, null, { timeout: 20_000 });
+  await page.evaluate(() => {
+    try { localStorage.removeItem('jarvis-coached'); localStorage.setItem('sbl-seen', '1'); } catch {}
+    window.location.reload();
+  });
+  await page.waitForFunction(() => !!window.__api, null, { timeout: 20_000 });
+  await page.evaluate(() => {
+    document.getElementById('overlay-start')?.click();
+    window.__api.loadDocument({ v: 2, robotId: 'self-balancer', name: 't', components: [], nets: [],
+      code: null, sim: { gravity: -9.81, seed: 42 }, meta: { revision: 0 } });
+  });
+  // it shows, with the first step as "current"
+  await expect(page.locator('#coach')).toBeVisible();
+  await expect(page.locator('#coach-steps li.current')).toContainText('battery');
+  // placing a battery ticks step 1 and advances to the motor step
+  await page.evaluate(() => window.__api.place_component({ type: 'battery', id: 'b1' }));
+  await expect(page.locator('#coach-steps li.done')).toContainText('battery', { timeout: 3000 });
+  await expect(page.locator('#coach-steps li.current')).toContainText('motor');
+});
+
 test('the inspector renders the live document + solved current in the DOM', async ({ page }) => {
   await openApp(page);
   await page.evaluate(() => {

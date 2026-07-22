@@ -190,6 +190,29 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
 .insp-amps { color: var(--accent-text); font-variant-numeric: tabular-nums; }
 .insp-dir { opacity: .8; margin-right: 2px; }
 .insp-omega { color: var(--green); font-variant-numeric: tabular-nums; }
+
+/* ── first-run onboarding coach ── */
+#coach { position: absolute; top: 54px; left: 50%; transform: translateX(-50%);
+  z-index: 40; width: min(340px, 86vw); padding: 12px 14px;
+  background: color-mix(in srgb, var(--panel, #12151c) 92%, transparent);
+  border: 1px solid var(--border, #2a2f3a); border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.45); backdrop-filter: blur(6px);
+  font-size: 13px; transition: opacity .3s; pointer-events: none; }
+#coach-dismiss { pointer-events: auto; }
+#coach.hidden { display: none; }
+#coach.coach-complete { opacity: 0; }
+.coach-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.coach-title { font-weight: 700; letter-spacing: .02em; color: var(--text, #e8eef5); }
+#coach-dismiss { background: none; border: none; color: var(--text-dim, #8a93a3);
+  cursor: pointer; font-size: 14px; line-height: 1; padding: 2px 4px; border-radius: 6px; }
+#coach-dismiss:hover { color: var(--text, #e8eef5); background: var(--panel-2, #1a1f2a); }
+#coach-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+#coach-steps li { display: flex; align-items: center; gap: 8px; color: var(--text-dim, #8a93a3);
+  padding: 3px 4px; border-radius: 6px; transition: color .2s, background .2s; }
+#coach-steps li.current { color: var(--text, #e8eef5); background: color-mix(in srgb, var(--accent, #d4af37) 14%, transparent); }
+#coach-steps li.done { color: var(--green, #2ecc71); }
+#coach-steps li.done .coach-label { text-decoration: line-through; opacity: .7; }
+.coach-check { width: 14px; text-align: center; font-variant-numeric: tabular-nums; }
 .insp-params { display: flex; flex-wrap: wrap; gap: 4px 10px; padding: 2px 0 6px 4px; }
 .insp-pfield { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-dim); }
 .insp-pfield input[type=number] { width: 52px; background: var(--panel-2, #1a1a1a); color: var(--text);

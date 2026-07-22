@@ -185,9 +185,8 @@ export function initCreatorAssembly({ canvas, scene, camera, controls, api, hud 
   // upright at their authored yaw; R sets yaw via the doc) — position is the
   // only thing physics owns. The doc transform stays the persisted "rest" pose;
   // physics drives the live mesh position each frame and wires follow.
-  const GROUND_Y = 0;              // bench top; a box collider ½-height 1 rests a part origin at y=1
+  const GROUND_Y = 0;              // bench-top surface; parts rest with their base here
   const BOUND = 26;                // low walls keep parts on the bench
-  const SPAWN_Y = 7;               // parts drop in from here
   let phys = null;                 // { RAPIER, world, bodies:Map(id→body) }
 
   initBenchPhysics();
@@ -207,22 +206,42 @@ export function initCreatorAssembly({ canvas, scene, camera, controls, api, hud 
     ensureBodies();   // parts placed before Rapier finished loading
   }
 
-  // spawn a dynamic body for a component (box footprint, rotations locked)
+  // spawn a dynamic body for a component. The collider is sized to the part's
+  // ACTUAL mesh bounds (not a fat fixed footprint) so parts rest flush on the
+  // bench and sit close together — realistic gravity, not oversized bubbles.
   function makeBody(c, dropIn) {
     const { RAPIER, world } = phys;
     const p = c.transform?.pos || [0, 1, 0];
-    // stagger the drop height by how many bodies already exist and add a little
-    // XZ jitter, so parts dropped on the same spot don't spawn perfectly
-    // coincident (which makes Rapier's overlap resolution launch them).
+
+    // measure the mesh in local space (temporarily neutralise its transform)
+    const g = meshes.get(c.id);
+    let hx, hy, hz, cx, cy, cz;
+    if (g) {
+      const savedPos = g.position.clone(), savedRot = g.rotation.clone();
+      g.position.set(0, 0, 0); g.rotation.set(0, 0, 0); g.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(g);
+      g.position.copy(savedPos); g.rotation.copy(savedRot); g.updateMatrixWorld(true);
+      const size = box.getSize(new THREE.Vector3());
+      const ctr = box.getCenter(new THREE.Vector3());
+      hx = Math.max(size.x / 2, 0.3); hy = Math.max(size.y / 2, 0.3); hz = Math.max(size.z / 2, 0.3);
+      cx = ctr.x; cy = ctr.y; cz = ctr.z;
+    } else {
+      const f = footprint(c.type); hx = hz = f; hy = 1; cx = cz = 0; cy = 1;
+    }
+
+    // rest height so the mesh's true base sits on the bench (y=0):
+    //   body.y + (cy - hy) = GROUND_Y  ⇒  restY = GROUND_Y + hy - cy
+    const restY = GROUND_Y + hy - cy;
+    // stagger drops + jitter XZ so coincident drops don't launch (overlap solve)
     const jit = () => (Math.random() - 0.5) * 0.8;
-    const y = dropIn ? SPAWN_Y + phys.bodies.size * 2.5 : Math.max(p[1], 1);
+    const y = dropIn ? restY + 5 + phys.bodies.size * (hy * 2 + 1) : Math.max(p[1], restY);
     const body = world.createRigidBody(
       RAPIER.RigidBodyDesc.dynamic().setTranslation(p[0] + jit(), y, p[2] + jit())
         .enabledRotations(false, false, false)      // stay upright; yaw is doc-driven
-        .setLinearDamping(0.4));
-    const f = footprint(c.type);
+        .setLinearDamping(0.35));
     world.createCollider(
-      RAPIER.ColliderDesc.cuboid(f, 1, f).setFriction(0.9).setRestitution(0).setDensity(1), body);
+      RAPIER.ColliderDesc.cuboid(hx, hy, hz).setTranslation(cx, cy, cz)
+        .setFriction(0.9).setRestitution(0).setDensity(1), body);
     phys.bodies.set(c.id, body);
     return body;
   }
@@ -668,19 +687,20 @@ export function initCreatorAssembly({ canvas, scene, camera, controls, api, hud 
 
     // ── real gravity + collisions: step Rapier, copy bodies → meshes ──
     if (phys) {
-      const steps = Math.min(4, Math.max(1, Math.round(dt / (1 / 60))));
-      for (let i = 0; i < steps; i++) phys.world.step();
+      // skip the whole world when nothing's moving (all bodies asleep, no drag)
+      // — keeps idle build mode cheap and out of the RUN sim's way.
       let anyAwake = !!moving;
-      for (const [id, body] of phys.bodies) {
-        const g = meshes.get(id);
-        if (!g) continue;
-        if (!body.isSleeping()) anyAwake = true;
-        const t = body.translation();
-        g.position.set(t.x, t.y, t.z);   // physics owns position; yaw stays from the doc
+      for (const [, body] of phys.bodies) if (!body.isSleeping()) { anyAwake = true; break; }
+      if (anyAwake) {
+        const steps = Math.min(4, Math.max(1, Math.round(dt / (1 / 60))));
+        for (let i = 0; i < steps; i++) phys.world.step();
+        for (const [id, body] of phys.bodies) {
+          const g = meshes.get(id);
+          if (g) { const t = body.translation(); g.position.set(t.x, t.y, t.z); }
+        }
+        group.updateMatrixWorld(true);
+        rebuildWires(doc.nets);           // wires follow the falling/sliding parts
       }
-      // only rebuild wires while something is actually moving (avoids per-frame
-      // tube churn once the bench has settled — sync() holds them otherwise).
-      if (anyAwake) { group.updateMatrixWorld(true); rebuildWires(doc.nets); }
     }
 
     // motors physically spin from their solved current — direction follows sign

@@ -51,7 +51,9 @@ try {
   showFatal();
   throw e;
 }
-const { scene, camera, controls, resize, composer, floorUniforms, assemblyDecor } = sceneBits;
+const { renderer, scene, camera, controls, resize, composer, floorUniforms, assemblyDecor } = sceneBits;
+// Feed the renderer to the perf HUD so it can show draw-call/triangle counts (no-op when the HUD is off).
+window.__perf?.setRenderer?.(renderer);
 
 const sim = createSimBody(activeRobot().simKey, scene);   // legacy balance body (unused in M1; kept for hud refs)
 const creatorSim = new CreatorSim(scene);                 // M1 doc-driven motor body

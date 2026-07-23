@@ -9,18 +9,24 @@ import { state } from './state.js';
 
 const SEEN_KEY = 'jarvis-coached';
 
-// Each step: a label + a predicate over { doc, elec, mode }. Steps are checked
-// in order; the first not-yet-done step is the "current" one.
+// Each step: a short label, an optional one-line hint, and a predicate over
+// { doc, elec, mode }. Steps are checked in order; the first not-yet-done step
+// is the "current" one and shows its hint.
 const STEPS = [
   { label: 'Drag a battery onto the bench',
-    done: ({ doc }) => doc.components.some(c => baseType(c.type) === 'battery') },
+    hint: 'Grab it from the parts tray on the left.',
+    done: ({ doc }) => hasType(doc, 'battery') },
   { label: 'Drag a motor onto the bench',
-    done: ({ doc }) => doc.components.some(c => baseType(c.type) === 'motor') },
-  { label: 'Wire the battery + to the motor',
+    hint: 'One more part from the tray — the motor is what spins.',
+    done: ({ doc }) => hasType(doc, 'motor') },
+  { label: 'Wire battery + to the motor',
+    hint: 'Click the battery + pin, then a motor pin to join them.',
     done: ({ doc }) => wired(doc, 'power+', 'motor') },
-  { label: 'Wire the battery − to close the loop',
-    done: ({ elec }) => Object.values(elec.current || {}).some(i => Math.abs(i) > 0.01) },
+  { label: 'Close the loop so current flows',
+    hint: 'Wire battery − back to the motor. The Inspector will show current.',
+    done: ({ elec }) => currentFlows(elec) },
   { label: 'Press RUN to watch it spin',
+    hint: 'Hit RUN (top right) to drop into the physics sim.',
     done: ({ mode }) => mode === 'sim' },
 ];
 
@@ -30,6 +36,10 @@ function wired(doc, role, targetType) {
   const motorEps = new Set(epsOfType(doc, targetType));
   return doc.nets.some(n => n.endpoints.some(e => batPins.has(e)) &&
     n.endpoints.some(e => motorEps.has(e)));
+}
+function hasType(doc, type) { return doc.components.some(c => baseType(c.type) === type); }
+function currentFlows(elec) {
+  return Object.values(elec.current || {}).some(i => Math.abs(i) > 0.01);
 }
 function pinsWithRole(doc, type, role) {
   // map by the known library roles: battery + is power+, − is power-
@@ -54,10 +64,35 @@ export function initCoach(api) {
   if (seen) return { stop() {} };
 
   list.innerHTML = STEPS.map((s, i) =>
-    `<li data-i="${i}"><span class="coach-check">○</span><span class="coach-label">${s.label}</span></li>`).join('');
+    `<li data-i="${i}">
+       <span class="coach-check">○</span>
+       <span class="coach-body">
+         <span class="coach-label">${s.label}</span>
+         <span class="coach-hint">${s.hint || ''}</span>
+       </span>
+     </li>`).join('');
+
+  // A friendly nudge that Jarvis can do the whole thing for you — the
+  // learning-curve flattener. Injected once, below the steps.
+  const nudge = document.createElement('div');
+  nudge.className = 'coach-nudge';
+  nudge.innerHTML = `New to this? <button type="button" class="coach-ask" ` +
+    `aria-label="Open Jarvis and ask it to build the circuit">Ask Jarvis to build it ✨</button>`;
+  host.appendChild(nudge);
+  nudge.querySelector('.coach-ask')?.addEventListener('click', () => {
+    // open Jarvis and pre-fill a starter prompt; it's just the DOM, no coupling.
+    const jv = document.getElementById('jarvis');
+    jv?.classList.remove('collapsed');
+    const inp = document.getElementById('jarvis-input');
+    if (inp) { inp.value = 'wire a battery to a motor and run it'; inp.focus(); }
+  });
+
   host.classList.remove('hidden');
 
+  let done = false;
   function dismiss() {
+    if (done) return;
+    done = true;
     host.classList.add('hidden');
     try { localStorage.setItem(SEEN_KEY, '1'); } catch { /* ignore */ }
     clearInterval(timer);
@@ -76,15 +111,25 @@ export function initCoach(api) {
       if (!safe(() => STEPS[i].done(ctx), false)) { current = i; break; }
     }
     [...list.children].forEach((li, i) => {
-      const done = i < current;
-      li.classList.toggle('done', done);
+      const isDone = i < current;
+      li.classList.toggle('done', isDone);
       li.classList.toggle('current', i === current);
-      li.querySelector('.coach-check').textContent = done ? '✓' : (i === current ? '▸' : '○');
+      li.querySelector('.coach-check').textContent = isDone ? '✓' : (i === current ? '▸' : '○');
     });
-    if (current >= STEPS.length) {   // all done — celebrate briefly, then retire
-      host.classList.add('coach-complete');
-      setTimeout(dismiss, 2200);
+    if (current >= STEPS.length && !host.classList.contains('coach-complete')) {
+      celebrate();
     }
+  }
+
+  function celebrate() {
+    host.classList.add('coach-complete');
+    nudge.remove();
+    const banner = document.createElement('div');
+    banner.className = 'coach-done';
+    banner.innerHTML = `🎉 <b>Nice — your first circuit is alive!</b>` +
+      `<span>That's the whole loop: place → wire → run. Build anything from here.</span>`;
+    host.appendChild(banner);
+    setTimeout(dismiss, 3600);
   }
 
   render();

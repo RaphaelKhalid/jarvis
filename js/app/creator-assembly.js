@@ -34,7 +34,37 @@ const CARD = {
     help: 'Polar: current only flows anode (A, long leg) → cathode (K). Wire it the right way and it glows; backwards it stays dark. Needs a resistor in series or it burns out.' },
   potentiometer: { name: 'Potentiometer', swatch: '#8fb3ff', desc: 'A knob you turn to vary resistance',
     help: 'A variable resistor. Scroll on the knob (or edit R in the Inspector) to change its resistance live — turn it down and the motor speeds up / the LED brightens.' },
+  push_button: { name: 'Push Button', swatch: '#7bd88f', desc: 'Momentary tactile switch',
+    help: 'A momentary switch — conducts only while pressed. Great for triggering an action on demand.' },
+  lamp: { name: 'Lamp', swatch: '#ffd27a', desc: 'Incandescent bulb',
+    help: 'A filament bulb. Non-polar: current either way heats the filament and it glows brighter the more current flows.' },
+  buzzer: { name: 'Buzzer', swatch: '#3a3f4a', desc: 'Piezo sounder',
+    help: 'Makes a tone when current flows through it. Wire it across a source to hear it buzz.' },
+  diode: { name: 'Diode', swatch: '#5a606c', desc: 'One-way current valve',
+    help: 'Polar: current only flows anode (A) → cathode (K, the banded end). Blocks reverse current — a rectifier.' },
+  photoresistor: { name: 'Photoresistor', swatch: '#c9b063', desc: 'Light-dependent resistor',
+    help: 'Its resistance drops as light hits its face. Non-polar — a light sensor for the circuit.' },
+  thermistor: { name: 'Thermistor', swatch: '#c86b4a', desc: 'Temperature-sensitive resistor',
+    help: 'Its resistance changes with temperature. Non-polar — a heat sensor for the circuit.' },
+  fuse: { name: 'Fuse', swatch: '#c9c9d0', desc: 'Overcurrent protection',
+    help: 'A thin link that carries current until it exceeds the rated limit — protects the rest of the circuit.' },
+  capacitor: { name: 'Capacitor', swatch: '#2a8f8f', desc: 'Stores charge',
+    help: 'Stores and releases charge. Smooths and buffers a circuit; blocks steady DC once charged.' },
+  servo: { name: 'Servo', swatch: '#4d7bd8', desc: 'Positional motor',
+    help: 'A geared motor that holds a commanded angle. Three wires: power, ground, and a signal line.' },
+  relay: { name: 'Relay', swatch: '#3d5a8f', desc: 'Electrically-switched contact',
+    help: 'An electrically-operated switch: energising its coil throws a separate, higher-power contact.' },
 };
+
+// tray category per type — powers the filter chips as the catalog grows.
+const CATEGORY = {
+  battery: 'Power',
+  motor: 'Output', led: 'Output', lamp: 'Output', buzzer: 'Output', servo: 'Output',
+  resistor: 'Passive', capacitor: 'Passive', diode: 'Passive', fuse: 'Passive',
+  switch: 'Control', push_button: 'Control', potentiometer: 'Control', relay: 'Control',
+  photoresistor: 'Sensor', thermistor: 'Sensor',
+};
+const CATEGORY_ORDER = ['Power', 'Output', 'Passive', 'Control', 'Sensor'];
 
 // A motor mesh whose two terminals are named A / B (to match the library),
 // reusing the self-balancer's nicely-detailed motor geometry.
@@ -183,7 +213,211 @@ function updatePotVisual(group, frac) {
   group.traverse((o) => { if (o.userData?.role === 'pot-knob') o.rotation.y = a; });
 }
 
-const FACTORY = { battery: makeBattery, motor: makeMotorAB, resistor: makeResistorMesh, switch: makeSwitchMesh, led: makeLedMesh, potentiometer: makePotMesh };
+// ── new catalog geometry (data-driven pins) ───────────────────────
+// Shared instrument-look materials so the growing catalog reads as one family.
+const MAT = {
+  darkCase: () => new THREE.MeshStandardMaterial({ color: 0x2a2f3a, roughness: 0.62, metalness: 0.25 }),
+  metal: () => new THREE.MeshStandardMaterial({ color: 0xc6ccd6, roughness: 0.32, metalness: 0.85 }),
+  glass: (c = 0xbfe4ff) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.08, metalness: 0, transparent: true, opacity: 0.35 }),
+};
+
+// Attach lead pins whose names/count come straight from the library, so wiring
+// works no matter what the library agent named them. Pins spread along X (or Z),
+// centred, sitting at the given base height.
+function attachLibraryPins(g, type, { y = 0, z = 0, spread = null, along = 'x' } = {}) {
+  const pins = pinsFor(type);
+  const n = pins.length || 2;
+  const width = spread ?? Math.max(1.4, (n - 1) * 1.1 + 1.0);
+  pins.forEach((p, i) => {
+    const t = n === 1 ? 0 : (i / (n - 1) - 0.5);   // -0.5 … 0.5
+    const px = along === 'x' ? t * width : 0;
+    const pz = along === 'z' ? t * width : z;
+    addLeadPin(g, p.name, px, y, pz);
+  });
+}
+
+// push-button: square housing with a round tactile cap on top (role 'btn-cap').
+function makeButtonMesh() {
+  const g = new THREE.Group();
+  g.userData = { type: 'push_button', pins: [] };
+  const base = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.7, 2.0), MAT.darkCase());
+  base.position.y = 0.35; base.castShadow = true; g.add(base);
+  const cap = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.62, 0.7, 0.55, 20),
+    new THREE.MeshStandardMaterial({ color: 0x7bd88f, roughness: 0.45, metalness: 0.15 }));
+  cap.position.y = 0.95; cap.userData.role = 'btn-cap'; cap.castShadow = true; g.add(cap);
+  attachLibraryPins(g, 'push_button', { y: 0.7, spread: 3.0 });
+  return g;
+}
+// reflect closed(pressed) state: cap sinks + tints green.
+function updateButtonVisual(group, closed) {
+  group.traverse((o) => {
+    if (o.userData?.role !== 'btn-cap') return;
+    o.position.y = closed ? 0.82 : 0.95;
+    o.material.color.setHex(closed ? 0x2ecc71 : 0x7bd88f);
+  });
+}
+
+// lamp: a glass bulb on a brass screw base with a filament that glows w/ current.
+function makeLampMesh() {
+  const g = new THREE.Group();
+  g.userData = { type: 'lamp', pins: [] };
+  const baseM = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.62, 0.62, 0.9, 16),
+    new THREE.MeshStandardMaterial({ color: 0xb8860b, roughness: 0.4, metalness: 0.7 }));
+  baseM.position.y = 0.9; g.add(baseM);
+  const glass = new THREE.Mesh(new THREE.SphereGeometry(1.0, 22, 18),
+    new THREE.MeshStandardMaterial({ color: 0xfff4d0, roughness: 0.12, metalness: 0, transparent: true, opacity: 0.4 }));
+  glass.position.y = 2.2; glass.castShadow = true; g.add(glass);
+  const fil = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.06, 8, 16),
+    new THREE.MeshStandardMaterial({ color: 0xffcf6b, emissive: 0xffaa22, emissiveIntensity: 0 }));
+  fil.position.y = 2.1; fil.userData.role = 'lamp-fil'; g.add(fil);
+  attachLibraryPins(g, 'lamp', { y: 0.35, spread: 1.6 });
+  return g;
+}
+function updateLampVisual(group, amps, maxCurrent) {
+  const frac = Math.max(0, Math.min(1, Math.abs(amps || 0) / Math.max(maxCurrent || 0.5, 1e-6)));
+  group.traverse((o) => {
+    if (o.userData?.role === 'lamp-fil') o.material.emissiveIntensity = frac * 3.0;
+  });
+}
+
+// buzzer: a black cylindrical can with a top sound port.
+function makeBuzzerMesh() {
+  const g = new THREE.Group();
+  g.userData = { type: 'buzzer', pins: [] };
+  const can = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 1.5, 24), MAT.darkCase());
+  can.position.y = 0.75; can.castShadow = true; g.add(can);
+  const port = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.1, 16),
+    new THREE.MeshStandardMaterial({ color: 0x0a0d12, roughness: 0.8 }));
+  port.position.y = 1.51; g.add(port);
+  attachLibraryPins(g, 'buzzer', { y: 0.0, spread: 1.2 });
+  return g;
+}
+
+// diode: glass cylinder body with a cathode band + two axial leads.
+function makeDiodeMesh() {
+  const g = new THREE.Group();
+  g.userData = { type: 'diode', pins: [] };
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 2.0, 16),
+    new THREE.MeshStandardMaterial({ color: 0x2b2b30, roughness: 0.35, metalness: 0.4 }));
+  body.rotation.z = Math.PI / 2; body.position.y = 1.0; body.castShadow = true; g.add(body);
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(0.53, 0.53, 0.28, 16),
+    new THREE.MeshStandardMaterial({ color: 0xd8dde5, roughness: 0.5 }));
+  band.rotation.z = Math.PI / 2; band.position.set(0.6, 1.0, 0); g.add(band);   // toward cathode (K)
+  attachLibraryPins(g, 'diode', { y: 1.0, spread: 3.2 });
+  return g;
+}
+
+// photoresistor: round ceramic face with a serpentine sensor track.
+function makePhotoresistorMesh() {
+  const g = new THREE.Group();
+  g.userData = { type: 'photoresistor', pins: [] };
+  const face = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, 0.4, 24),
+    new THREE.MeshStandardMaterial({ color: 0xc9b063, roughness: 0.5, metalness: 0.2 }));
+  face.position.y = 0.9; face.rotation.x = Math.PI / 2; face.castShadow = true; g.add(face);
+  for (let i = 0; i < 4; i++) {
+    const trk = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.06, 0.14),
+      new THREE.MeshStandardMaterial({ color: 0x5a4a1a, roughness: 0.6 }));
+    trk.position.set(0, 1.12, -0.5 + i * 0.33); g.add(trk);
+  }
+  attachLibraryPins(g, 'photoresistor', { y: 0.0, spread: 1.4 });
+  return g;
+}
+
+// thermistor: a small epoxy bead on two leads.
+function makeThermistorMesh() {
+  const g = new THREE.Group();
+  g.userData = { type: 'thermistor', pins: [] };
+  const bead = new THREE.Mesh(new THREE.SphereGeometry(0.7, 18, 14),
+    new THREE.MeshStandardMaterial({ color: 0xc86b4a, roughness: 0.5, metalness: 0.1 }));
+  bead.position.y = 1.4; bead.scale.set(1, 1.15, 0.7); bead.castShadow = true; g.add(bead);
+  attachLibraryPins(g, 'thermistor', { y: 0.0, spread: 1.2 });
+  return g;
+}
+
+// fuse: a clear glass tube with metal end caps + a filament wire.
+function makeFuseMesh() {
+  const g = new THREE.Group();
+  g.userData = { type: 'fuse', pins: [] };
+  const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 2.2, 18), MAT.glass(0xcfe6ff));
+  tube.rotation.z = Math.PI / 2; tube.position.y = 1.0; g.add(tube);
+  for (const x of [-1.0, 1.0]) {
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.58, 0.58, 0.5, 18), MAT.metal());
+    cap.rotation.z = Math.PI / 2; cap.position.set(x, 1.0, 0); cap.castShadow = true; g.add(cap);
+  }
+  const fil = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.05, 0.05),
+    new THREE.MeshStandardMaterial({ color: 0x9a9aa2, roughness: 0.4, metalness: 0.7 }));
+  fil.position.y = 1.0; g.add(fil);
+  attachLibraryPins(g, 'fuse', { y: 1.0, spread: 3.0 });
+  return g;
+}
+
+// capacitor: an electrolytic can with a vented top + a polarity stripe.
+function makeCapacitorMesh() {
+  const g = new THREE.Group();
+  g.userData = { type: 'capacitor', pins: [] };
+  const can = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 2.6, 24),
+    new THREE.MeshStandardMaterial({ color: 0x2a8f8f, roughness: 0.4, metalness: 0.35 }));
+  can.position.y = 1.55; can.castShadow = true; g.add(can);
+  const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.24, 2.2, 0.02),
+    new THREE.MeshStandardMaterial({ color: 0xe8eef5, roughness: 0.6 }));
+  stripe.position.set(0, 1.55, 0.9); g.add(stripe);
+  // vent cross on the top
+  const vent = new THREE.Mesh(new THREE.CylinderGeometry(0.82, 0.82, 0.06, 24),
+    new THREE.MeshStandardMaterial({ color: 0x1c1f26, roughness: 0.7 }));
+  vent.position.y = 2.86; g.add(vent);
+  attachLibraryPins(g, 'capacitor', { y: 0.0, spread: 1.2 });
+  return g;
+}
+
+// servo: the classic blue box with a white output horn (role 'servo-horn').
+function makeServoMesh() {
+  const g = new THREE.Group();
+  g.userData = { type: 'servo', pins: [] };
+  const body = new THREE.Mesh(new THREE.BoxGeometry(3.6, 2.6, 1.8),
+    new THREE.MeshStandardMaterial({ color: 0x2f5fc0, roughness: 0.5, metalness: 0.2 }));
+  body.position.y = 1.3; body.castShadow = true; g.add(body);
+  const boss = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.7, 18),
+    new THREE.MeshStandardMaterial({ color: 0x1c1f26, roughness: 0.6 }));
+  boss.position.set(1.0, 2.85, 0); g.add(boss);
+  const horn = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.18, 0.34),
+    new THREE.MeshStandardMaterial({ color: 0xe8eef5, roughness: 0.5 }));
+  horn.position.set(1.0, 3.25, 0); horn.userData.role = 'servo-horn'; g.add(horn);
+  // mounting tabs
+  for (const x of [-2.2, 2.2]) {
+    const tab = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.3, 1.8),
+      new THREE.MeshStandardMaterial({ color: 0x2f5fc0, roughness: 0.5 }));
+    tab.position.set(x, 1.9, 0); g.add(tab);
+  }
+  attachLibraryPins(g, 'servo', { y: 0.9, z: -0.9, spread: 2.4 });
+  return g;
+}
+
+// relay: a translucent blue cube case over a visible coil + contact.
+function makeRelayMesh() {
+  const g = new THREE.Group();
+  g.userData = { type: 'relay', pins: [] };
+  const shell = new THREE.Mesh(new THREE.BoxGeometry(3.0, 2.8, 2.4),
+    new THREE.MeshStandardMaterial({ color: 0x3a6bd0, roughness: 0.3, metalness: 0.1, transparent: true, opacity: 0.55 }));
+  shell.position.y = 1.4; shell.castShadow = true; g.add(shell);
+  const coil = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 1.6, 16),
+    new THREE.MeshStandardMaterial({ color: 0xb8860b, roughness: 0.5, metalness: 0.6 }));
+  coil.position.set(-0.7, 1.2, 0); g.add(coil);
+  const arm = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.4, 0.5),
+    new THREE.MeshStandardMaterial({ color: 0xc6ccd6, roughness: 0.35, metalness: 0.8 }));
+  arm.position.set(0.7, 1.3, 0); g.add(arm);
+  attachLibraryPins(g, 'relay', { y: 0.0, spread: null });
+  return g;
+}
+
+const FACTORY = {
+  battery: makeBattery, motor: makeMotorAB, resistor: makeResistorMesh,
+  switch: makeSwitchMesh, led: makeLedMesh, potentiometer: makePotMesh,
+  push_button: makeButtonMesh, lamp: makeLampMesh, buzzer: makeBuzzerMesh,
+  diode: makeDiodeMesh, photoresistor: makePhotoresistorMesh, thermistor: makeThermistorMesh,
+  fuse: makeFuseMesh, capacitor: makeCapacitorMesh, servo: makeServoMesh, relay: makeRelayMesh,
+};
 
 const KIND_COLOR = { power: 0xff4d4d, ground: 0x2a2f3a, data: 0xffd166 };
 const TW_OPEN = 'crosshair';
@@ -301,27 +535,91 @@ export function initCreatorAssembly({ canvas, scene, camera, controls, api, hud 
 
   // ── parts tray ────────────────────────────────────────────────
   const tray = document.getElementById('parts-tray');
-  tray.innerHTML = '';
-  for (const type of Object.keys(LIBRARY)) {
-    const meta = CARD[type] || { name: type, swatch: '#888', desc: '', help: '' };
-    const card = document.createElement('div');
-    card.className = 'part-card';
-    card.dataset.type = type;
-    card.innerHTML = `
-      <div class="part-name"><span class="part-swatch" style="background:${meta.swatch}"></span>${meta.name}</div>
-      <div class="part-desc">${meta.desc}</div>
-      <span class="help-icon" title="">?</span>`;
-    tray.appendChild(card);
-    const help = card.querySelector('.help-icon');
-    help.addEventListener('mouseenter', (e) => hud.showTooltip(e, meta.help));
-    help.addEventListener('mouseleave', hud.hideTooltip);
-    help.addEventListener('mousemove', hud.moveTooltip);
-    card.addEventListener('pointerdown', (e) => {
-      if (e.target.classList.contains('help-icon')) return;
-      if (state.mode !== 'assembly') return;
-      startDrag(type, e);
+
+  // Search + category filters above the tray so parts stay findable as the
+  // catalog grows. Filter state is live; renderTray() re-filters the cards.
+  let searchText = '';
+  let activeCat = 'All';
+
+  const trayControls = document.createElement('div');
+  trayControls.className = 'tray-controls';
+  const search = document.createElement('input');
+  search.type = 'search';
+  search.className = 'tray-search';
+  search.placeholder = 'Search parts…';
+  search.setAttribute('aria-label', 'Search parts');
+  trayControls.appendChild(search);
+
+  const chipRow = document.createElement('div');
+  chipRow.className = 'tray-filters';
+  chipRow.setAttribute('role', 'group');
+  chipRow.setAttribute('aria-label', 'Filter parts by category');
+  for (const cat of ['All', ...CATEGORY_ORDER]) {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'tray-chip' + (cat === 'All' ? ' is-active' : '');
+    chip.dataset.cat = cat;
+    chip.textContent = cat;
+    chip.setAttribute('aria-pressed', cat === 'All' ? 'true' : 'false');
+    chip.addEventListener('click', () => {
+      activeCat = cat;
+      for (const c of chipRow.children) {
+        const on = c === chip;
+        c.classList.toggle('is-active', on);
+        c.setAttribute('aria-pressed', on ? 'true' : 'false');
+      }
+      renderTray();
     });
+    chipRow.appendChild(chip);
   }
+  trayControls.appendChild(chipRow);
+  tray.parentNode.insertBefore(trayControls, tray);
+
+  const emptyMsg = document.createElement('div');
+  emptyMsg.className = 'tray-empty';
+  emptyMsg.textContent = 'No parts match your search.';
+  emptyMsg.hidden = true;
+  tray.parentNode.insertBefore(emptyMsg, tray.nextSibling);
+
+  search.addEventListener('input', () => { searchText = search.value.trim().toLowerCase(); renderTray(); });
+
+  function matches(type, meta, cat) {
+    if (activeCat !== 'All' && cat !== activeCat) return false;
+    if (!searchText) return true;
+    const hay = `${meta.name} ${type} ${meta.desc} ${cat}`.toLowerCase();
+    return hay.includes(searchText);
+  }
+
+  function renderTray() {
+    tray.innerHTML = '';
+    let shown = 0;
+    for (const type of Object.keys(LIBRARY)) {
+      const meta = CARD[type] || { name: type, swatch: '#888', desc: '', help: '' };
+      const cat = CATEGORY[type] || 'Other';
+      if (!matches(type, meta, cat)) continue;
+      shown++;
+      const card = document.createElement('div');
+      card.className = 'part-card';
+      card.dataset.type = type;
+      card.dataset.category = cat;
+      card.innerHTML = `
+        <div class="part-name"><span class="part-swatch" style="background:${meta.swatch}"></span>${meta.name}</div>
+        <div class="part-desc">${meta.desc}</div>
+        <span class="help-icon" title="">?</span>`;
+      tray.appendChild(card);
+      const help = card.querySelector('.help-icon');
+      help.addEventListener('mouseenter', (e) => hud.showTooltip(e, meta.help));
+      help.addEventListener('mouseleave', hud.hideTooltip);
+      help.addEventListener('mousemove', hud.moveTooltip);
+      card.addEventListener('pointerdown', (e) => {
+        if (e.target.classList.contains('help-icon')) return;
+        if (state.mode !== 'assembly') return;
+        startDrag(type, e);
+      });
+    }
+    emptyMsg.hidden = shown > 0;
+  }
+  renderTray();
 
   // ── drag a card onto the workspace → api.place_component ───────
   let drag = null;
@@ -373,7 +671,11 @@ export function initCreatorAssembly({ canvas, scene, camera, controls, api, hud 
 
   // XZ footprint half-extent per component — the box collider size that gives
   // parts solidity (they collide/stack under Rapier gravity, below).
-  const FOOTPRINT = { battery: 3.4, motor: 5.0, resistor: 2.2, switch: 2.4, led: 1.8, potentiometer: 1.6 };
+  const FOOTPRINT = {
+    battery: 3.4, motor: 5.0, resistor: 2.2, switch: 2.4, led: 1.8, potentiometer: 1.6,
+    push_button: 1.6, lamp: 1.4, buzzer: 1.3, diode: 1.9, photoresistor: 1.4,
+    thermistor: 1.2, fuse: 1.9, capacitor: 1.2, servo: 2.4, relay: 1.8,
+  };
   const footprint = (type) => FOOTPRINT[baseType(type)] || 2.6;
 
   // rotate a placed part about Y (R key / scroll while grabbing). Rotations are
@@ -415,6 +717,8 @@ export function initCreatorAssembly({ canvas, scene, camera, controls, api, hud 
       g.rotation.set(r[0], r[1], r[2]);
       if (!phys?.bodies.has(c.id)) g.position.set(p[0], p[1], p[2]);
       if (baseType(c.type) === 'switch') updateSwitchVisual(g, c.params?.closed === true);
+      if (baseType(c.type) === 'push_button') updateButtonVisual(g, c.params?.closed === true);
+      if (baseType(c.type) === 'lamp') updateLampVisual(g, elec?.current?.[c.id], c.params?.maxCurrent);
       if (baseType(c.type) === 'led') updateLedVisual(g, elec?.current?.[c.id], c.params?.maxCurrent);
       if (baseType(c.type) === 'potentiometer') {
         updatePotVisual(g, (c.params?.resistance || 0) / (c.params?.maxResistance || 1000));
@@ -514,7 +818,7 @@ export function initCreatorAssembly({ canvas, scene, camera, controls, api, hud 
   // nearest switch component under the pointer (for click-to-toggle).
   function pickSwitch() {
     const swIds = new Set(api.get_document().components
-      .filter(c => baseType(c.type) === 'switch').map(c => c.id));
+      .filter(c => baseType(c.type) === 'switch' || baseType(c.type) === 'push_button').map(c => c.id));
     const id = pickComponent();
     return swIds.has(id) ? id : null;
   }

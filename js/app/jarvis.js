@@ -19,6 +19,15 @@ const MAX_STEPS = 8;          // model turns per user message (tool loops)
 const FREE_DAILY = 25;        // free/anon messages per day per browser
 const USAGE_KEY = 'gyro-jarvis-usage';
 
+// A few one-tap starter prompts that show, by example, that Jarvis can build the
+// whole thing for you — the fastest path past a blank bench.
+const EXAMPLE_PROMPTS = [
+  'Build a blinking LED',
+  'Wire a motor to a battery',
+  'Add a switch to turn the motor on and off',
+  'Wire it up and run it',
+];
+
 export function initJarvis({ api, onFlash, getTier, onUpgrade } = {}) {
   const form = document.getElementById('jarvis-form');
   const input = document.getElementById('jarvis-input');
@@ -44,6 +53,36 @@ export function initJarvis({ api, onFlash, getTier, onUpgrade } = {}) {
     log.appendChild(el);
     log.scrollTop = log.scrollHeight;
   }
+
+  // Animated "thinking…" placeholder shown while a model turn is in flight.
+  // Returned handle is removed as soon as the turn resolves.
+  function showThinking() {
+    const el = document.createElement('div');
+    el.className = 'jv-thinking';
+    el.setAttribute('aria-label', 'Jarvis is thinking');
+    el.innerHTML = '<span class="jv-dot"></span><span class="jv-dot"></span><span class="jv-dot"></span>';
+    log.appendChild(el);
+    log.scrollTop = log.scrollHeight;
+    return { remove() { el.remove(); } };
+  }
+
+  // Example-prompt chips: one tap fills the input and sends. Rendered once,
+  // hidden after the first user message so they don't clutter the transcript.
+  function renderChips() {
+    const wrap = document.createElement('div');
+    wrap.className = 'jv-chips';
+    for (const p of EXAMPLE_PROMPTS) {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'jv-chip';
+      chip.textContent = p;
+      chip.addEventListener('click', () => { send(p); });
+      wrap.appendChild(chip);
+    }
+    log.appendChild(wrap);
+    return wrap;
+  }
+  const chips = renderChips();
 
   // ── free-tier quota ───────────────────────────────────────────
   function today() { return new Date().toISOString().slice(0, 10); }
@@ -72,7 +111,15 @@ export function initJarvis({ api, onFlash, getTier, onUpgrade } = {}) {
     });
     if (!res.ok) {
       const e = await res.json().catch(() => ({}));
-      if (res.status === 429) throw new Error('Jarvis is rate-limited right now — try again in a moment.');
+      // 503 = the Edge proxy has no GEMINI_API_KEY configured (e.g. local dev
+      // or a fork). Jarvis is optional — the whole app works without it — so say
+      // so plainly rather than looking broken.
+      if (res.status === 503) {
+        const err = new Error('Jarvis is offline here — no API key is set. You can still build by hand: drag parts in and click pin-to-pin to wire.');
+        err.soft = true;
+        throw err;
+      }
+      if (res.status === 429) throw new Error('Jarvis is busy right now — give it a few seconds and try again.');
       throw new Error(e.error || `Jarvis request failed (${res.status})`);
     }
     return res.json();   // { content:{role,parts}, finishReason }
@@ -81,19 +128,22 @@ export function initJarvis({ api, onFlash, getTier, onUpgrade } = {}) {
   async function send(text) {
     if (busy || !text.trim()) return;
     if (overQuota()) {
-      bubble('err', `Daily free limit reached (${FREE_DAILY} messages). Sign in / upgrade for more.`);
+      bubble('err', `Daily free limit reached — you've used your ${FREE_DAILY} free Jarvis messages for today. Sign in or upgrade for more, or keep building by hand, it's all yours.`);
       onUpgrade?.();
       return;
     }
     busy = true;
     input.disabled = true;
+    chips?.remove();   // starter chips have served their purpose
     bubble('user', text);
     contents.push({ role: 'user', parts: [{ text }] });
     bumpUsage();   // one user message = one unit, regardless of tool round-trips
 
     try {
       for (let step = 0; step < MAX_STEPS; step++) {
-        const reply = await turn();
+        const thinking = showThinking();
+        let reply;
+        try { reply = await turn(); } finally { thinking.remove(); }
         const parts = (reply.content && reply.content.parts) || [];
         contents.push(reply.content || { role: 'model', parts: [] });
 
@@ -114,8 +164,11 @@ export function initJarvis({ api, onFlash, getTier, onUpgrade } = {}) {
         contents.push({ role: 'user', parts: responseParts });
       }
     } catch (e) {
-      bubble('err', e.message || 'Jarvis failed');
-      onFlash?.(e.message || 'Jarvis failed', 'bad');
+      const msg = e.message || 'Jarvis failed';
+      bubble('err', msg);
+      // Soft failures (Jarvis just isn't available) shouldn't fire an alarming
+      // red status flash — the app is fine, only the assistant is off.
+      if (!e.soft) onFlash?.(msg, 'bad');
     } finally {
       busy = false;
       input.disabled = false;

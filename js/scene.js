@@ -1,4 +1,13 @@
-// Three.js scene setup: renderer, camera, lights, chassis plate, slots.
+// Three.js scene setup: renderer, camera, lights, mounting deck, slots.
+//
+// ART DIRECTION — "Precision Instrument Studio":
+// A cool, neutral, product-photography look inspired by modern CAD viewports and
+// scientific-instrument industrial design. A seamless graduated backdrop (no hard
+// horizon), a designed technical floor with a fine energy grid + a soft pool of
+// light under the bench, calibrated three-point studio lighting (cool key, cooler
+// fill, blue rim), ACES tone mapping, and a restrained bloom so emissive accents
+// (cyan status glow, part LEDs) read as tastefully lit — never blown out. The
+// intent: screenshots that look like a shipped instrument, not a WebGL demo.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
@@ -14,42 +23,85 @@ import { isLowQuality } from './app/quality.js';
 // it. Shared with js/app/assembly.js so parts and deck lift together.
 export const ASSEMBLY_LIFT = 2.1;
 
+// Signature palette — cool neutral instrument studio with a cyan accent.
+const COL = {
+  bgTop:   0x0a0e15,   // deep cool charcoal (backdrop zenith)
+  bgHoriz: 0x161d29,   // slightly lifted horizon band
+  bgFloor: 0x070a10,   // near-black under the bench
+  accent:  0x39d7ff,   // cyan technical accent (grid, trim glow)
+  keyCol:  0xf2f6ff,   // neutral-cool key light
+  fillCol: 0xaec6ff,   // cool sky-blue fill
+  rimCol:  0x5b8cff,   // blue rim/separation light
+};
+
 export function createScene(canvas) {
   const lowQ = isLowQuality();
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: !lowQ });
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: !lowQ, powerPreference: 'high-performance' });
   // pixel ratio is the biggest GPU lever and also drives the bloom pass's
   // internal resolution — cap it lower on weak devices.
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, lowQ ? 1 : 2));
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  // soft PCF on capable devices; plain (cheaper) shadows on low tier.
+  renderer.shadowMap.type = lowQ ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
+  // ACES filmic gives the calibrated, slightly desaturated highlight roll-off that
+  // reads as "product render". Exposure tuned so metals stay crisp under bloom.
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 0.95;
+  renderer.toneMappingExposure = 1.02;
 
   const scene = new THREE.Scene();
-  // cozy wood-workshop backdrop — warm, dim, natural
-  scene.background = new THREE.Color(0x140d07);
-  scene.fog = new THREE.Fog(0x140d07, 70, 260);
+  scene.background = new THREE.Color(COL.bgHoriz);
+  // cool volumetric depth so distant scenery fades into the backdrop seamlessly.
+  scene.fog = new THREE.Fog(COL.bgHoriz, 90, 320);
 
-  // Warm, dim environment for reflections: a dark room lit by a single warm
-  // ceiling lamp — metals pick up a soft amber sheen instead of a blown-out
-  // studio highlight. Built procedurally so we fully control its brightness.
+  // ── environment reflections: a soft cool studio gradient ──────────────────
+  // A procedural gradient dome (dark cool zenith → lifted horizon → deep floor)
+  // gives metals a graduated, believable sheen instead of a flat grey or a
+  // blown-out studio softbox. Built in-scene so we own every value; PMREM turns
+  // it into a filtered environment map for MeshStandardMaterial reflections.
+  const gradShader = {
+    uniforms: {
+      top:    { value: new THREE.Color(COL.bgTop) },
+      horiz:  { value: new THREE.Color(COL.bgHoriz) },
+      bottom: { value: new THREE.Color(COL.bgFloor) },
+      accent: { value: new THREE.Color(COL.accent) },
+    },
+    vertexShader: `
+      varying vec3 vDir;
+      void main() {
+        vDir = normalize(position);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }`,
+    fragmentShader: `
+      varying vec3 vDir;
+      uniform vec3 top; uniform vec3 horiz; uniform vec3 bottom; uniform vec3 accent;
+      void main() {
+        float h = vDir.y;                        // -1 (down) .. 1 (up)
+        vec3 col = h > 0.0
+          ? mix(horiz, top, pow(clamp(h, 0.0, 1.0), 0.8))
+          : mix(horiz, bottom, pow(clamp(-h, 0.0, 1.0), 0.5));
+        // a faint cool key-glow band just above the horizon for depth
+        col += accent * 0.06 * smoothstep(0.35, 0.0, abs(h - 0.12));
+        gl_FragColor = vec4(col, 1.0);
+      }`,
+  };
+
   const envScene = new THREE.Scene();
-  envScene.background = new THREE.Color(0x0d0805);
-  const envRoom = new THREE.Mesh(
-    new THREE.BoxGeometry(40, 26, 40),
-    new THREE.MeshBasicMaterial({ color: 0x241609, side: THREE.BackSide }));
-  envScene.add(envRoom);
-  const envLamp = new THREE.Mesh(
-    new THREE.PlaneGeometry(9, 9),
-    new THREE.MeshBasicMaterial({ color: 0xffca7a }));
-  envLamp.position.set(0, 12.8, 0);
-  envLamp.rotation.x = Math.PI / 2;
-  envScene.add(envLamp);
+  const envDome = new THREE.Mesh(
+    new THREE.SphereGeometry(50, 32, 24),
+    new THREE.ShaderMaterial({ ...cloneShader(gradShader), side: THREE.BackSide, depthWrite: false }));
+  envScene.add(envDome);
+  // a soft overhead softbox so metals get one clean, gentle highlight
+  const envBox = new THREE.Mesh(
+    new THREE.PlaneGeometry(30, 30),
+    new THREE.MeshBasicMaterial({ color: 0xdfe8ff }));
+  envBox.position.set(0, 24, 0);
+  envBox.rotation.x = Math.PI / 2;
+  envScene.add(envBox);
   const pmrem = new THREE.PMREMGenerator(renderer);
-  scene.environment = pmrem.fromScene(envScene, 0.5).texture;
+  scene.environment = pmrem.fromScene(envScene, 0.04).texture;
 
-  const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
-  camera.position.set(18, 20, 26);
+  const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 2000);
+  camera.position.set(18, 19, 27);
 
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
@@ -57,108 +109,183 @@ export function createScene(canvas) {
   controls.target.set(0, 2, 1);
   controls.maxPolarAngle = Math.PI * 0.49;
   controls.minDistance = 8;
-  controls.maxDistance = 140;
+  controls.maxDistance = 160;
 
-  // ── lights: warm workshop lamp key + dim amber fill ──
-  // hemisphere: warm light from above, wood-brown bounce from the bench below
-  scene.add(new THREE.HemisphereLight(0xffdca8, 0x1a0f06, 0.45));
-  scene.add(new THREE.AmbientLight(0xffe4c0, 0.12));
-  // key = a hanging workshop lamp: warm orange, angled like an overhead bulb
-  const key = new THREE.DirectionalLight(0xffb060, 2.4);
-  key.position.set(24, 60, 30);
+  // ── calibrated three-point studio lighting (cool, product-photo) ──────────
+  // hemisphere: cool sky above, dark cool bounce below — sets the neutral base
+  scene.add(new THREE.HemisphereLight(0xcfe0ff, 0x0a0e15, 0.55));
+  scene.add(new THREE.AmbientLight(0xdfe8ff, 0.08));
+  // key: crisp neutral-cool light from upper front-left, the shadow caster
+  const key = new THREE.DirectionalLight(COL.keyCol, 2.6);
+  key.position.set(26, 58, 34);
   key.castShadow = true;
-  key.shadow.mapSize.set(2048, 2048);
-  const s = 90;
+  const shMap = lowQ ? 1024 : 2048;
+  key.shadow.mapSize.set(shMap, shMap);
+  const s = 60;
   key.shadow.camera.left = -s; key.shadow.camera.right = s;
   key.shadow.camera.top = s; key.shadow.camera.bottom = -s;
-  key.shadow.camera.far = 240;
-  key.shadow.bias = -0.0004;
+  key.shadow.camera.near = 1;
+  key.shadow.camera.far = 220;
+  key.shadow.bias = -0.0003;
+  key.shadow.normalBias = 0.02;
+  key.shadow.radius = 3;
   scene.add(key);
-  // soft warm fill from the other side so shadows aren't black
-  const fill = new THREE.DirectionalLight(0xffa866, 0.5);
-  fill.position.set(-30, 22, -18);
+  // fill: dim, cooler, opposite side — opens up the shadows without flattening
+  const fill = new THREE.DirectionalLight(COL.fillCol, 0.55);
+  fill.position.set(-32, 24, -14);
   scene.add(fill);
-  // a warm point light for a pool of lamplight over the bench
-  const lamp = new THREE.PointLight(0xffb673, 90, 120, 2.0);
-  lamp.position.set(0, 26, 6);
-  scene.add(lamp);
+  // rim: blue back-light that traces a cool edge on parts, separating them from
+  // the backdrop — the classic "expensive product shot" separation.
+  const rim = new THREE.DirectionalLight(COL.rimCol, 1.1);
+  rim.position.set(-10, 16, -40);
+  scene.add(rim);
+  // a soft cool pool of light hovering over the bench for local falloff
+  const pool = new THREE.PointLight(0xdaeaff, 55, 130, 2.0);
+  pool.position.set(0, 26, 6);
+  scene.add(pool);
 
-  // ── PBR wood-plank workbench floor (real CC0 PolyHaven texture set) ──
-  // A lit MeshStandardMaterial so the floor takes the same warm key light,
-  // casts/receives shadows, and blooms consistently with the bench and parts —
-  // the old unlit shader floor read as fake next to the lit geometry.
-  // floorUniforms kept as a harmless stub so main.js's uTime tick stays valid.
-  const floorUniforms = { uTime: { value: 0 } };
-  const texLoader = new THREE.TextureLoader();
-  const maxAniso = renderer.capabilities.getMaxAnisotropy();
-  const FLOOR_SIZE = 500;
-  const FLOOR_TILE = 150;                       // world units covered by one texture tile (~1 plank run)
-  const repeat = FLOOR_SIZE / FLOOR_TILE;
-  function loadFloorTex(url, srgb) {
-    const t = texLoader.load(url);
-    t.wrapS = t.wrapT = THREE.RepeatWrapping;
-    t.repeat.set(repeat, repeat);
-    t.anisotropy = maxAniso;
-    if (srgb) t.colorSpace = THREE.SRGBColorSpace;
-    return t;
-  }
-  const floorMat = new THREE.MeshStandardMaterial({
-    map:          loadFloorTex('assets/textures/wood_floor_diff.jpg', true),
-    normalMap:    loadFloorTex('assets/textures/wood_floor_nor.png', false),
-    roughnessMap: loadFloorTex('assets/textures/wood_floor_rough.jpg', false),
-    roughness: 0.85, metalness: 0.0,
-    normalScale: new THREE.Vector2(0.75, 0.75),
-    color: 0xcabfa6,                            // desaturated tan so the warm key light doesn't push the planks fully red
+  // ── designed technical floor: energy grid + soft light pool ───────────────
+  // A custom ShaderMaterial floor (this is what main.js animates via
+  // floorUniforms.uTime). It reads as a precision worktop: a dark cool base, a
+  // fine measured grid that fades with distance, brighter major gridlines, a
+  // soft radial pool of light centered under the bench, and a slow breathing
+  // pulse along the grid so the surface feels alive without being noisy.
+  // The floor shader opts into scene fog (fog:true + fog_pars chunks), so it must
+  // carry THREE's fog uniforms (fogColor/fogNear/fogFar) or the renderer derefs
+  // undefined.value while refreshing them. Merge them alongside our custom set.
+  const floorUniforms = THREE.UniformsUtils.merge([
+    THREE.UniformsLib.fog,
+    {
+      uTime:   { value: 0 },
+      uBase:   { value: new THREE.Color(0x0b0f16) },
+      uGrid:   { value: new THREE.Color(0x22303f) },
+      uAccent: { value: new THREE.Color(COL.accent) },
+      uPulse:  { value: lowQ ? 0.0 : 1.0 },   // disable the animated pulse on low tier
+    },
+  ]);
+  const FLOOR_SIZE = 600;
+  const floorMat = new THREE.ShaderMaterial({
+    uniforms: floorUniforms,
+    fog: true,
+    transparent: false,
+    vertexShader: `
+      varying vec2 vWorld;
+      varying vec3 vViewPos;
+      #include <fog_pars_vertex>
+      void main() {
+        vWorld = position.xy;                    // plane is XY before rotation
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        vViewPos = mv.xyz;
+        #ifdef USE_FOG
+          vFogDepth = -mv.z;
+        #endif
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: `
+      varying vec2 vWorld;
+      uniform float uTime;
+      uniform vec3 uBase; uniform vec3 uGrid; uniform vec3 uAccent;
+      uniform float uPulse;
+      #include <fog_pars_fragment>
+
+      // anti-aliased grid line intensity at spacing sp, line width lw (world units)
+      float gridLine(vec2 p, float sp, float lw) {
+        vec2 g = abs(fract(p / sp - 0.5) - 0.5) * sp;
+        vec2 w = fwidth(p) * lw;
+        vec2 l = smoothstep(w, vec2(0.0), g);
+        return max(l.x, l.y);
+      }
+
+      void main() {
+        vec2 p = vWorld;
+        float r = length(p);
+
+        // fade the whole pattern out with distance so the floor dissolves into
+        // the backdrop (no hard tile edge, no visible far plane)
+        float fade = smoothstep(280.0, 40.0, r);
+
+        // fine + major grid
+        float minor = gridLine(p, 4.0, 1.0) * 0.35;
+        float major = gridLine(p, 20.0, 1.4) * 0.9;
+
+        vec3 col = uBase;
+        col = mix(col, uGrid, minor * fade);
+        col = mix(col, mix(uGrid, uAccent, 0.35), major * fade);
+
+        // soft central pool of light under the bench
+        float pool = smoothstep(70.0, 0.0, r);
+        col += uAccent * 0.05 * pool;
+        col = mix(col, col * 1.35, pool * 0.6);
+
+        // slow breathing pulse travelling out along the major grid
+        float pulse = uPulse * major * fade * (0.5 + 0.5 * sin(uTime * 1.2 - r * 0.05));
+        col += uAccent * 0.6 * pulse;
+
+        // gentle vignette toward the far floor
+        col *= mix(0.55, 1.0, smoothstep(320.0, 30.0, r));
+
+        gl_FragColor = vec4(col, 1.0);
+        #include <fog_fragment>
+      }`,
   });
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(FLOOR_SIZE, FLOOR_SIZE), floorMat);
   floor.rotation.x = -Math.PI / 2;
   floor.position.y = -0.02;
-  floor.receiveShadow = true;
   scene.add(floor);
+  // a plain shadow-catcher just above the shader floor so the bench still casts
+  // a grounded contact shadow (the shader floor can't receive shadows itself).
+  const shadowCatcher = new THREE.Mesh(
+    new THREE.PlaneGeometry(FLOOR_SIZE, FLOOR_SIZE),
+    new THREE.ShadowMaterial({ opacity: 0.28 }));
+  shadowCatcher.rotation.x = -Math.PI / 2;
+  shadowCatcher.position.y = -0.015;
+  shadowCatcher.receiveShadow = true;
+  scene.add(shadowCatcher);
 
-  // ── mounting deck the robot is built on (layered, product-looking) ──
+  // ── mounting deck the robot is built on (anodized-instrument look) ────────
   const chassis = new THREE.Group();
-  // wooden base board (slightly larger, gives a warm border)
+  // dark base plate (gives a crisp shadow line and a slim border)
   const board = new THREE.Mesh(
     new THREE.BoxGeometry(18, 0.6, 28),
-    new THREE.MeshStandardMaterial({ color: 0x3a2414, roughness: 0.78, metalness: 0.04 }));
+    new THREE.MeshStandardMaterial({ color: 0x14181f, roughness: 0.55, metalness: 0.3 }));
   board.position.y = -0.55;
   board.receiveShadow = true; board.castShadow = true;
   chassis.add(board);
-  // brushed dark-metal deck the parts actually sit on (top at y≈0)
+  // brushed anodized-aluminium deck the parts actually sit on (top at y≈0)
   const deck = new THREE.Mesh(
     new THREE.BoxGeometry(16, 0.4, 26),
-    new THREE.MeshStandardMaterial({ color: 0x26282c, roughness: 0.42, metalness: 0.82 }));
+    new THREE.MeshStandardMaterial({ color: 0x3a4048, roughness: 0.34, metalness: 0.9 }));
   deck.position.y = -0.2;
   deck.receiveShadow = true; deck.castShadow = true;
   chassis.add(deck);
-  // brass edge trim (a frame, so it doesn't cover the mounting surface)
-  const brass = new THREE.MeshStandardMaterial({ color: 0xc0902f, roughness: 0.33, metalness: 0.88 });
-  for (const [w, d, x, z] of [[16.5, 0.4, 0, 13], [16.5, 0.4, 0, -13], [0.4, 26.5, 8, 0], [0.4, 26.5, -8, 0]]) {
-    const bar = new THREE.Mesh(new THREE.BoxGeometry(w, 0.18, d), brass);
-    bar.position.set(x, 0.0, z);
+  // slim emissive cyan accent trim (a frame) — the signature "powered on" cue.
+  // emissive so it catches the bloom pass tastefully.
+  const trimMat = new THREE.MeshStandardMaterial({
+    color: 0x0c1418, roughness: 0.4, metalness: 0.7,
+    emissive: new THREE.Color(COL.accent), emissiveIntensity: 0.9,
+  });
+  for (const [w, d, x, z] of [[16.6, 0.24, 0, 13], [16.6, 0.24, 0, -13], [0.24, 26.6, 8, 0], [0.24, 26.6, -8, 0]]) {
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(w, 0.16, d), trimMat);
+    bar.position.set(x, 0.02, z);
     chassis.add(bar);
   }
-  // brass corner bolts
+  // machined corner bolts (neutral steel)
+  const boltMat = new THREE.MeshStandardMaterial({ color: 0x9aa4ad, roughness: 0.28, metalness: 0.95 });
   for (const bx of [-7.4, 7.4]) for (const bz of [-12.4, 12.4]) {
-    const bolt = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.5, 12), brass);
+    const bolt = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.5, 16), boltMat);
     bolt.position.set(bx, 0.06, bz);
+    bolt.castShadow = true;
     chassis.add(bolt);
   }
-  // lift the whole rig so the motors' wheels (which hang ~2 units below their
-  // mount and off the deck edges) rest on the workbench floor instead of
-  // clipping through it. Assembly parts + slot ghosts lift by the same amount.
   chassis.position.y = ASSEMBLY_LIFT;
   scene.add(chassis);
 
-  // ── backdrop sky dome: the same sunset panorama the sim uses, so the build
-  // view shares the outdoor look (toneMapped:false — it's a finished image). ──
-  const skyTex = new THREE.TextureLoader().load('assets/textures/sky_06_2k.png');
-  skyTex.colorSpace = THREE.SRGBColorSpace;
-  skyTex.wrapS = THREE.RepeatWrapping;
+  // ── graduated backdrop dome (the same gradient the env map uses) ──────────
+  // No texture, no hard horizon — a seamless cool studio cyclorama. toneMapped
+  // so it sits in the same colour space as the lit geometry.
   const sky = new THREE.Mesh(
-    new THREE.SphereGeometry(600, 60, 40),
-    new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide, depthWrite: false, fog: false, toneMapped: false }));
+    new THREE.SphereGeometry(900, 48, 32),
+    new THREE.ShaderMaterial({ ...cloneShader(gradShader), side: THREE.BackSide, depthWrite: false, fog: false }));
   scene.add(sky);
 
   // ── slot ghosts (highlighted during drag) ──
@@ -167,7 +294,7 @@ export function createScene(canvas) {
     const g = new THREE.Mesh(
       new THREE.PlaneGeometry(slot.w, slot.d),
       new THREE.MeshBasicMaterial({
-        color: 0xffb257, transparent: true, opacity: 0, side: THREE.DoubleSide,
+        color: COL.accent, transparent: true, opacity: 0, side: THREE.DoubleSide,
       })
     );
     g.rotation.x = -Math.PI / 2;
@@ -178,15 +305,19 @@ export function createScene(canvas) {
   }
 
   // assembly-only scenery — hidden while the sim's arena is on screen
-  const assemblyDecor = [floor, chassis, sky];
+  const assemblyDecor = [floor, shadowCatcher, chassis, sky];
 
-  // ── post-processing: bloom makes the emissive accents glow (big fidelity win) ──
+  // ── post-processing: bloom lifts the emissive accents (big fidelity win) ──
   const composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, camera));
-  // higher threshold so only genuinely bright emissives glow — lit metal and
-  // wood no longer bloom into white hotspots.
-  // soften bloom slightly on low-quality devices (cheaper, still glows)
-  const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), lowQ ? 0.38 : 0.5, lowQ ? 0.5 : 0.6, 0.92);
+  // Restrained bloom: a high threshold so only genuinely bright emissives (the
+  // cyan trim, part LEDs, status glow) bloom — lit metal and the backdrop stay
+  // crisp. Soften further on low-quality devices (cheaper, still glows).
+  const bloom = new UnrealBloomPass(
+    new THREE.Vector2(1, 1),
+    lowQ ? 0.34 : 0.42,   // strength
+    lowQ ? 0.5 : 0.55,    // radius
+    0.85);                // threshold
   composer.addPass(bloom);
   composer.addPass(new OutputPass());
   // SMAA anti-aliasing — display-space, so it goes AFTER OutputPass. The composer
@@ -207,4 +338,15 @@ export function createScene(canvas) {
   resize();
 
   return { renderer, scene, camera, controls, slotMeshes, resize, composer, floorUniforms, assemblyDecor };
+}
+
+// Deep-clone the shared gradient shader's uniforms so each mesh (env dome +
+// backdrop) owns its own THREE.Color instances rather than aliasing one set.
+function cloneShader(src) {
+  const uniforms = {};
+  for (const k in src.uniforms) {
+    const v = src.uniforms[k].value;
+    uniforms[k] = { value: v && v.clone ? v.clone() : v };
+  }
+  return { uniforms, vertexShader: src.vertexShader, fragmentShader: src.fragmentShader };
 }

@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>JARVIS — Robotics simulation, minus the learning curve</title>
+<meta name="description" content="JARVIS is a premium, friendly robotics simulator in your browser. Drag real components onto a bench, wire the circuit, let a real DC solver light LEDs and drive motors, then RUN a physics sim. An AI co-builder wires it for you. Zero install.">
+<meta name="theme-color" content="#0a0d12" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f7f9fc" media="(prefers-color-scheme: light)">
+<link rel="apple-touch-icon" href="/favicon.svg">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="JARVIS">
+<meta property="og:title" content="JARVIS — robotics simulation without the steep learning curve">
+<meta property="og:description" content="Drag real components onto a bench, wire the circuit, and watch a real physics sim run it. An AI co-builder wires it for you. Runs in the browser.">
+<!-- fonts: same faces the app uses -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap">
+<link rel="preconnect" href="https://api.fontshare.com">
+<link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
+<link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=clash-display@400,500,600,700&display=swap">
+<link rel="stylesheet" href="css/landing.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="JARVIS home"><span class="dot" aria-hidden="true"></span>JARVIS</a>
+    <nav class="nav-links" aria-label="Primary">
+      <a class="ghost" href="#features">Features</a>
+      <a class="ghost" href="#how">How it works</a>
+      <a class="ghost" href="#pricing">Pricing</a>
+      <a class="btn btn-primary" href="index.html">Launch the Lab</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+  <!-- ── HERO ─────────────────────────────────────── -->
+  <section class="hero" id="top">
+    <div class="wrap">
+      <p class="eyebrow reveal"><span class="spark" aria-hidden="true"></span> Browser-native robotics simulator</p>
+      <h1 class="headline reveal">Robotics simulation, <span class="grad">minus the learning curve.</span></h1>
+      <p class="subhead reveal">Isaac Sim and Gazebo are powerful — and brutal to start. JARVIS gives you the same build-wire-simulate loop in a friendly, zero-install browser lab. Drag real components onto a bench, wire the pins, and a genuine DC-circuit solver lights LEDs and drives motors before you even hit RUN.</p>
+      <div class="hero-cta reveal">
+        <a class="btn btn-primary btn-lg" href="index.html">Launch the Lab</a>
+        <a class="btn btn-ghost btn-lg" href="#how">See how it works</a>
+      </div>
+      <div class="hero-meta reveal">
+        <span><i class="ok" aria-hidden="true"></i> No install, no sign-up to try</span>
+        <span><i class="ok" aria-hidden="true"></i> Runs on iPad &amp; iPhone</span>
+        <span><i class="ok" aria-hidden="true"></i> Real circuit + real physics</span>
+      </div>
+
+      <figure class="hero-visual reveal" aria-label="Illustration of the JARVIS build bench: a battery, motor, LED and switch wired into a live circuit.">
+        <div class="hv-bar">
+          <span class="tl a"></span><span class="tl b"></span><span class="tl c"></span>
+          <span class="title">jarvis — build bench</span>
+        </div>
+        <div class="hv-stage">
+          <div class="chip"><div class="ico" aria-hidden="true">🔋</div><div class="nm">battery</div></div>
+          <div class="chip live"><div class="ico" aria-hidden="true">⚙️</div><div class="nm">motor · driven</div></div>
+          <div class="chip"><div class="ico" aria-hidden="true">🎚️</div><div class="nm">potentiometer</div></div>
+          <div class="chip live"><div class="ico" aria-hidden="true">💡</div><div class="nm">LED · lit</div></div>
+          <div class="chip"><div class="ico" aria-hidden="true">🔀</div><div class="nm">switch</div></div>
+          <span class="wire-lbl">◉ solver: circuit OK · 42 mA flowing</span>
+        </div>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ── FEATURES ─────────────────────────────────── -->
+  <section id="features">
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="kicker">What's inside</p>
+        <h2>A real lab, not a toy diagram.</h2>
+        <p>Every part behaves the way its real-world twin does. Wire it wrong and you'll see the short — wire it right and it comes alive.</p>
+      </div>
+      <div class="features">
+        <article class="card">
+          <div class="fico" aria-hidden="true">🔌</div>
+          <h3>A real circuit solver</h3>
+          <p>Modified Nodal Analysis under the hood. Batteries and motors are true voltage sources, LEDs are nonlinear diodes, and it flags shorts and over-current live as you wire.</p>
+        </article>
+        <article class="card">
+          <div class="fico" aria-hidden="true">🧩</div>
+          <h3>Tons of components + search</h3>
+          <p>Batteries, motors, resistors, switches, LEDs, potentiometers and more — each with real pins and parameters. Find any part fast and drop it straight onto the bench.</p>
+        </article>
+        <article class="card">
+          <div class="fico" aria-hidden="true">🤖</div>
+          <h3>Jarvis, your AI co-builder</h3>
+          <p>Describe what you want in plain language. Jarvis places components, wires the pins, and tunes parameters for you — then explains what it did.</p>
+        </article>
+        <article class="card">
+          <div class="fico" aria-hidden="true">🎢</div>
+          <h3>Physics simulation on RUN</h3>
+          <p>Hit RUN and the solved motor current becomes real torque in a Rapier physics world. Watch your build actually move, spin, and settle under gravity.</p>
+        </article>
+        <article class="card">
+          <div class="fico" aria-hidden="true">📱</div>
+          <h3>Runs in the browser</h3>
+          <p>No downloads, no toolchains, no drivers. WebGL and WebAssembly do the heavy lifting, so it's smooth on a laptop and touch-friendly on iPad and iPhone.</p>
+        </article>
+        <article class="card">
+          <div class="fico" aria-hidden="true">⚡</div>
+          <h3>Live feedback everywhere</h3>
+          <p>Charge visibly flows along wires at solved speed, LEDs glow in proportion to current, and a powered motor's wheel spins — all before you enter the sim.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── HOW IT WORKS ─────────────────────────────── -->
+  <section id="how">
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="kicker">How it works</p>
+        <h2>From empty bench to running robot in three steps.</h2>
+      </div>
+      <div class="steps">
+        <div class="step">
+          <div class="num" aria-hidden="true">1</div>
+          <h3>Place your parts</h3>
+          <p>Drag components from the tray onto the bench. They fall, collide, and settle with real gravity, just like the real thing.</p>
+        </div>
+        <div class="step">
+          <div class="num" aria-hidden="true">2</div>
+          <h3>Wire the circuit</h3>
+          <p>Click pin to pin to connect. The solver runs instantly — LEDs light, motors throttle, and shorts glow red. Or just ask Jarvis to wire it.</p>
+        </div>
+        <div class="step">
+          <div class="num" aria-hidden="true">3</div>
+          <h3>Hit RUN</h3>
+          <p>Enter the physics sim and drive the motor your circuit powers. Tune a value, re-run, and see the difference immediately.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── PRICING ──────────────────────────────────── -->
+  <section id="pricing">
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="kicker">Pricing</p>
+        <h2>Free to try. Buy once to keep.</h2>
+        <p>Start building in seconds. When you're ready, unlock the full component library and AI co-builder with a single purchase — no subscription.</p>
+      </div>
+      <div class="pricing">
+        <article class="plan">
+          <p class="tag">Free</p>
+          <div class="price">$0</div>
+          <p class="once">Full access to the core lab</p>
+          <ul>
+            <li><span class="ck" aria-hidden="true">✓</span> The full circuit solver &amp; physics sim</li>
+            <li><span class="ck" aria-hidden="true">✓</span> Core components + wiring</li>
+            <li><span class="ck" aria-hidden="true">✓</span> A daily allowance of Jarvis AI messages</li>
+            <li><span class="ck" aria-hidden="true">✓</span> Runs on any modern browser</li>
+          </ul>
+          <a class="btn btn-ghost" href="index.html">Launch the Lab</a>
+        </article>
+        <article class="plan pro">
+          <span class="badge-pop" aria-hidden="true">Best value</span>
+          <p class="tag">Pro — one-time</p>
+          <div class="price">$49 <small>once</small></div>
+          <p class="once">Yours forever. No subscription.</p>
+          <ul>
+            <li><span class="ck" aria-hidden="true">✓</span> Everything in Free</li>
+            <li><span class="ck" aria-hidden="true">✓</span> The complete component library</li>
+            <li><span class="ck" aria-hidden="true">✓</span> Unlimited Jarvis AI co-builder</li>
+            <li><span class="ck" aria-hidden="true">✓</span> Save, share &amp; export your builds</li>
+            <li><span class="ck" aria-hidden="true">✓</span> All future updates included</li>
+          </ul>
+          <a class="btn btn-primary" href="index.html">Start free, upgrade anytime</a>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── FINAL CTA ────────────────────────────────── -->
+  <section class="cta-band">
+    <div class="wrap">
+      <div class="cta-inner">
+        <p class="kicker">Ready when you are</p>
+        <h2>Build your first working circuit in under a minute.</h2>
+        <p>No account, no install. Just open the lab and start dragging parts.</p>
+        <a class="btn btn-primary btn-lg" href="index.html">Launch the Lab</a>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="fbrand"><span class="dot" style="width:11px;height:11px;border-radius:50%;background:var(--accent);display:inline-block;"></span> JARVIS</div>
+    <nav aria-label="Footer">
+      <a href="index.html">Launch the Lab</a>
+      <a href="#features">Features</a>
+      <a href="#how">How it works</a>
+      <a href="#pricing">Pricing</a>
+    </nav>
+    <p class="fine">JARVIS is a browser-based robotics creator space — a real DC-circuit solver and physics sim in a friendly, zero-install lab. Built for makers, students, and the robotics-curious.</p>
+  </div>
+</footer>
+
+</body>
+</html>

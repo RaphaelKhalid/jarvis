@@ -35,6 +35,56 @@ export const COMPONENTS = {
     blurb: 'The power source. Feeds ~7.4V to the motor driver and to the Arduino’s VIN. Every ground in the circuit ties back here.',
     unit: 'Unit 1 · Electronics Basics',
   },
+  push_button: {
+    title: 'Push Button',
+    blurb: 'A momentary switch — it only closes the circuit while you hold it down. Click the button in 3D to press it.',
+    unit: 'Unit 1 · Electronics Basics',
+  },
+  lamp: {
+    title: 'Incandescent Lamp',
+    blurb: 'A filament bulb. It’s just a resistor that glows: the more current flows, the brighter it shines. Draw too much and it burns out.',
+    unit: 'Unit 1 · Electronics Basics',
+  },
+  buzzer: {
+    title: 'Piezo Buzzer',
+    blurb: 'Makes a tone when current passes through it. Polarised — the + and − terminals matter.',
+    unit: 'Unit 1 · Electronics Basics',
+  },
+  diode: {
+    title: 'Diode',
+    blurb: 'A one-way valve for current: it conducts from anode (A) to cathode (K) once past ~0.7V, and blocks the other way. The striped band marks the cathode.',
+    unit: 'Unit 1 · Electronics Basics',
+  },
+  photoresistor: {
+    title: 'Photoresistor (LDR)',
+    blurb: 'A light-dependent resistor: its resistance drops as light rises. Model the light level by editing its resistance in the Inspector.',
+    unit: 'Unit 5 · Sensors',
+  },
+  thermistor: {
+    title: 'Thermistor',
+    blurb: 'A temperature-dependent resistor. Its resistance changes with heat — a simple way to sense temperature. Tune its resistance in the Inspector.',
+    unit: 'Unit 5 · Sensors',
+  },
+  fuse: {
+    title: 'Fuse',
+    blurb: 'A deliberate weak link. It passes current freely until the load exceeds its rating, then “blows” to protect the rest of the circuit.',
+    unit: 'Unit 1 · Electronics Basics',
+  },
+  capacitor: {
+    title: 'Capacitor',
+    blurb: 'Stores charge on two plates. Under steady DC it behaves as an open circuit (blocks current) once charged — so in this DC solver it passes almost nothing.',
+    unit: 'Unit 1 · Electronics Basics',
+  },
+  servo: {
+    title: 'Servo Motor',
+    blurb: 'A geared motor with a signal line (SIG) that commands a target angle. Powered from + / −; behaves like a small motor in the circuit.',
+    unit: 'Unit 3 · Motors & Drivers',
+  },
+  relay: {
+    title: 'Relay',
+    blurb: 'An electrically-controlled switch. When energised it connects COM to NO (normally-open), letting a small signal switch a bigger load.',
+    unit: 'Unit 3 · Motors & Drivers',
+  },
 };
 
 // pin roles. `kind` drives the tooltip accent color.
@@ -83,6 +133,29 @@ export const PINS = {
   // ── battery ──
   'battery.+': { title: 'Positive terminal (+7.4V)', role: 'Feeds the motor driver’s 12V input and the Arduino’s VIN.', kind: 'power' },
   'battery.-': { title: 'Negative terminal (0V)', role: 'The circuit’s ground reference — everything returns here.', kind: 'ground' },
+
+  // ── new bench components ──
+  'push_button.A': { title: 'Button terminal A', role: 'One side of the momentary contact. Closed only while pressed.', kind: 'data' },
+  'push_button.B': { title: 'Button terminal B', role: 'The other side of the momentary contact.', kind: 'data' },
+  'lamp.A': { title: 'Lamp terminal', role: 'One end of the filament. Current through it makes the bulb glow.', kind: 'power' },
+  'lamp.B': { title: 'Lamp terminal', role: 'The return end of the filament.', kind: 'power' },
+  'buzzer.+': { title: 'Buzzer + terminal', role: 'Positive supply into the buzzer.', kind: 'power' },
+  'buzzer.-': { title: 'Buzzer − terminal', role: 'Return to ground.', kind: 'ground' },
+  'diode.A': { title: 'Anode (A)', role: 'Current enters here. Conducts toward the cathode once above ~0.7V.', kind: 'power' },
+  'diode.K': { title: 'Cathode (K)', role: 'Current exits here (marked by the band). Blocks flow the other way.', kind: 'power' },
+  'photoresistor.A': { title: 'LDR terminal A', role: 'One side of the light-dependent resistor.', kind: 'data' },
+  'photoresistor.B': { title: 'LDR terminal B', role: 'The other side of the light-dependent resistor.', kind: 'data' },
+  'thermistor.A': { title: 'Thermistor terminal A', role: 'One side of the temperature-dependent resistor.', kind: 'data' },
+  'thermistor.B': { title: 'Thermistor terminal B', role: 'The other side of the temperature-dependent resistor.', kind: 'data' },
+  'fuse.A': { title: 'Fuse terminal A', role: 'Current in. Passes freely until the rated limit is exceeded.', kind: 'data' },
+  'fuse.B': { title: 'Fuse terminal B', role: 'Current out to the protected circuit.', kind: 'data' },
+  'capacitor.A': { title: 'Capacitor + plate', role: 'Positive plate. Blocks steady DC once charged.', kind: 'power' },
+  'capacitor.B': { title: 'Capacitor − plate', role: 'Negative plate.', kind: 'power' },
+  'servo.+': { title: 'Servo + (power)', role: 'Motor supply into the servo.', kind: 'power' },
+  'servo.-': { title: 'Servo − (ground)', role: 'Return to ground.', kind: 'ground' },
+  'servo.SIG': { title: 'Servo signal (SIG)', role: 'The control line that commands the target angle.', kind: 'data' },
+  'relay.COM': { title: 'Relay COM (common)', role: 'The common pole that switches over to NO when the relay energises.', kind: 'data' },
+  'relay.NO': { title: 'Relay NO (normally open)', role: 'Connected to COM only while the relay is on.', kind: 'data' },
 };
 
 // The rover reuses the base components under instanced namespaces (two drivers

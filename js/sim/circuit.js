@@ -79,6 +79,103 @@ export const COMPONENT_ELECTRICAL = {
       maxCurrent: num(c.params?.maxCurrent, 0.03),
     };
   },
+  // push button: a momentary switch — conducts A→B only while pressed (closed).
+  push_button(c) {
+    const closed = c.params?.closed === true || c.params?.closed === 1;
+    return {
+      pins: ['A', 'B'],
+      elements: closed ? [{ kind: 'R', a: 'A', b: 'B', r: 1e-3 }] : [],
+      maxCurrent: num(c.params?.maxCurrent, 5),
+    };
+  },
+  // relay: an electrically-switched contact across COM/NO (closed = energized).
+  relay(c) {
+    const closed = c.params?.closed === true || c.params?.closed === 1;
+    return {
+      pins: ['COM', 'NO'],
+      elements: closed ? [{ kind: 'R', a: 'COM', b: 'NO', r: 1e-3 }] : [],
+      maxCurrent: num(c.params?.maxCurrent, 10),
+    };
+  },
+  // lamp: an ohmic resistive load; brightness reads from the solved current.
+  lamp(c) {
+    const r = Math.max(num(c.params?.resistance, 24), 1e-4);
+    return {
+      pins: ['A', 'B'],
+      elements: [{ kind: 'R', a: 'A', b: 'B', r }],
+      maxCurrent: num(c.params?.maxCurrent, 0.5),
+    };
+  },
+  // buzzer: a resistive load between + and −; sounds while current flows.
+  buzzer(c) {
+    const r = Math.max(num(c.params?.resistance, 80), 1e-4);
+    return {
+      pins: ['+', '-'],
+      elements: [{ kind: 'R', a: '+', b: '-', r }],
+      maxCurrent: num(c.params?.maxCurrent, 0.1),
+    };
+  },
+  // fuse: a near-ideal conductor; the generic over-current check flags it past
+  // maxCurrent (its rated blow current).
+  fuse(c) {
+    const r = Math.max(num(c.params?.resistance, 0.01), 1e-4);
+    return {
+      pins: ['A', 'B'],
+      elements: [{ kind: 'R', a: 'A', b: 'B', r }],
+      maxCurrent: num(c.params?.maxCurrent, 1),
+    };
+  },
+  // diode: piecewise-linear rectifier, same model as the LED (A→K).
+  diode(c) {
+    const vf = Math.max(num(c.params?.forwardVoltage, 0.7), 0);
+    const ron = Math.max(num(c.params?.resistance, 5), 1e-3);
+    return {
+      pins: ['A', 'K'],
+      elements: [{ kind: 'D', a: 'A', b: 'K', vf, ron }],
+      maxCurrent: num(c.params?.maxCurrent, 1),
+    };
+  },
+  // photoresistor (LDR): a variable R (rheostat) set by sensed light.
+  photoresistor(c) {
+    const r = Math.max(num(c.params?.resistance, 5000), 1e-3);
+    return {
+      pins: ['A', 'B'],
+      elements: [{ kind: 'R', a: 'A', b: 'B', r }],
+      maxCurrent: num(c.params?.maxCurrent, 1),
+    };
+  },
+  // thermistor: a variable R (rheostat) set by sensed temperature.
+  thermistor(c) {
+    const r = Math.max(num(c.params?.resistance, 10000), 1e-3);
+    return {
+      pins: ['A', 'B'],
+      elements: [{ kind: 'R', a: 'A', b: 'B', r }],
+      maxCurrent: num(c.params?.maxCurrent, 1),
+    };
+  },
+  // capacitor: an open circuit at DC steady state. Modeled as a very large
+  // resistance so the MNA solve stays well-posed (no isolated/floating matrix).
+  capacitor(c) {
+    return {
+      pins: ['A', 'B'],
+      elements: [{ kind: 'R', a: 'A', b: 'B', r: 1e9 }],
+      maxCurrent: num(c.params?.maxCurrent, 5),
+    };
+  },
+  // servo: shares the DC-motor electrical model — a V-source (back-EMF) with
+  // series armature R across its power pins. The SIG pin carries no current here.
+  servo(c, state) {
+    const Ra = Math.max(num(c.params?.resistance, 3.0), 1e-4);
+    const Ke = num(c.params?.kv ? 1 / (c.params.kv * 2 * Math.PI / 60) : c.params?.ke, 0.04);
+    const omega = state?.omega || 0;
+    const backEmf = Ke * omega;
+    return {
+      pins: ['+', '-', 'SIG'],
+      elements: [{ kind: 'V', a: '+', b: '-', v: backEmf, series: Ra, meter: '+' }],
+      maxCurrent: num(c.params?.maxCurrent, 2),
+      ke: Ke,
+    };
+  },
 };
 
 function num(v, d) { return (typeof v === 'number' && isFinite(v)) ? v : d; }

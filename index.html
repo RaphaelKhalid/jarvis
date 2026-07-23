@@ -2,10 +2,21 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- viewport-fit=cover so the app can paint under the notch/home-indicator; user-scalable=no
+     stops Safari's double-tap/pinch page-zoom from stealing 3D pinch/orbit gestures. -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Jarvis — Robotics Creator</title>
 <meta name="description" content="Build a robot from real components in your browser, wire the circuit, and watch a physics simulation run it. A natural-language assistant builds alongside you. Zero install.">
-<meta name="theme-color" content="#0a0d12">
+<!-- theme-color: dark UI chrome; media-scoped so a light-theme browser UI matches too -->
+<meta name="theme-color" content="#0a0d12" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#0a0d12" media="(prefers-color-scheme: light)">
+<!-- iOS standalone / installable web-app polish -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Jarvis">
+<meta name="format-detection" content="telephone=no">
+<link rel="apple-touch-icon" href="/favicon.svg">
 <link rel="canonical" href="https://selfbalance-lab.vercel.app/">
 <!-- favicon + installable manifest -->
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -104,7 +115,9 @@
       <div><b>Click</b> a pin then its target pin to wire them</div>
       <div><b>Right-click</b> a part or wire to remove it · empty-space drag orbits</div>
     </div>
-    <canvas id="three-canvas"></canvas>
+    <!-- touch-action:none + inline overscroll guard so Safari never turns a 3D drag/orbit/pinch
+     into page scroll or rubber-band; CSS agent can move this to the stylesheet later. -->
+<canvas id="three-canvas" style="touch-action:none; -webkit-user-select:none; user-select:none;"></canvas>
     <!-- Jarvis: natural-language build assistant (M2). Talks to /api/jarvis;
          acts only through window.__api. -->
     <div id="jarvis" class="collapsed">

@@ -133,6 +133,18 @@ export function createApi({ doc, hooks = {} } = {}) {
   }
 
   // ── binding helpers (not part of the tool schema) ──────────────
+  // Transient live param write: mutates the current doc in place WITHOUT a
+  // history commit or onDocChange. For continuously-varying inputs (a sensor
+  // being driven by an interactive prop each frame) where an undo entry per
+  // frame + a full re-render would be wrong. The next real mutation snapshots
+  // whatever value it left behind. Returns whether the value actually moved.
+  function set_param_live({ id, key, value } = {}) {
+    const comp = history.get().components.find(c => c.id === id);
+    if (!comp || !key) return false;
+    if (comp.params[key] === value) return false;
+    comp.params[key] = value;
+    return true;
+  }
   function setSimState(s) { simState = s || {}; }
   function loadDocument(d) { history.reset(d); }
   function getHistory() { return history; }
@@ -143,7 +155,7 @@ export function createApi({ doc, hooks = {} } = {}) {
     run_sim, stop_sim, reset_sim, undo, redo,
     get_document, read_telemetry, read_electrical, validate,
     // internal wiring
-    setSimState, loadDocument, getHistory,
+    set_param_live, setSimState, loadDocument, getHistory,
   };
 }
 

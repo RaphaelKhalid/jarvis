@@ -16,7 +16,8 @@ import { makeFlatLabel } from '../labels.js';
 import { loadRapier } from '../sim.js';
 import { pinInfo } from '../glossary.js';
 import { audio } from '../audio.js';
-import { state } from './state.js';
+import { state, subscribe } from './state.js';
+import { initProps } from './props.js';
 import { KIND_LABEL } from './hud.js';
 import { track, trackOnce } from './analytics.js';
 
@@ -1044,12 +1045,28 @@ export function initCreatorAssembly({ canvas, scene, camera, controls, api, hud 
     return mag;
   }
 
+  // ── interactive bench props (candle → thermistor, lamp → photoresistor) ──
+  // A physical input you drag near a sensor to change its resistance live. Only
+  // shown while a matching sensor is on the bench; hidden in the RUN sim.
+  const props = initProps({ canvas, scene, camera, controls, api, hud });
+  subscribe('mode', (m) => { props.root.visible = m === 'assembly'; });
+
   function animate(dt) {
     let elec = null;
     try { elec = api.read_electrical(); } catch { /* ignore */ }
     const cur = elec?.current || {};
     const powered = elec?.ok !== false;
     const doc = api.get_document();
+
+    // drive interactive sensors (thermistor/photoresistor) from prop proximity
+    const sensors = [];
+    for (const c of doc.components) {
+      const bt = baseType(c.type);
+      if ((bt === 'thermistor' || bt === 'photoresistor') && meshes.get(c.id)) {
+        sensors.push({ id: c.id, type: bt, mesh: meshes.get(c.id) });
+      }
+    }
+    props.tick(sensors, dt);
 
     // ── real gravity + collisions: step Rapier, copy bodies → meshes ──
     if (phys) {

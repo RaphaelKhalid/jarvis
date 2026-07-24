@@ -16,6 +16,7 @@ import { emptyDoc } from './model/doc.js';
 import { CreatorSim } from './sim/creator-sim.js';
 import { initDocSave } from './app/docsave.js';
 import { initInspector } from './app/inspector.js';
+import { initExamples } from './app/examples.js';
 import { initJarvis } from './app/jarvis.js';
 import { initCoach } from './app/coach.js';
 import { initPerf } from './app/perf.js';
@@ -166,7 +167,10 @@ const docSave = initDocSave(api, { onFlash: (m, k) => hud.flash(m, k) });
 initInspector(api, { getMode: () => state.mode });
 // First-run onboarding coach — a 5-step build-your-first-circuit checklist that
 // advances by watching real API state; self-retires once done (persisted).
-initCoach(api);
+const coach = initCoach(api);
+// Example-circuit gallery — scripted builds (incl. the candle/thermistor and
+// photoresistor "physical input" demos) loaded through the same API.
+initExamples({ api, hud, exitSim: () => exitSim() });
 // Jarvis: natural-language build assistant (M2). Acts only through the API.
 // Free/anon users are quota-capped (protects the shared Gemini free key); pro
 // (profiles.tier) is uncapped. currentTier is updated on sign-in below.
@@ -186,6 +190,8 @@ const jarvis = initJarvis({
 }
 
 document.getElementById('help-btn')?.addEventListener('click', () => {
+  // bring the build guide back if it was minimized; otherwise show the welcome.
+  coach?.reopen?.();
   document.getElementById('overlay')?.classList.remove('hidden');
 });
 

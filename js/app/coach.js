@@ -89,11 +89,76 @@ export function initCoach(api) {
 
   host.classList.remove('hidden');
 
+  // ── minimize ⇄ restore: the tab can collapse into a small chip docked at the
+  // left edge (it animates away) and a click on the chip brings it back — like a
+  // little assistant shrinking to the sidebar and popping back up. Separate from
+  // dismiss (✕), which retires it for good. ──
+  const head = host.querySelector('.coach-head');
+  const minBtn = document.createElement('button');
+  minBtn.id = 'coach-min';
+  minBtn.type = 'button';
+  minBtn.title = 'Minimize';
+  minBtn.setAttribute('aria-label', 'Minimize the guide to the side');
+  minBtn.textContent = '–';
+  // sit it just before the dismiss ✕
+  head.insertBefore(minBtn, document.getElementById('coach-dismiss'));
+
+  const workspace = host.parentElement;   // #workspace (position:relative)
+  const chip = document.createElement('button');
+  chip.id = 'coach-chip';
+  chip.type = 'button';
+  chip.className = 'hidden';
+  chip.title = 'Show the guide';
+  chip.setAttribute('aria-label', 'Show the build guide');
+  chip.innerHTML = `<span class="coach-chip-dot">◐</span><span class="coach-chip-label">Guide</span>`;
+  workspace.appendChild(chip);
+
+  function minimize() {
+    host.classList.add('minimized');   // CSS animates it out + hides
+    chip.classList.remove('hidden');
+    requestAnimationFrame(() => chip.classList.add('in'));
+  }
+  function restore() {
+    chip.classList.remove('in');
+    chip.classList.add('hidden');
+    host.classList.remove('minimized');
+  }
+  minBtn.addEventListener('click', minimize);
+  chip.addEventListener('click', restore);
+
+  // ── drag the tab by its header (ignore the buttons) ──
+  let drag = null;
+  head.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('button')) return;   // let ✕ / – work
+    const r = host.getBoundingClientRect();
+    const pr = workspace.getBoundingClientRect();
+    drag = { dx: e.clientX - r.left, dy: e.clientY - r.top, pr };
+    host.classList.add('dragging');
+    host.style.transform = 'none';            // stop the translateX centering
+    head.setPointerCapture?.(e.pointerId);
+    e.preventDefault();
+  });
+  head.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    const { pr } = drag;
+    let left = e.clientX - pr.left - drag.dx;
+    let top = e.clientY - pr.top - drag.dy;
+    // keep it inside the workspace
+    left = Math.max(6, Math.min(left, pr.width - host.offsetWidth - 6));
+    top = Math.max(6, Math.min(top, pr.height - 40));
+    host.style.left = `${left}px`;
+    host.style.top = `${top}px`;
+  });
+  const endDrag = () => { if (drag) { drag = null; host.classList.remove('dragging'); } };
+  head.addEventListener('pointerup', endDrag);
+  head.addEventListener('pointercancel', endDrag);
+
   let done = false;
   function dismiss() {
     if (done) return;
     done = true;
     host.classList.add('hidden');
+    chip.classList.add('hidden');
     try { localStorage.setItem(SEEN_KEY, '1'); } catch { /* ignore */ }
     clearInterval(timer);
   }
@@ -134,7 +199,10 @@ export function initCoach(api) {
 
   render();
   const timer = setInterval(render, 500);
-  return { stop: () => clearInterval(timer), dismiss };
+  // reopen(): bring the tab back if it was minimized (used by the top "?" help
+  // button). No-op once permanently dismissed.
+  function reopen() { if (!done) restore(); }
+  return { stop: () => clearInterval(timer), dismiss, minimize, reopen };
 }
 
 function safe(fn, fallback) { try { return fn() ?? fallback; } catch { return fallback; } }

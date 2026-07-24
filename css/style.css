@@ -146,7 +146,13 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
 .auto-btn:disabled { opacity: 0.4; cursor: default; }
 
 /* ── parts tray ── */
-#parts-tray { padding: 8px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
+/* The left panel is a grid item; min-height:0 lets its flex children actually
+   shrink + scroll (Firefox honours min-height:auto strictly, which otherwise
+   let the tall parts tray squeeze the Inspector to zero height). */
+#left-panel { min-height: 0; }
+/* The three scrolling regions share the column proportionally (tray 3 : links 1 :
+   inspector 3) so none can collapse — each scrolls within its own share. */
+#parts-tray { padding: 8px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; flex: 3 1 0; min-height: 0; }
 .part-card {
   background: linear-gradient(180deg, var(--panel-3), var(--panel-2));
   border: 1px solid var(--border);
@@ -185,13 +191,13 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
 .part-card .help-icon:hover { border-color: var(--accent); color: var(--accent); }
 
 /* ── checklist ── */
-#checklist { padding: 8px 12px; overflow-y: auto; flex: 1; }
+#checklist { padding: 8px 12px; overflow-y: auto; flex: 1 1 0; min-height: 0; }
 .check-item { display: flex; gap: 8px; padding: 3px 0; font-size: 11px; color: var(--text-dim); font-family: var(--mono); }
 .check-item.done { color: var(--green); }
 .check-item .box { flex-shrink: 0; }
 
 /* ── inspector (live document + electrical solve) ── */
-#inspector { padding: 8px 12px; overflow-y: auto; flex: 1; min-height: 0; font-family: var(--mono); font-size: 11px; }
+#inspector { padding: 8px 12px; overflow-y: auto; flex: 3 1 0; min-height: 0; font-family: var(--mono); font-size: 11px; }
 .insp-sect { margin-bottom: 12px; }
 .insp-h { color: var(--text-faint); letter-spacing: .12em; font-size: 9.5px; text-transform: uppercase; font-weight: 600; margin-bottom: 5px; padding-bottom: 3px; border-bottom: 1px solid var(--border); }
 .insp-count { color: var(--accent-text); }
@@ -211,14 +217,42 @@ aside, main { background: var(--panel); overflow: hidden; display: flex; flex-di
   box-shadow: var(--shadow), var(--edge-hi); backdrop-filter: var(--glass-blur);
   font-size: 13px; transition: opacity .3s var(--ease-out); pointer-events: none;
   animation: slide-down var(--t-slow) var(--ease-out) both; }
-#coach-dismiss { pointer-events: auto; }
+#coach-dismiss, #coach-min, .coach-nudge, .coach-ask { pointer-events: auto; }
 #coach.hidden { display: none; }
 #coach.coach-complete { opacity: 0; }
-.coach-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-.coach-title { font-weight: 700; letter-spacing: .02em; color: var(--text, #e8eef5); }
-#coach-dismiss { background: none; border: none; color: var(--text-dim, #8a93a3);
-  cursor: pointer; font-size: 14px; line-height: 1; padding: 2px 4px; border-radius: 6px; }
-#coach-dismiss:hover { color: var(--text, #e8eef5); background: var(--panel-2, #1a1f2a); }
+/* minimize: shrink + fade toward the left edge, then remove from layout.
+   animation:none is required — the base slide-down (fill:both) otherwise pins
+   opacity:1 and would override this. visibility:hidden after the fade so it
+   can't catch pointer events. */
+#coach.minimized { opacity: 0; transform: translateX(-40px) scale(.85); pointer-events: none;
+  animation: none; visibility: hidden;
+  transition: opacity .25s var(--ease-out), transform .25s var(--ease-out), visibility 0s .25s; }
+#coach.minimized ~ #coach-chip { /* chip handles its own visibility */ }
+#coach.dragging { animation: none; transition: none; cursor: grabbing; }
+/* the header is the drag handle (rest of the tab stays click-through) */
+.coach-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;
+  pointer-events: auto; cursor: grab; touch-action: none; }
+#coach.dragging .coach-head { cursor: grabbing; }
+.coach-title { font-weight: 700; letter-spacing: .02em; color: var(--text, #e8eef5); margin-right: auto; }
+#coach-dismiss, #coach-min { background: none; border: none; color: var(--text-dim, #8a93a3);
+  cursor: pointer; font-size: 14px; line-height: 1; padding: 2px 6px; border-radius: 6px; }
+#coach-dismiss:hover, #coach-min:hover { color: var(--text, #e8eef5); background: var(--panel-2, #1a1f2a); }
+.coach-head-btns { display: flex; align-items: center; gap: 2px; }
+
+/* the docked "restore" chip — a small pill on the left the tab collapses into */
+#coach-chip { position: absolute; left: 12px; top: 54px; z-index: 40;
+  display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px;
+  background: var(--overlay-strong); color: var(--text); cursor: pointer;
+  border: 1px solid var(--border-2); border-radius: 999px;
+  box-shadow: var(--shadow), var(--edge-hi); backdrop-filter: var(--glass-blur);
+  font-size: 12px; font-weight: 600; letter-spacing: .02em;
+  opacity: 0; transform: translateX(-16px) scale(.9);
+  transition: opacity .25s var(--ease-out), transform .25s var(--ease-out); }
+#coach-chip.hidden { display: none; }
+#coach-chip.in { opacity: 1; transform: none; }
+#coach-chip:hover { border-color: var(--accent); }
+#coach-chip .coach-chip-dot { color: var(--accent); animation: coach-pulse 2.4s ease-in-out infinite; }
+@keyframes coach-pulse { 0%, 100% { opacity: .6; } 50% { opacity: 1; } }
 #coach-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 #coach-steps li { display: flex; align-items: center; gap: 8px; color: var(--text-dim, #8a93a3);
   padding: 3px 4px; border-radius: 6px; transition: color .2s, background .2s; }
@@ -1148,4 +1182,50 @@ html, body { overscroll-behavior: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .jv-dot { animation: none; }
+}
+
+/* ── example-circuit gallery ── */
+#examples-btn {
+  position: absolute; top: 14px; right: 14px; z-index: 7;
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 8px 13px; border-radius: 999px;
+  background: var(--overlay-strong); border: 1px solid var(--border-2); color: var(--text);
+  font-size: 12px; font-weight: 600; letter-spacing: .02em; cursor: pointer;
+  box-shadow: var(--shadow-1), var(--edge-hi); backdrop-filter: var(--glass-blur);
+  transition: border-color var(--t-fast), transform var(--t-fast);
+}
+#examples-btn:hover { border-color: var(--accent); transform: translateY(-1px); }
+#examples-btn span:first-child { color: var(--accent); }
+
+#examples-panel {
+  position: absolute; top: 54px; right: 14px; z-index: 30;
+  width: min(340px, 88vw); max-height: min(70vh, 560px); display: flex; flex-direction: column;
+  background: var(--overlay-strong); border: 1px solid var(--border-2); border-radius: var(--r-lg);
+  box-shadow: var(--shadow-lg, var(--shadow)), var(--edge-hi); backdrop-filter: var(--glass-blur);
+  animation: slide-down var(--t-slow) var(--ease-out) both;
+}
+#examples-panel.hidden { display: none; }
+.ex-head { display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 14px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.ex-head b { color: var(--text); font-family: var(--heading, inherit); letter-spacing: .01em; }
+.ex-close { background: none; border: none; color: var(--text-dim); cursor: pointer;
+  font-size: 14px; padding: 2px 6px; border-radius: 6px; }
+.ex-close:hover { color: var(--text); background: var(--panel-2); }
+.ex-body { overflow-y: auto; padding: 8px; min-height: 0; }
+.ex-group { margin-bottom: 10px; }
+.ex-tier { color: var(--text-faint); font-size: 9.5px; text-transform: uppercase;
+  letter-spacing: .12em; font-weight: 600; padding: 4px 6px 6px; }
+.ex-item { display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: left;
+  padding: 9px 11px; margin-bottom: 4px; cursor: pointer;
+  background: linear-gradient(180deg, var(--panel-3), var(--panel-2));
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  transition: border-color var(--t-fast), transform var(--t-fast), box-shadow var(--t-fast); }
+.ex-item:hover { border-color: var(--accent); transform: translateY(-1px); box-shadow: var(--shadow-1); }
+.ex-item:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.ex-title { color: var(--text); font-weight: 600; font-size: 13px; }
+.ex-blurb { color: var(--text-dim); font-size: 11px; line-height: 1.4; }
+
+@media (max-width: 1024px) {
+  #examples-btn span:last-child { display: none; }   /* icon-only on tablets */
+  #examples-btn { padding: 8px; }
 }

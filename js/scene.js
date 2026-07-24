@@ -100,13 +100,13 @@ export function createScene(canvas) {
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(envScene, 0.04).texture;
 
-  const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 2000);
-  camera.position.set(18, 19, 27);
+  const camera = new THREE.PerspectiveCamera(44, 1, 0.1, 2000);
+  camera.position.set(21, 22, 33);
 
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
-  controls.target.set(0, 2, 1);
+  controls.target.set(3, 1, 3);
   controls.maxPolarAngle = Math.PI * 0.49;
   controls.minDistance = 8;
   controls.maxDistance = 160;

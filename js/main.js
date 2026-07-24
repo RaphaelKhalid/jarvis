@@ -10,6 +10,7 @@ import { state, set } from './app/state.js';
 import { initHud } from './app/hud.js';
 import { initCreatorAssembly } from './app/creator-assembly.js';
 import { initBenchSplat } from './app/bench-splat.js';
+import { initBenchRoom } from './app/bench-room.js';
 import { initInput } from './app/input.js';
 import { initTouch } from './app/touch.js';
 import { createApi } from './api/index.js';
@@ -59,6 +60,20 @@ window.__perf?.setRenderer?.(renderer);
 // Optional captured-room backdrop (Gaussian splat). Inert unless a splat is
 // supplied via ?splat=<url> / window.__benchSplat — costs nothing otherwise.
 window.__benchSplatApi = initBenchSplat({ scene, renderer, assemblyDecor });
+// Modeled desk-room workbench (replica of the reference photo). It replaces the
+// abstract "instrument studio" backdrop: hide the shader floor / chassis plate /
+// sky dome and swap in the room, keeping the shadow-catcher so parts still cast
+// contact shadows on the marble. assemblyDecor drives the sim-mode show/hide, so
+// pushing the room group into it means RUN hides the whole room in one shot.
+const benchRoom = initBenchRoom({ scene, renderer });
+const [studioFloor, shadowCatcher, studioChassis, studioSky] = assemblyDecor;
+[studioFloor, studioChassis, studioSky].forEach((m) => { if (m) m.visible = false; });
+scene.fog = null; // the room encloses the view; the studio fog would gray it out
+assemblyDecor.length = 0;
+assemblyDecor.push(shadowCatcher, benchRoom.group);
+window.__benchRoom = benchRoom;
+window.__view = { camera, controls }; // dev hook: inspect/position the assembly camera
+
 
 const sim = createSimBody(activeRobot().simKey, scene);   // legacy balance body (unused in M1; kept for hud refs)
 const creatorSim = new CreatorSim(scene);                 // M1 doc-driven motor body
@@ -309,9 +324,9 @@ function exitSim() {
   canvas.style.cursor = 'crosshair';
   controlsLegend.classList.remove('hidden');
   controls.enabled = true;
-  controls.target.set(0, 2, 1);
-  camera.position.set(18, 20, 26);
-  camera.fov = 45; camera.updateProjectionMatrix();
+  controls.target.set(3, 1, 3);
+  camera.position.set(21, 22, 33);
+  camera.fov = 44; camera.updateProjectionMatrix();
   hud.simHud.classList.add('hidden');
   hud.updateStepper();
 }

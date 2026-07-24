@@ -9,6 +9,7 @@ import { audio } from './audio.js';
 import { state, set } from './app/state.js';
 import { initHud } from './app/hud.js';
 import { initCreatorAssembly } from './app/creator-assembly.js';
+import { initBenchSplat } from './app/bench-splat.js';
 import { initInput } from './app/input.js';
 import { initTouch } from './app/touch.js';
 import { createApi } from './api/index.js';
@@ -55,6 +56,9 @@ try {
 const { renderer, scene, camera, controls, resize, composer, floorUniforms, assemblyDecor } = sceneBits;
 // Feed the renderer to the perf HUD so it can show draw-call/triangle counts (no-op when the HUD is off).
 window.__perf?.setRenderer?.(renderer);
+// Optional captured-room backdrop (Gaussian splat). Inert unless a splat is
+// supplied via ?splat=<url> / window.__benchSplat — costs nothing otherwise.
+window.__benchSplatApi = initBenchSplat({ scene, renderer, assemblyDecor });
 
 const sim = createSimBody(activeRobot().simKey, scene);   // legacy balance body (unused in M1; kept for hud refs)
 const creatorSim = new CreatorSim(scene);                 // M1 doc-driven motor body

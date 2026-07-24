@@ -59,7 +59,7 @@ export function initHud({ wiring, sim, getPlacedCount, getGains, onExitSim, onGa
 
     // M1: Run is always enabled — violations surface in the sim, not as a gate.
     uploadBtn.disabled = false;
-    clearBtn.disabled = state.mode === 'sim' || getPlacedCount() === 0;
+    clearBtn.disabled = state.mode === 'sim';
     updateStepper();
   }
 

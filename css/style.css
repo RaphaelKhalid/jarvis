@@ -1197,6 +1197,20 @@ html, body { overscroll-behavior: none; }
 #examples-btn:hover { border-color: var(--accent); transform: translateY(-1px); }
 #examples-btn span:first-child { color: var(--accent); }
 
+/* room-mode swap (modeled ⇄ scan): sits just below the Examples button */
+#room-toggle {
+  position: absolute; top: 54px; right: 14px; z-index: 7;
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 8px 13px; border-radius: 999px;
+  background: var(--overlay-strong); border: 1px solid var(--border-2); color: var(--text);
+  font-size: 12px; font-weight: 600; letter-spacing: .02em; cursor: pointer;
+  box-shadow: var(--shadow-1), var(--edge-hi); backdrop-filter: var(--glass-blur);
+  transition: border-color var(--t-fast), transform var(--t-fast);
+}
+#room-toggle:hover { border-color: var(--accent); transform: translateY(-1px); }
+#room-toggle span:first-child { color: var(--accent); }
+@media (max-width: 900px) { #room-toggle span:last-child { display: none; } #room-toggle { padding: 8px; } }
+
 #examples-panel {
   position: absolute; top: 54px; right: 14px; z-index: 30;
   width: min(340px, 88vw); max-height: min(70vh, 560px); display: flex; flex-direction: column;

@@ -20,7 +20,7 @@ import * as THREE from 'three';
 
 // palette pulled from the photo
 const SAGE = 0x9db09f;      // muted mint cabinet
-const MARBLE_WHITE = 0xf4f3ef;
+const MARBLE_WHITE = 0xdedad0;
 const WALL_GRAY = 0xcdd0cc;
 const WOOD = 0xcaa87e;      // light oak floor
 const BLACK_METAL = 0x1c1e22;
@@ -36,7 +36,7 @@ function makeCanvas(size = 1024) {
 // calacatta: warm-white base with a few soft grey (+ faint gold) vein systems
 function makeMarbleTexture() {
   const s = 1024, c = makeCanvas(s), x = c.getContext('2d');
-  x.fillStyle = '#f5f4f0'; x.fillRect(0, 0, s, s);
+  x.fillStyle = '#e8e5dc'; x.fillRect(0, 0, s, s);
   // faint cloudy mottling
   for (let i = 0; i < 120; i++) {
     x.globalAlpha = 0.03;
@@ -133,7 +133,7 @@ export function initBenchRoom({ scene, renderer } = {}) {
     // photographic exposure: the room is a bright white-marble space, so pull the
     // exposure down from the studio default (1.02) or the marble blows past the
     // bloom threshold (0.85) and washes the whole view white.
-    renderer.toneMappingExposure = 0.76;
+    renderer.toneMappingExposure = 0.72;
   }
   const group = new THREE.Group();
   group.name = 'bench-room';
@@ -144,8 +144,8 @@ export function initBenchRoom({ scene, renderer } = {}) {
 
   const marbleMat = new THREE.MeshPhysicalMaterial({
     color: MARBLE_WHITE, map: marbleTex,
-    roughness: 0.38, clearcoat: 1.0, clearcoatRoughness: 0.14,
-    envMapIntensity: 0.6,
+    roughness: 0.5, clearcoat: 0.8, clearcoatRoughness: 0.28,
+    envMapIntensity: 0.35,
   });
   const sageMat = new THREE.MeshStandardMaterial({ color: SAGE, roughness: 0.62, metalness: 0.02 });
   const wallMat = new THREE.MeshStandardMaterial({ color: WALL_GRAY, map: wallTex, roughness: 0.96 });
@@ -159,60 +159,63 @@ export function initBenchRoom({ scene, renderer } = {}) {
   // backsplash lip
   group.add(box(135, 8, 2.5, marbleMat, 12.5, 4, -23));
 
+  // Everything below is "room decor" — it lives in a sub-group so Scan mode can
+  // hide it and show the captured mesh in its place, while the marble slab +
+  // lights stay on as the bench surface in both modes.
+  const decor = [];
+
   // ── sage-green cabinet under the left of the counter ───────────────────────
   const cab = box(78, 76, 44, sageMat, -16, -42, 0);
-  group.add(cab);
+  decor.push(cab);
   // two drawer fronts + black bar handles on the front face (z = +22)
   const drawerMat = new THREE.MeshStandardMaterial({ color: 0xa7b9a9, roughness: 0.55 });
   for (const dx of [-34, 3]) {
-    const dr = box(35, 20, 1.5, drawerMat, dx, -13, 22.3);
-    group.add(dr);
-    group.add(box(15, 1.6, 1.6, blackMat, dx, -13, 23.4)); // handle bar
+    decor.push(box(35, 20, 1.5, drawerMat, dx, -13, 22.3));
+    decor.push(box(15, 1.6, 1.6, blackMat, dx, -13, 23.4)); // handle bar
   }
 
   // ── LG-style front-load washer under the right of the counter ──────────────
   const washer = box(54, 76, 44, washerMat, 52, -42, 0);
-  group.add(washer);
+  decor.push(washer);
   // recessed dark glass door
   const doorRing = new THREE.Mesh(
     new THREE.CylinderGeometry(16, 16, 3, 40),
     new THREE.MeshStandardMaterial({ color: 0xf0f0f0, roughness: 0.3, metalness: 0.3 }));
   doorRing.rotation.x = Math.PI / 2; doorRing.position.set(52, -38, 22.5);
-  doorRing.castShadow = true; group.add(doorRing);
+  doorRing.castShadow = true; decor.push(doorRing);
   const glass = new THREE.Mesh(
     new THREE.CylinderGeometry(12, 12, 2, 40),
     new THREE.MeshPhysicalMaterial({ color: 0x14171b, roughness: 0.15, metalness: 0.2,
       clearcoat: 1, clearcoatRoughness: 0.1 }));
-  glass.rotation.x = Math.PI / 2; glass.position.set(52, -38, 23.4); group.add(glass);
+  glass.rotation.x = Math.PI / 2; glass.position.set(52, -38, 23.4); decor.push(glass);
   // control strip
-  group.add(box(50, 7, 1, new THREE.MeshStandardMaterial({ color: 0x2a2d31, roughness: 0.5 }), 52, -8, 22.4));
+  decor.push(box(50, 7, 1, new THREE.MeshStandardMaterial({ color: 0x2a2d31, roughness: 0.5 }), 52, -8, 22.4));
 
   // ── room shell: back wall, left wall (with window), floor ──────────────────
   const backWall = new THREE.Mesh(new THREE.PlaneGeometry(400, 320), wallMat);
-  backWall.position.set(0, 60, -24.5); backWall.receiveShadow = true; group.add(backWall);
+  backWall.position.set(0, 60, -24.5); backWall.receiveShadow = true; decor.push(backWall);
 
   const leftWall = new THREE.Mesh(new THREE.PlaneGeometry(320, 320), wallMat);
   leftWall.rotation.y = Math.PI / 2; leftWall.position.set(-57, 60, 40);
-  leftWall.receiveShadow = true; group.add(leftWall);
+  leftWall.receiveShadow = true; decor.push(leftWall);
 
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(500, 500), woodMat);
   floor.rotation.x = -Math.PI / 2; floor.position.set(20, -78, 30);
-  floor.receiveShadow = true; group.add(floor);
+  floor.receiveShadow = true; decor.push(floor);
 
   // ── window on the left wall: bright warm pane + white frame + blind slats ───
   const paneMat = new THREE.MeshStandardMaterial({
-    color: 0xfff4e0, emissive: 0xfff0d6, emissiveIntensity: 0.55, roughness: 1 });
+    color: 0xfff4e0, emissive: 0xfff0d6, emissiveIntensity: 0.32, roughness: 1 });
   const pane = new THREE.Mesh(new THREE.PlaneGeometry(70, 70), paneMat);
-  pane.rotation.y = Math.PI / 2; pane.position.set(-56.6, 34, -6); group.add(pane);
+  pane.rotation.y = Math.PI / 2; pane.position.set(-56.6, 34, -6); decor.push(pane);
   const frameMat = new THREE.MeshStandardMaterial({ color: 0xf3f3f0, roughness: 0.7 });
-  const vframe = (z) => { const m = box(2, 74, 4, frameMat, -56.5, 34, z); group.add(m); };
-  const hframe = (y) => { const m = box(2, 4, 74, frameMat, -56.5, y, -6); group.add(m); };
+  const vframe = (z) => decor.push(box(2, 74, 4, frameMat, -56.5, 34, z));
+  const hframe = (y) => decor.push(box(2, 4, 74, frameMat, -56.5, y, -6));
   vframe(-42); vframe(30); hframe(-2); hframe(70);
   // blind slats over the top half
   const slatMat = new THREE.MeshStandardMaterial({ color: 0xf6f5f2, roughness: 0.8 });
   for (let i = 0; i < 8; i++) {
-    const sl = box(1.5, 1.4, 68, slatMat, -55.8, 66 - i * 4.5, -6);
-    group.add(sl);
+    decor.push(box(1.5, 1.4, 68, slatMat, -55.8, 66 - i * 4.5, -6));
   }
 
   // ── black desk lamp with an Edison globe bulb (left of the counter) ─────────
@@ -233,7 +236,7 @@ export function initBenchRoom({ scene, renderer } = {}) {
   bulb.position.set(12, 32, 0); lamp.add(bulb);
   const bulbLight = new THREE.PointLight(0xffcf87, 0.8, 120, 2);
   bulbLight.position.set(12, 31, 0); lamp.add(bulbLight);
-  lamp.position.set(-42, 0, -13); group.add(lamp);
+  lamp.position.set(-42, 0, -13); decor.push(lamp);
 
   // ── lighting: warm window key + soft fills, tuned to the photo ─────────────
   const key = new THREE.DirectionalLight(0xffdca8, 1.25);
@@ -253,6 +256,11 @@ export function initBenchRoom({ scene, renderer } = {}) {
   fill.position.set(40, 30, 40); group.add(fill);
   group.add(new THREE.AmbientLight(0xffffff, 0.05));
 
+  // pack all decor into the swappable sub-group
+  const props = new THREE.Group(); props.name = 'room-props';
+  for (const d of decor) props.add(d);
+  group.add(props);
+
   scene.add(group);
-  return { group, marbleY: 0, slab, textures: [marbleTex, woodTex, wallTex] };
+  return { group, props, marbleY: 0, slab, textures: [marbleTex, woodTex, wallTex] };
 }

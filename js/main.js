@@ -11,6 +11,7 @@ import { initHud } from './app/hud.js';
 import { initCreatorAssembly } from './app/creator-assembly.js';
 import { initBenchSplat } from './app/bench-splat.js';
 import { initBenchRoom } from './app/bench-room.js';
+import { initBenchScan } from './app/bench-scan.js';
 import { initInput } from './app/input.js';
 import { initTouch } from './app/touch.js';
 import { createApi } from './api/index.js';
@@ -73,6 +74,34 @@ assemblyDecor.length = 0;
 assemblyDecor.push(shadowCatcher, benchRoom.group);
 window.__benchRoom = benchRoom;
 window.__view = { camera, controls }; // dev hook: inspect/position the assembly camera
+
+// Scan variant of the room (the augmented photogrammetry mesh) + a click-to-swap
+// toggle. The marble slab + lights stay on in both modes; only the room decor
+// (walls/cabinet/washer/window/lamp) swaps for the captured mesh. The scan group
+// rides in assemblyDecor so RUN hides it too.
+const benchScan = initBenchScan({ scene });
+assemblyDecor.push(benchScan.group);
+let roomIsScan = false;
+function setRoomMode(scan) {
+  roomIsScan = scan;
+  benchRoom.props.visible = !scan;
+  if (scan) benchScan.show(); else benchScan.hide();
+  const btn = document.getElementById('room-toggle');
+  if (btn) btn.querySelector('span:last-child').textContent = scan ? 'Scan' : 'Modeled';
+}
+(function mountRoomToggle() {
+  const ws = document.getElementById('workspace');
+  if (!ws) return;
+  const btn = document.createElement('button');
+  btn.id = 'room-toggle';
+  btn.type = 'button';
+  btn.title = 'Swap between the hand-modeled room and the captured 3D scan';
+  btn.innerHTML = '<span aria-hidden="true">⇄</span><span>Modeled</span>';
+  btn.addEventListener('click', () => setRoomMode(!roomIsScan));
+  ws.appendChild(btn);
+})();
+window.__benchScan = benchScan;
+window.__setRoomMode = setRoomMode;
 
 
 const sim = createSimBody(activeRobot().simKey, scene);   // legacy balance body (unused in M1; kept for hud refs)

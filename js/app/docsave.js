@@ -89,12 +89,24 @@ export function initDocSave(api, { onFlash } = {}) {
   // API's onDocChange → 3D re-sync) rather than replacing it.
   const history = api.getHistory();
   const prevOnChange = history.onChange;
-  let timer = null;
+  let timer = null, pending = null;
+  function flush() {
+    if (!pending) return;
+    clearTimeout(timer); timer = null;
+    try { localStorage.setItem(DOC_KEY, JSON.stringify(pending)); } catch { /* quota/private */ }
+    pending = null;
+  }
   history.onChange = (doc) => {
     prevOnChange?.(doc);
+    pending = doc;
     clearTimeout(timer);
-    timer = setTimeout(() => { try { localStorage.setItem(DOC_KEY, JSON.stringify(doc)); } catch {} }, 200);
+    timer = setTimeout(flush, 200);
   };
+  // Never let the debounce swallow a build: a reload or a tab close within the
+  // debounce window — or a busy main thread that delays the timer past it —
+  // would otherwise drop the last change.
+  window.addEventListener('pagehide', flush);
+  window.addEventListener('visibilitychange', () => { if (document.hidden) flush(); });
 
   function shareUrl() {
     const doc = api.get_document();

@@ -76,15 +76,21 @@ window.__benchRoom = benchRoom;
 window.__view = { camera, controls }; // dev hook: inspect/position the assembly camera
 
 // Scan variant of the room (the augmented photogrammetry mesh) + a click-to-swap
-// toggle. The marble slab + lights stay on in both modes; only the room decor
-// (walls/cabinet/washer/window/lamp) swaps for the captured mesh. The scan group
-// rides in assemblyDecor so RUN hides it too.
+// toggle. In Scan mode the captured counter itself is the bench — bench-scan
+// lands its detected countertop on y = 0 (the plane parts rest on) — so BOTH the
+// modeled decor and the procedural marble slab hide; only the lights are shared.
+// The scan group rides in assemblyDecor so RUN hides it too.
 const benchScan = initBenchScan({ scene });
 assemblyDecor.push(benchScan.group);
-let roomIsScan = false;
+// The captured mesh is the default room; the toggle (and the persisted choice)
+// can fall back to the hand-modeled one.
+const ROOM_KEY = 'jarvis-room-mode';
+let roomIsScan = localStorage.getItem(ROOM_KEY) !== 'modeled';
 function setRoomMode(scan) {
   roomIsScan = scan;
+  try { localStorage.setItem(ROOM_KEY, scan ? 'scan' : 'modeled'); } catch { /* private mode */ }
   benchRoom.props.visible = !scan;
+  benchRoom.bench.visible = !scan;
   if (scan) benchScan.show(); else benchScan.hide();
   const btn = document.getElementById('room-toggle');
   if (btn) btn.querySelector('span:last-child').textContent = scan ? 'Scan' : 'Modeled';
@@ -99,6 +105,7 @@ function setRoomMode(scan) {
   btn.innerHTML = '<span aria-hidden="true">⇄</span><span>Modeled</span>';
   btn.addEventListener('click', () => setRoomMode(!roomIsScan));
   ws.appendChild(btn);
+  setRoomMode(roomIsScan);   // apply the default/persisted choice once the label exists
 })();
 window.__benchScan = benchScan;
 window.__setRoomMode = setRoomMode;

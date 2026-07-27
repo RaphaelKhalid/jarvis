@@ -154,14 +154,18 @@ export function initBenchRoom({ scene, renderer } = {}) {
   const washerMat = new THREE.MeshStandardMaterial({ color: WASHER_WHITE, roughness: 0.35, metalness: 0.1 });
 
   // ── countertop: top surface flush at y = 0 (where parts rest) ──────────────
+  // The slab + backsplash live in their own sub-group: in Scan mode the captured
+  // counter IS the bench surface, so main.js hides this group and only the lights
+  // stay shared between the two modes.
+  const bench = new THREE.Group(); bench.name = 'room-bench';
   const slab = box(135, 4, 50, marbleMat, 12.5, -2, 1);
-  group.add(slab);
+  bench.add(slab);
   // backsplash lip
-  group.add(box(135, 8, 2.5, marbleMat, 12.5, 4, -23));
+  bench.add(box(135, 8, 2.5, marbleMat, 12.5, 4, -23));
+  group.add(bench);
 
   // Everything below is "room decor" — it lives in a sub-group so Scan mode can
-  // hide it and show the captured mesh in its place, while the marble slab +
-  // lights stay on as the bench surface in both modes.
+  // hide it and show the captured mesh in its place.
   const decor = [];
 
   // ── sage-green cabinet under the left of the counter ───────────────────────
@@ -262,5 +266,5 @@ export function initBenchRoom({ scene, renderer } = {}) {
   group.add(props);
 
   scene.add(group);
-  return { group, props, marbleY: 0, slab, textures: [marbleTex, woodTex, wallTex] };
+  return { group, props, bench, marbleY: 0, slab, textures: [marbleTex, woodTex, wallTex] };
 }

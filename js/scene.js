@@ -101,20 +101,22 @@ export function createScene(canvas) {
   scene.environment = pmrem.fromScene(envScene, 0.04).texture;
 
   const camera = new THREE.PerspectiveCamera(44, 1, 0.1, 2000);
-  camera.position.set(21, 22, 33);
+  camera.position.set(38, 32, 56);
 
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
-  controls.target.set(3, 1, 3);
+  controls.target.set(6, -2, 2);
   controls.maxPolarAngle = Math.PI * 0.49;
   controls.minDistance = 8;
   controls.maxDistance = 160;
 
   // ── calibrated three-point studio lighting (cool, product-photo) ──────────
   // hemisphere: cool sky above, dark cool bounce below — sets the neutral base
-  scene.add(new THREE.HemisphereLight(0xcfe0ff, 0x0a0e15, 0.55));
-  scene.add(new THREE.AmbientLight(0xdfe8ff, 0.08));
+  const studioHemi = new THREE.HemisphereLight(0xcfe0ff, 0x0a0e15, 0.55);
+  const studioAmbient = new THREE.AmbientLight(0xdfe8ff, 0.08);
+  scene.add(studioHemi);
+  scene.add(studioAmbient);
   // key: crisp neutral-cool light from upper front-left, the shadow caster
   const key = new THREE.DirectionalLight(COL.keyCol, 2.6);
   key.position.set(26, 58, 34);
@@ -337,7 +339,16 @@ export function createScene(canvas) {
   window.addEventListener('resize', resize);
   resize();
 
-  return { renderer, scene, camera, controls, slotMeshes, resize, composer, floorUniforms, assemblyDecor };
+  // `bloom` is returned so a backdrop can retune it: the threshold below is set
+  // for the dark studio, where only emissives are bright. A daylit white-marble
+  // room pushes ordinary lit surfaces past it, and the whole bench hazes over.
+  //
+  // `studioLights` is the three-point rig above. It is NOT part of assemblyDecor
+  // (which only holds meshes), so nothing hides it — a backdrop that brings its
+  // own lighting has to switch it off explicitly or the two rigs sum, which
+  // both over-exposes the scene and drags a cool blue cast across it.
+  const studioLights = [studioHemi, studioAmbient, key, fill, rim, pool];
+  return { renderer, scene, camera, controls, slotMeshes, resize, composer, floorUniforms, assemblyDecor, bloom, studioLights };
 }
 
 // Deep-clone the shared gradient shader's uniforms so each mesh (env dome +

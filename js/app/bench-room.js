@@ -1,51 +1,68 @@
 // Bench room — a modeled 3D replica of the reference desk photo, built to be the
 // surface the electronic parts sit on. This is the "in-engine reconstruction"
-// path (chosen after a photo-capture came out too rough): a hand-built sage-green
-// cabinet desk with a white calacatta-marble countertop, a gray wall, a blinded
-// window throwing warm light from the left, a black desk lamp with an Edison
-// globe bulb, and an LG-style front-load washer tucked under the right of the
-// counter.
+// path (chosen after a photo-capture came out too rough): a sage-green cabinet
+// desk with a white calacatta-marble countertop, a plaster wall, a curtained
+// window throwing warm light from the left, a desk lamp, and an LG-style
+// front-load washer tucked under the right of the counter.
 //
 // Coordinate contract (1 unit = 1 cm, matching the rest of the app):
 //   • the marble TOP sits at world y = 0 — the same plane creator-assembly.js
 //     rests parts on (GROUND_Y = 0), so parts land flush on the counter.
 //   • the build area is ~±26 units in x/z; the slab extends well past that and
 //     the cabinet/washer sit below, the wall behind (−z), the window to the left.
+//   • every prop is placed OUTSIDE that ±26 keep-out, so nothing a user drags a
+//     component onto is ever occupied by scenery.
 //
-// Everything is procedural (geometry + canvas textures) so it stays zero-build
-// and CSP-safe — no external asset fetches. All meshes + lights live under one
-// group; hiding the group (done by the sim-mode decor toggle) turns the whole
-// room, lights included, off in one shot.
+// Fidelity comes from the CC0 asset set in assets/ (see CREDITS.md): ambientCG
+// PBR materials on the built surfaces, Poly Haven glTF models for the props, and
+// a Poly Haven HDRI for image-based lighting. The IBL is the load-bearing part —
+// marble, brushed metal and a laptop shell all read as flat plastic when there
+// is nothing in the scene for them to reflect.
+//
+// Loading is progressive and never blocks: geometry + lights go up synchronously
+// so the bench is usable immediately, then materials resolve and the props fade
+// in as their glTFs arrive. A missing or failed asset degrades to the flat
+// colour underneath it rather than throwing.
 import * as THREE from 'three';
+import { pbrMaterial, placeModel, loadEnvironment, whenIdle } from './room-assets.js';
+import { isLowQuality } from './quality.js';
 
-// palette pulled from the photo
-const SAGE = 0x9db09f;      // muted mint cabinet
-const MARBLE_WHITE = 0xdedad0;
-const WALL_GRAY = 0xcdd0cc;
-const WOOD = 0xcaa87e;      // light oak floor
+// palette pulled from the photo. These are TINTS, and three multiplies tint ×
+// albedo — so a surface that already carries its own colour (the calacatta
+// canvas, the oak floor) must be left at white or it just goes muddy.
+const SAGE = 0xa8bcaa;      // muted mint cabinet
+const MARBLE_WHITE = 0xffffff;   // colour lives in the calacatta canvas
+const WALL_GRAY = 0xdfe2de;
+const WOOD = 0xffffff;      // WoodFloor051 is already light oak
 const BLACK_METAL = 0x1c1e22;
 const WASHER_WHITE = 0xe8e9ea;
 
-// ── procedural textures ────────────────────────────────────────────────────
+// The build area parts get dropped into. Props must clear it.
+const BUILD_HALF = 26;
+
+// ── procedural albedos ─────────────────────────────────────────────────────
+// Two surfaces draw their base colour from canvas rather than from the CC0 set,
+// because the downloaded material doesn't look like its name (see room-assets.js
+// `useColor`). Their ambientCG normal/roughness maps are still used underneath —
+// only the colour is replaced.
 function makeCanvas(size = 1024) {
   const c = document.createElement('canvas');
   c.width = c.height = size;
   return c;
 }
 
-// calacatta: warm-white base with a few soft grey (+ faint gold) vein systems
+// calacatta: warm-white base with a few soft grey (+ faint gold) vein systems.
+// Stands in for Marble016, which is black marble.
 function makeMarbleTexture() {
   const s = 1024, c = makeCanvas(s), x = c.getContext('2d');
-  x.fillStyle = '#e8e5dc'; x.fillRect(0, 0, s, s);
-  // faint cloudy mottling
+  x.fillStyle = '#f2efe7'; x.fillRect(0, 0, s, s);
   for (let i = 0; i < 120; i++) {
     x.globalAlpha = 0.03;
-    x.fillStyle = i % 5 ? '#e9e7e0' : '#d9d6cd';
+    x.fillStyle = i % 5 ? '#f6f4ee' : '#e2dfd6';
     const r = 40 + Math.random() * 160;
     x.beginPath(); x.arc(Math.random() * s, Math.random() * s, r, 0, 7); x.fill();
   }
   x.globalAlpha = 1;
-  // vein systems — a few main diagonals with branching hairlines
   const vein = (sx, sy, ex, ey, w, col) => {
     x.strokeStyle = col; x.lineWidth = w; x.lineCap = 'round';
     x.beginPath(); x.moveTo(sx, sy);
@@ -55,16 +72,15 @@ function makeMarbleTexture() {
   };
   for (let i = 0; i < 5; i++) {
     const sx = Math.random() * s, sy = -20, ex = Math.random() * s, ey = s + 20;
-    vein(sx, sy, ex, ey, 2.4 + Math.random() * 2, 'rgba(120,120,124,0.5)');
-    // hairline branches
+    vein(sx, sy, ex, ey, 2.4 + Math.random() * 2, 'rgba(120,120,124,0.45)');
     for (let j = 0; j < 4; j++) {
       const t = Math.random();
       vein(sx + (ex - sx) * t, sy + (ey - sy) * t,
         sx + (ex - sx) * t + (Math.random() - 0.5) * 260,
         sy + (ey - sy) * t + (Math.random() - 0.5) * 260,
-        0.8, 'rgba(150,148,150,0.35)');
+        0.8, 'rgba(150,148,150,0.3)');
     }
-    if (i < 2) vein(sx + 6, sy, ex + 6, ey, 1, 'rgba(196,178,120,0.22)'); // faint gold
+    if (i < 2) vein(sx + 6, sy, ex + 6, ey, 1, 'rgba(196,178,120,0.2)'); // faint gold
   }
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
@@ -72,45 +88,15 @@ function makeMarbleTexture() {
   return t;
 }
 
-// light oak planks with subtle grain
-function makeWoodTexture() {
-  const s = 1024, c = makeCanvas(s), x = c.getContext('2d');
-  x.fillStyle = '#caa87e'; x.fillRect(0, 0, s, s);
-  const planks = 6, pw = s / planks;
-  for (let p = 0; p < planks; p++) {
-    const shade = 200 + Math.floor(Math.random() * 30);
-    x.fillStyle = `rgb(${shade},${Math.floor(shade * 0.82)},${Math.floor(shade * 0.6)})`;
-    x.fillRect(p * pw, 0, pw, s);
-    // grain lines
-    for (let g = 0; g < 40; g++) {
-      x.globalAlpha = 0.05 + Math.random() * 0.06;
-      x.strokeStyle = '#7a5a34'; x.lineWidth = 0.6 + Math.random();
-      const gy = Math.random() * s;
-      x.beginPath(); x.moveTo(p * pw, gy);
-      x.bezierCurveTo(p * pw + pw * 0.3, gy + (Math.random() - 0.5) * 20,
-        p * pw + pw * 0.6, gy + (Math.random() - 0.5) * 20, p * pw + pw, gy);
-      x.stroke();
-    }
-    x.globalAlpha = 1;
-    // plank seam
-    x.strokeStyle = 'rgba(60,40,20,0.5)'; x.lineWidth = 2;
-    x.beginPath(); x.moveTo(p * pw, 0); x.lineTo(p * pw, s); x.stroke();
-  }
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.repeat.set(4, 4);
-  t.anisotropy = 8;
-  return t;
-}
-
-// subtle wall stipple (the gray textured plaster)
+// clean grey painted plaster. Stands in for PaintedPlaster016, whose colour AND
+// normal are distressed plaster falling off exposed brick — the brick relief
+// makes even its normal map unusable for a tidy interior wall.
 function makeWallTexture() {
   const s = 512, c = makeCanvas(s), x = c.getContext('2d');
-  x.fillStyle = '#cdd0cc'; x.fillRect(0, 0, s, s);
+  x.fillStyle = '#d5d8d4'; x.fillRect(0, 0, s, s);
   for (let i = 0; i < 9000; i++) {
     x.globalAlpha = 0.04;
-    x.fillStyle = Math.random() > 0.5 ? '#ffffff' : '#a8aca6';
+    x.fillStyle = Math.random() > 0.5 ? '#ffffff' : '#b4b8b2';
     x.fillRect(Math.random() * s, Math.random() * s, 1.4, 1.4);
   }
   const t = new THREE.CanvasTexture(c);
@@ -127,31 +113,85 @@ function box(w, h, d, mat, x = 0, y = 0, z = 0) {
   return m;
 }
 
-export function initBenchRoom({ scene, renderer } = {}) {
+export function initBenchRoom({ scene, renderer, bloom, studioLights = [] } = {}) {
+  const lowQ = isLowQuality();
+  // The studio three-point rig isn't a mesh, so the decor show/hide never touches
+  // it. Left on, it sums with the room's own daylight — over-exposing everything
+  // and washing a cool blue cast over warm wood and sage paint. The room lights
+  // itself, so the studio rig goes dark while it's up. Kept (not removed) so RUN
+  // mode and the Scan room can switch it back on.
+  for (const l of studioLights) l.visible = false;
   if (renderer) {
     renderer.shadowMap.enabled = true;
-    // photographic exposure: the room is a bright white-marble space, so pull the
-    // exposure down from the studio default (1.02) or the marble blows past the
-    // bloom threshold (0.85) and washes the whole view white.
-    renderer.toneMappingExposure = 0.72;
+    // photographic exposure, a touch under the studio default (1.02).
+    renderer.toneMappingExposure = 1.0;
+  }
+  // Retune bloom for a daylit room. The studio threshold (0.85 linear) assumes
+  // the only bright things in frame are emissives; here every sunlit white
+  // surface clears it, and the bench hazes over into milk. Raising the threshold
+  // above "brightly lit white" keeps the glow for LEDs and the lamp filament,
+  // which are emissive and far brighter still.
+  if (bloom) {
+    bloom.threshold = 1.15;
+    bloom.strength = lowQ ? 0.22 : 0.3;
   }
   const group = new THREE.Group();
   group.name = 'bench-room';
 
+  // ── materials ─────────────────────────────────────────────────────────────
+  // `repeat` is tiles across each face's 0..1 UV span, picked so the grain reads
+  // at real-world scale on the mesh it lands on.
+  //
+  // Only WoodFloor051 is used as shipped. The rest take their surface relief
+  // (normal/roughness/AO) from ambientCG but get their colour from the palette
+  // or a canvas — see room-assets.js `useColor` for why.
   const marbleTex = makeMarbleTexture();
-  const woodTex = makeWoodTexture();
   const wallTex = makeWallTexture();
 
-  const marbleMat = new THREE.MeshPhysicalMaterial({
-    color: MARBLE_WHITE, map: marbleTex,
-    roughness: 0.5, clearcoat: 0.8, clearcoatRoughness: 0.28,
-    envMapIntensity: 0.35,
+  const marbleMat = pbrMaterial('Marble016', {
+    repeat: 2, physical: true, useColor: false,
+    map: marbleTex, color: MARBLE_WHITE,
+    roughness: 0.42, clearcoat: 0.4, clearcoatRoughness: 0.3,
+    envMapIntensity: 0.55,
   });
-  const sageMat = new THREE.MeshStandardMaterial({ color: SAGE, roughness: 0.62, metalness: 0.02 });
-  const wallMat = new THREE.MeshStandardMaterial({ color: WALL_GRAY, map: wallTex, roughness: 0.96 });
-  const woodMat = new THREE.MeshStandardMaterial({ color: WOOD, map: woodTex, roughness: 0.78 });
-  const blackMat = new THREE.MeshStandardMaterial({ color: BLACK_METAL, roughness: 0.42, metalness: 0.75 });
-  const washerMat = new THREE.MeshStandardMaterial({ color: WASHER_WHITE, roughness: 0.35, metalness: 0.1 });
+  // plain plaster: PaintedPlaster016's normal carries brick relief, so this one
+  // takes nothing from the CC0 set at all.
+  const wallMat = new THREE.MeshStandardMaterial({
+    map: wallTex, color: WALL_GRAY, roughness: 0.95, envMapIntensity: 0.6,
+  });
+  const woodMat = pbrMaterial('WoodFloor051', {
+    repeat: 7, color: WOOD, roughness: 0.8, envMapIntensity: 0.5,
+  });
+  // painted cabinetry: the barn-wood grain relief reads correctly as grain
+  // showing through paint, so keep the normal and repaint the albedo sage.
+  const cabinetMat = pbrMaterial('PaintedWood008C', {
+    repeat: 2, useColor: false, color: SAGE, roughness: 0.6, envMapIntensity: 0.6,
+  });
+  const drawerMat = pbrMaterial('PaintedWood008C', {
+    repeat: 1, useColor: false, color: 0xaec0b0, roughness: 0.55, envMapIntensity: 0.6,
+  });
+  const curtainMat = pbrMaterial('Fabric061', {
+    repeat: 3, useColor: false, color: 0xf6f3ec, roughness: 0.95,
+    side: THREE.DoubleSide, envMapIntensity: 0.8,
+  });
+  const blackMat = new THREE.MeshStandardMaterial({
+    color: BLACK_METAL, roughness: 0.38, metalness: 0.8, envMapIntensity: 1.1 });
+  const washerMat = new THREE.MeshStandardMaterial({
+    color: WASHER_WHITE, roughness: 0.3, metalness: 0.12, envMapIntensity: 0.9 });
+
+  // ── image-based lighting (async; the room is lit by the analytic lights until
+  // it lands, then gains real reflections) ───────────────────────────────────
+  if (renderer) {
+    // 1k, not 2k, on every tier. The HDRI is never rendered — scene.background
+    // stays as-is and it is only ever convolved by PMREM into a low-order
+    // irradiance/specular map, so the extra mip detail in the 2k is thrown away.
+    // What it does cost is real: 6.5 MB of float decode plus a slower convolution
+    // (~4× the page-load time in CI). assets/hdri keeps the 2k for stills.
+    whenIdle(() => loadEnvironment(renderer, scene, {
+      file: 'residential_garden_1k',
+      intensity: 0.9,
+    }).catch((e) => console.warn('[bench-room] HDRI failed, keeping studio env', e)));
+  }
 
   // ── countertop: top surface flush at y = 0 (where parts rest) ──────────────
   // The slab + backsplash live in their own sub-group: in Scan mode the captured
@@ -169,102 +209,169 @@ export function initBenchRoom({ scene, renderer } = {}) {
   const decor = [];
 
   // ── sage-green cabinet under the left of the counter ───────────────────────
-  const cab = box(78, 76, 44, sageMat, -16, -42, 0);
-  decor.push(cab);
-  // two drawer fronts + black bar handles on the front face (z = +22)
-  const drawerMat = new THREE.MeshStandardMaterial({ color: 0xa7b9a9, roughness: 0.55 });
+  decor.push(box(78, 76, 44, cabinetMat, -16, -42, 0));
   for (const dx of [-34, 3]) {
     decor.push(box(35, 20, 1.5, drawerMat, dx, -13, 22.3));
     decor.push(box(15, 1.6, 1.6, blackMat, dx, -13, 23.4)); // handle bar
   }
 
   // ── LG-style front-load washer under the right of the counter ──────────────
-  const washer = box(54, 76, 44, washerMat, 52, -42, 0);
-  decor.push(washer);
-  // recessed dark glass door
+  decor.push(box(54, 76, 44, washerMat, 52, -42, 0));
   const doorRing = new THREE.Mesh(
     new THREE.CylinderGeometry(16, 16, 3, 40),
-    new THREE.MeshStandardMaterial({ color: 0xf0f0f0, roughness: 0.3, metalness: 0.3 }));
+    new THREE.MeshStandardMaterial({ color: 0xf0f0f0, roughness: 0.28, metalness: 0.35 }));
   doorRing.rotation.x = Math.PI / 2; doorRing.position.set(52, -38, 22.5);
   doorRing.castShadow = true; decor.push(doorRing);
   const glass = new THREE.Mesh(
     new THREE.CylinderGeometry(12, 12, 2, 40),
-    new THREE.MeshPhysicalMaterial({ color: 0x14171b, roughness: 0.15, metalness: 0.2,
-      clearcoat: 1, clearcoatRoughness: 0.1 }));
+    new THREE.MeshPhysicalMaterial({ color: 0x14171b, roughness: 0.12, metalness: 0.2,
+      clearcoat: 1, clearcoatRoughness: 0.08, envMapIntensity: 1.4 }));
   glass.rotation.x = Math.PI / 2; glass.position.set(52, -38, 23.4); decor.push(glass);
-  // control strip
   decor.push(box(50, 7, 1, new THREE.MeshStandardMaterial({ color: 0x2a2d31, roughness: 0.5 }), 52, -8, 22.4));
 
-  // ── room shell: back wall, left wall (with window), floor ──────────────────
-  const backWall = new THREE.Mesh(new THREE.PlaneGeometry(400, 320), wallMat);
-  backWall.position.set(0, 60, -24.5); backWall.receiveShadow = true; decor.push(backWall);
+  // ── room shell: back wall, left wall (with window), right wall, floor ──────
+  const backWall = new THREE.Mesh(new THREE.PlaneGeometry(420, 320), wallMat);
+  backWall.position.set(20, 60, -24.5); backWall.receiveShadow = true; decor.push(backWall);
 
   const leftWall = new THREE.Mesh(new THREE.PlaneGeometry(320, 320), wallMat);
   leftWall.rotation.y = Math.PI / 2; leftWall.position.set(-57, 60, 40);
   leftWall.receiveShadow = true; decor.push(leftWall);
 
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(500, 500), woodMat);
-  floor.rotation.x = -Math.PI / 2; floor.position.set(20, -78, 30);
+  // right wall — off-frame at the default camera, but it bounces the key light
+  // back into the scene instead of letting it fall into a black void.
+  const rightWall = new THREE.Mesh(new THREE.PlaneGeometry(320, 320), wallMat);
+  rightWall.rotation.y = -Math.PI / 2; rightWall.position.set(150, 60, 40);
+  rightWall.receiveShadow = true; decor.push(rightWall);
+
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(600, 600), woodMat);
+  floor.rotation.x = -Math.PI / 2; floor.position.set(20, -78, 40);
   floor.receiveShadow = true; decor.push(floor);
 
-  // ── window on the left wall: bright warm pane + white frame + blind slats ───
+  // ── window on the left wall: bright warm pane + white frame + fabric curtain ─
   const paneMat = new THREE.MeshStandardMaterial({
-    color: 0xfff4e0, emissive: 0xfff0d6, emissiveIntensity: 0.32, roughness: 1 });
+    color: 0xfff4e0, emissive: 0xfff0d6, emissiveIntensity: 0.3, roughness: 1 });
   const pane = new THREE.Mesh(new THREE.PlaneGeometry(70, 70), paneMat);
   pane.rotation.y = Math.PI / 2; pane.position.set(-56.6, 34, -6); decor.push(pane);
-  const frameMat = new THREE.MeshStandardMaterial({ color: 0xf3f3f0, roughness: 0.7 });
+  const frameMat = new THREE.MeshStandardMaterial({ color: 0xf3f3f0, roughness: 0.65 });
   const vframe = (z) => decor.push(box(2, 74, 4, frameMat, -56.5, 34, z));
   const hframe = (y) => decor.push(box(2, 4, 74, frameMat, -56.5, y, -6));
   vframe(-42); vframe(30); hframe(-2); hframe(70);
-  // blind slats over the top half
-  const slatMat = new THREE.MeshStandardMaterial({ color: 0xf6f5f2, roughness: 0.8 });
-  for (let i = 0; i < 8; i++) {
-    decor.push(box(1.5, 1.4, 68, slatMat, -55.8, 66 - i * 4.5, -6));
+  // a gathered fabric panel down the near edge of the window, replacing the old
+  // procedural blind slats — a real cloth normal map catches the key light and
+  // sells the "daylight through a window" read far better than flat white boxes.
+  const curtain = new THREE.Mesh(new THREE.PlaneGeometry(46, 80, 24, 1), curtainMat);
+  {
+    const p = curtain.geometry.attributes.position;
+    for (let i = 0; i < p.count; i++) {
+      // ripple across the panel's width so it reads as hanging cloth, not card
+      p.setZ(i, Math.sin(p.getX(i) * 0.42) * 2.6);
+    }
+    curtain.geometry.computeVertexNormals();
   }
+  curtain.rotation.y = Math.PI / 2; curtain.position.set(-54, 34, 12);
+  curtain.castShadow = true; curtain.receiveShadow = true; decor.push(curtain);
 
-  // ── black desk lamp with an Edison globe bulb (left of the counter) ─────────
-  const lamp = new THREE.Group();
-  const base = new THREE.Mesh(new THREE.CylinderGeometry(6, 6.5, 2, 24),
-    new THREE.MeshStandardMaterial({ color: 0xcaa87e, roughness: 0.6 })); // wood base
-  base.position.set(0, 1, 0); base.castShadow = true; lamp.add(base);
-  const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 40, 16), blackMat);
-  rod.position.set(0, 21, 0); rod.castShadow = true; lamp.add(rod);
-  const arm = new THREE.Mesh(new THREE.TorusGeometry(6, 0.7, 12, 24, Math.PI), blackMat);
-  arm.position.set(6, 40, 0); arm.rotation.z = Math.PI; lamp.add(arm);
-  const socket = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 3, 16), blackMat);
-  socket.position.set(12, 38, 0); lamp.add(socket);
-  const bulbMat = new THREE.MeshStandardMaterial({
-    color: 0xfff1cf, emissive: 0xffd98a, emissiveIntensity: 2.4, roughness: 0.3,
-    transparent: true, opacity: 0.92 });
-  const bulb = new THREE.Mesh(new THREE.SphereGeometry(4, 24, 24), bulbMat);
-  bulb.position.set(12, 32, 0); lamp.add(bulb);
-  const bulbLight = new THREE.PointLight(0xffcf87, 0.8, 120, 2);
-  bulbLight.position.set(12, 31, 0); lamp.add(bulbLight);
-  lamp.position.set(-42, 0, -13); decor.push(lamp);
+  // pack the built geometry into the swappable sub-group before the async props
+  // land — placeModel() appends into this same group as each glTF resolves.
+  const props = new THREE.Group(); props.name = 'room-props';
+  for (const d of decor) props.add(d);
+  group.add(props);
+
+  // ── Poly Haven props (async) ───────────────────────────────────────────────
+  // Every position clears the ±26 build area. Models are metres → placeModel
+  // applies the ×100 and bottom-aligns off the real bbox, so nothing floats or
+  // sinks when an asset is swapped. `y: 0` = standing on the counter,
+  // `y: -78` = standing on the floor.
+  // The counter is only ~55 cm of clear slab either side of the build area, and
+  // several of these assets are authored well over life size (the "classic
+  // laptop" is 65 cm wide), so each one is fitted to a real desk height and the
+  // strips hold exactly what they fit — one substantial prop per side plus small
+  // stuff. Crowding more in just makes props intersect each other.
+  const onCounter = [
+    // the articulated lamp, sitting where the procedural one used to
+    ['desk_lamp_arm_01', { x: -41, z: -2, rotY: 0.6, fitHeight: 46 }],
+    ['classic_laptop', { x: 48, z: 2, rotY: -0.55, fitHeight: 26 }],
+  ];
+  const onFloor = [
+    // The only floor prop the default camera actually sees: everything else out
+    // there is either behind the camera or inside the counter's footprint. The
+    // gap between the end of the counter (x=80) and the right wall (x=150) is
+    // ~70 cm, so it's fitted down from its natural 84 cm height to clear both.
+    ['potted_plant_02', { x: 115, z: -5, rotY: -0.4, fitHeight: 60 }],
+  ];
+  // Unused from the asset set, kept for later rather than forced in here:
+  //   • pachira_aquatica_01 — the file holds FOUR variants side by side (a/b/c/d,
+  //     each a bark + leaves pair), which is the real reason its bbox is 6.9 m
+  //     wide. Variant "d" alone is a fine 1.9 m tree, but with 1.4 m of canopy
+  //     spread there is nowhere in this room to stand it: the only visible floor
+  //     is the ~70 cm strip right of the counter.
+  //   • ceramic_pot — authored as a 66 cm floor planter; shrunk to desk scale it
+  //     reads as a bowl, and at full size it collides with everything.
+  //   • drawer_cabinet — redundant with the sage cabinet and washer already built
+  //     under the counter.
+
+  const placed = [];
+  const track = (p) => { if (p) placed.push(p); return p; };
+  const drop = (name, at, y) => placeModel(name, { ...at, y, parent: props })
+    .then(track).catch((e) => console.warn(`[bench-room] ${name} skipped`, e));
+  // deferred past `load` for the same reason as the HDRI — see whenIdle()
+  whenIdle(() => {
+    for (const [name, at] of onCounter) drop(name, at, 0);
+    for (const [name, at] of onFloor) drop(name, at, -78);
+  // The stationery set is 9 separate props authored side by side in one file, so
+  // it gets picked apart too. Note picking keeps the originals' relative spacing,
+  // so a multi-item pick is still as wide as their layout — taking just the
+  // pencil cup gives one compact 8 cm prop instead of a 29 cm spread.
+  //
+  // assets/models/polyhaven/modular_electric_cables is deliberately UNUSED here.
+  // It's a 49-piece modular kit for building wall/conduit runs, authored flat in
+  // the XY plane on a layout grid — every piece would need its own rotation to
+  // lie on a counter, and any multi-piece pick keeps the grid spacing and sprays
+  // cable across a metre of bench. It stays in the asset set for a future wiring
+  // prop, but it is not room dressing.
+    drop('stationery_supplies', {
+      x: -44, z: 18, rotY: 0.2, pick: (n) => /pencilcup/.test(n),
+    }, 0);
+  });
 
   // ── lighting: warm window key + soft fills, tuned to the photo ─────────────
-  const key = new THREE.DirectionalLight(0xffdca8, 1.25);
+  // Sized to light the room ALONE — the studio three-point rig is switched off
+  // above, so these are the only analytic lights in play. They also have to hold
+  // the room up on their own for the first moment, before the deferred HDRI
+  // lands and starts carrying the ambient.
+  const key = new THREE.DirectionalLight(0xffdca8, 2.1);
   key.position.set(-70, 70, 24); key.target.position.set(10, 0, 4);
   key.castShadow = true;
-  key.shadow.mapSize.set(2048, 2048);
+  key.shadow.mapSize.set(lowQ ? 1024 : 2048, lowQ ? 1024 : 2048);
   key.shadow.camera.near = 10; key.shadow.camera.far = 320;
   const sc = 110;
   key.shadow.camera.left = -sc; key.shadow.camera.right = sc;
   key.shadow.camera.top = sc; key.shadow.camera.bottom = -sc;
   key.shadow.bias = -0.0004;
+  key.shadow.normalBias = 0.4;
   group.add(key); group.add(key.target);
 
-  const hemi = new THREE.HemisphereLight(0xbfd4e8, 0x6b5a45, 0.32);
+  const hemi = new THREE.HemisphereLight(0xd6e6f5, 0x8a7a63, 0.55);
   group.add(hemi);
-  const fill = new THREE.DirectionalLight(0xdfe8ff, 0.2);
+  const fill = new THREE.DirectionalLight(0xdfe8ff, 0.45);
   fill.position.set(40, 30, 40); group.add(fill);
-  group.add(new THREE.AmbientLight(0xffffff, 0.05));
 
-  // pack all decor into the swappable sub-group
-  const props = new THREE.Group(); props.name = 'room-props';
-  for (const d of decor) props.add(d);
-  group.add(props);
+  // a warm point light standing in for the lamp's bulb, so the left end of the
+  // counter has a pool of light whether or not the lamp model ever loads.
+  const lampGlow = new THREE.PointLight(0xffcf87, 0.9, 130, 2);
+  lampGlow.position.set(-34, 34, -10);
+  group.add(lampGlow);
 
   scene.add(group);
-  return { group, props, bench, marbleY: 0, slab, textures: [marbleTex, woodTex, wallTex] };
+  return {
+    group, props, bench, marbleY: 0, slab, placed,
+    buildHalf: BUILD_HALF,
+    // named so tests can assert per-surface expectations: `pbrSurfaces` must
+    // carry ambientCG relief maps, all of them must carry a base colour.
+    materials: {
+      marble: marbleMat, wall: wallMat, floor: woodMat,
+      cabinet: cabinetMat, curtain: curtainMat,
+    },
+    pbrSurfaces: ['marble', 'floor', 'cabinet', 'curtain'],
+  };
 }

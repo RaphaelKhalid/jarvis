@@ -55,7 +55,7 @@ try {
   showFatal();
   throw e;
 }
-const { renderer, scene, camera, controls, resize, composer, floorUniforms, assemblyDecor } = sceneBits;
+const { renderer, scene, camera, controls, resize, composer, floorUniforms, assemblyDecor, bloom, studioLights } = sceneBits;
 // Feed the renderer to the perf HUD so it can show draw-call/triangle counts (no-op when the HUD is off).
 window.__perf?.setRenderer?.(renderer);
 // Optional captured-room backdrop (Gaussian splat). Inert unless a splat is
@@ -66,7 +66,7 @@ window.__benchSplatApi = initBenchSplat({ scene, renderer, assemblyDecor });
 // sky dome and swap in the room, keeping the shadow-catcher so parts still cast
 // contact shadows on the marble. assemblyDecor drives the sim-mode show/hide, so
 // pushing the room group into it means RUN hides the whole room in one shot.
-const benchRoom = initBenchRoom({ scene, renderer });
+const benchRoom = initBenchRoom({ scene, renderer, bloom, studioLights });
 const [studioFloor, shadowCatcher, studioChassis, studioSky] = assemblyDecor;
 [studioFloor, studioChassis, studioSky].forEach((m) => { if (m) m.visible = false; });
 scene.fog = null; // the room encloses the view; the studio fog would gray it out
@@ -82,10 +82,11 @@ window.__view = { camera, controls }; // dev hook: inspect/position the assembly
 // The scan group rides in assemblyDecor so RUN hides it too.
 const benchScan = initBenchScan({ scene });
 assemblyDecor.push(benchScan.group);
-// The captured mesh is the default room; the toggle (and the persisted choice)
-// can fall back to the hand-modeled one.
+// The modeled room is the default now that it's a PBR reconstruction (real
+// materials, glTF props, HDRI lighting) rather than the flat procedural stand-in
+// the capture used to beat; the toggle still swaps to the captured mesh.
 const ROOM_KEY = 'jarvis-room-mode';
-let roomIsScan = localStorage.getItem(ROOM_KEY) !== 'modeled';
+let roomIsScan = localStorage.getItem(ROOM_KEY) === 'scan';
 function setRoomMode(scan) {
   roomIsScan = scan;
   try { localStorage.setItem(ROOM_KEY, scan ? 'scan' : 'modeled'); } catch { /* private mode */ }
@@ -334,6 +335,9 @@ async function enterSim() {
   set('mode', 'sim');
   assemblyApi.group.visible = false;   // hides parts + wires (both live under the group)
   for (const d of assemblyDecor) d.visible = false;
+  // the room (and its lights) is gone in RUN — bring the studio rig back or the
+  // sim arena renders unlit
+  for (const l of studioLights) l.visible = true;
   canvas.style.cursor = 'default';
   controlsLegend.classList.add('hidden');
   creatorSim.reset();
@@ -357,11 +361,12 @@ function exitSim() {
   creatorSim.hide();
   assemblyApi.group.visible = true;
   for (const d of assemblyDecor) d.visible = true;
+  for (const l of studioLights) l.visible = false;   // back to the room's own lighting
   canvas.style.cursor = 'crosshair';
   controlsLegend.classList.remove('hidden');
   controls.enabled = true;
-  controls.target.set(3, 1, 3);
-  camera.position.set(21, 22, 33);
+  controls.target.set(6, -2, 2);
+  camera.position.set(38, 32, 56);
   camera.fov = 44; camera.updateProjectionMatrix();
   hud.simHud.classList.add('hidden');
   hud.updateStepper();

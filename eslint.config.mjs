@@ -25,6 +25,24 @@ export default [
     },
   },
   {
+    // The MCP server — plain Node, not a browser. It imports js/model, js/api and
+    // js/sim directly, so those files must stay free of browser globals.
+    files: ['mcp/**/*.{js,mjs}'],
+    languageOptions: {
+      ecmaVersion: 2024,
+      sourceType: 'module',
+      globals: {
+        process: 'readonly', console: 'readonly', fetch: 'readonly',
+        URL: 'readonly', Buffer: 'readonly',
+        setTimeout: 'readonly', clearTimeout: 'readonly',
+      },
+    },
+    rules: {
+      'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      'no-undef': 'error',
+    },
+  },
+  {
     // Vercel Edge Functions — web-standard runtime globals (fetch/Request/Response)
     // plus process.env for secrets.
     files: ['api/**/*.js'],

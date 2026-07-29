@@ -1,0 +1,37 @@
+{
+  "name": "jarvis",
+  "version": "1.0.0",
+  "description": "Jarvis — a browser robotics creator space. Build a robot from real components, wire the circuit, and watch a Rapier physics simulation run it. A natural-language assistant (Gemini) drives the same scriptable API the UI does.",
+  "main": "index.js",
+  "scripts": {
+    "test": "playwright test",
+    "test:mcp": "node --test mcp/tools.test.mjs",
+    "lint": "eslint .",
+    "serve": "node tests/server.mjs .",
+    "mcp:dev": "mcp-use dev --entry mcp/server.js",
+    "mcp:start": "node mcp/server.js",
+    "mcp:deploy": "mcp-use deploy --start-command \"node mcp/server.js\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RaphaelKhalid/selfbalance-lab.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/RaphaelKhalid/selfbalance-lab/issues"
+  },
+  "homepage": "https://github.com/RaphaelKhalid/selfbalance-lab#readme",
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.61.1",
+    "eslint": "^10.6.0",
+    "playwright": "^1.61.1"
+  },
+  "dependencies": {
+    "mcp-use": "^1.34.5",
+    "zod": "^4.4.3"
+  }
+}

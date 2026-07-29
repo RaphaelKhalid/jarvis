@@ -1,0 +1,4 @@
+{
+  "//": "The repo root is type:commonjs (dev tooling); everything under js/ is browser ES modules. Node needs this marker to import js/model, js/api and js/sim directly — which is what lets mcp/ run the real solver instead of a copy of it. Browsers ignore this file entirely; they load these paths via the import map in index.html.",
+  "type": "module"
+}

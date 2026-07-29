@@ -3,10 +3,13 @@ node_modules/
 .vercel
 *.log
 
-.vercel
+# package.json / package-lock.json used to be ignored here, from when this repo
+# was purely static files and npm existed only for dev tooling. They are tracked
+# now: mcp/ is a real Node service, so its dependencies and the `type: module`
+# markers (js/package.json, mcp/package.json) have to travel with the repo or a
+# fresh clone / cloud deploy fails on the first import. Note the bare pattern
+# also matched EVERY nested package.json, not just the root one.
 
-package.json
-package-lock.json
 _diag.mjs
 sim.png
 assembly.png
@@ -16,3 +19,6 @@ playwright-report/
 .env.*
 !.env.example
 .firecrawl/
+
+# mcp-use scratch: local session store + generated tool typings
+.mcp-use/

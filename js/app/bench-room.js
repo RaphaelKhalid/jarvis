@@ -70,20 +70,28 @@ function makeMarbleTexture() {
     const my = (sy + ey) / 2 + (Math.random() - 0.5) * 300;
     x.quadraticCurveTo(mx, my, ex, ey); x.stroke();
   };
-  for (let i = 0; i < 5; i++) {
+  // Many fine, low-contrast veins rather than a few bold ones. The texture tiles
+  // across the slab (see repeat below), so a stroke drawn here lands roughly
+  // 45cm long in world space — draw them heavy and the counter reads as scribble
+  // rather than stone.
+  for (let i = 0; i < 9; i++) {
     const sx = Math.random() * s, sy = -20, ex = Math.random() * s, ey = s + 20;
-    vein(sx, sy, ex, ey, 2.4 + Math.random() * 2, 'rgba(120,120,124,0.45)');
-    for (let j = 0; j < 4; j++) {
+    vein(sx, sy, ex, ey, 1.4 + Math.random() * 1.6, 'rgba(128,128,134,0.3)');
+    for (let j = 0; j < 5; j++) {
       const t = Math.random();
       vein(sx + (ex - sx) * t, sy + (ey - sy) * t,
-        sx + (ex - sx) * t + (Math.random() - 0.5) * 260,
-        sy + (ey - sy) * t + (Math.random() - 0.5) * 260,
-        0.8, 'rgba(150,148,150,0.3)');
+        sx + (ex - sx) * t + (Math.random() - 0.5) * 220,
+        sy + (ey - sy) * t + (Math.random() - 0.5) * 220,
+        0.7, 'rgba(150,148,152,0.2)');
     }
-    if (i < 2) vein(sx + 6, sy, ex + 6, ey, 1, 'rgba(196,178,120,0.2)'); // faint gold
+    if (i < 3) vein(sx + 7, sy, ex + 7, ey, 1, 'rgba(198,176,116,0.16)'); // faint gold
   }
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
+  // Tile it. Mapped 0..1 across a 135cm slab a single vein sweeps the entire
+  // counter; at 3× the pattern lands at a believable stone scale.
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(3, 1.4);
   t.anisotropy = 8;
   return t;
 }
@@ -229,7 +237,14 @@ export function initBenchRoom({ scene, renderer, bloom, studioLights = [] } = {}
   glass.rotation.x = Math.PI / 2; glass.position.set(52, -38, 23.4); decor.push(glass);
   decor.push(box(50, 7, 1, new THREE.MeshStandardMaterial({ color: 0x2a2d31, roughness: 0.5 }), 52, -8, 22.4));
 
-  // ── room shell: back wall, left wall (with window), right wall, floor ──────
+  // ── room shell: back / left / right walls, floor, ceiling ─────────────────
+  // Every shell surface is DOUBLE-SIDED. Single-sided planes are backface-culled
+  // the moment the orbit camera passes outside them, and the room stops being a
+  // room — it reads as a floating diorama against the dark studio background.
+  // Double-siding costs nothing here and means the box holds up from any angle.
+  wallMat.side = THREE.DoubleSide;
+  woodMat.side = THREE.DoubleSide;
+
   const backWall = new THREE.Mesh(new THREE.PlaneGeometry(420, 320), wallMat);
   backWall.position.set(20, 60, -24.5); backWall.receiveShadow = true; decor.push(backWall);
 
@@ -247,6 +262,13 @@ export function initBenchRoom({ scene, renderer, bloom, studioLights = [] } = {}
   floor.rotation.x = -Math.PI / 2; floor.position.set(20, -78, 40);
   floor.receiveShadow = true; decor.push(floor);
 
+  // Ceiling: closes the box so there's no open top to see sky-less void through,
+  // and gives the key light something to bounce off. It must NOT cast a shadow —
+  // a lid over a directional key light would put the whole room in shade.
+  const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(420, 400), wallMat);
+  ceiling.rotation.x = Math.PI / 2; ceiling.position.set(20, 142, 40);
+  ceiling.castShadow = false; ceiling.receiveShadow = true; decor.push(ceiling);
+
   // ── window on the left wall: bright warm pane + white frame + fabric curtain ─
   const paneMat = new THREE.MeshStandardMaterial({
     color: 0xfff4e0, emissive: 0xfff0d6, emissiveIntensity: 0.3, roughness: 1 });
@@ -259,16 +281,19 @@ export function initBenchRoom({ scene, renderer, bloom, studioLights = [] } = {}
   // a gathered fabric panel down the near edge of the window, replacing the old
   // procedural blind slats — a real cloth normal map catches the key light and
   // sells the "daylight through a window" read far better than flat white boxes.
-  const curtain = new THREE.Mesh(new THREE.PlaneGeometry(46, 80, 24, 1), curtainMat);
+  // It hangs at x = -56.2, tight to the wall (-57) and clear of the counter slab,
+  // whose left edge is x = -55. At -54 the panel speared straight up through the
+  // marble and read as a white board standing on the worktop.
+  const curtain = new THREE.Mesh(new THREE.PlaneGeometry(40, 72, 32, 1), curtainMat);
   {
     const p = curtain.geometry.attributes.position;
     for (let i = 0; i < p.count; i++) {
       // ripple across the panel's width so it reads as hanging cloth, not card
-      p.setZ(i, Math.sin(p.getX(i) * 0.42) * 2.6);
+      p.setZ(i, Math.sin(p.getX(i) * 0.55) * 2.2);
     }
     curtain.geometry.computeVertexNormals();
   }
-  curtain.rotation.y = Math.PI / 2; curtain.position.set(-54, 34, 12);
+  curtain.rotation.y = Math.PI / 2; curtain.position.set(-56.2, 36, 14);
   curtain.castShadow = true; curtain.receiveShadow = true; decor.push(curtain);
 
   // pack the built geometry into the swappable sub-group before the async props

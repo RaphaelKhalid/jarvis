@@ -365,9 +365,9 @@ function exitSim() {
   canvas.style.cursor = 'crosshair';
   controlsLegend.classList.remove('hidden');
   controls.enabled = true;
-  controls.target.set(6, -2, 2);
-  camera.position.set(38, 32, 56);
-  camera.fov = 44; camera.updateProjectionMatrix();
+  controls.target.set(4, 0, 2);
+  camera.position.set(34, 80, 93);
+  camera.fov = 55; camera.updateProjectionMatrix();
   hud.simHud.classList.add('hidden');
   hud.updateStepper();
 }

@@ -100,16 +100,22 @@ export function createScene(canvas) {
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(envScene, 0.04).texture;
 
-  const camera = new THREE.PerspectiveCamera(44, 1, 0.1, 2000);
-  camera.position.set(38, 32, 56);
+  const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 2000);
+  camera.position.set(34, 80, 93);
 
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
-  controls.target.set(6, -2, 2);
+  controls.target.set(4, 0, 2);
   controls.maxPolarAngle = Math.PI * 0.49;
   controls.minDistance = 8;
-  controls.maxDistance = 160;
+  controls.maxDistance = 175;
+  // The room is open only towards +z — it has a back wall, two side walls and a
+  // ceiling, and no fourth wall. Orbiting past ±85° puts the camera outside that
+  // shell, looking at the blank back of the plaster. Clamping the azimuth keeps
+  // every reachable angle a view *of the room* rather than of its exterior.
+  controls.minAzimuthAngle = -Math.PI * 0.47;
+  controls.maxAzimuthAngle = Math.PI * 0.47;
 
   // ── calibrated three-point studio lighting (cool, product-photo) ──────────
   // hemisphere: cool sky above, dark cool bounce below — sets the neutral base

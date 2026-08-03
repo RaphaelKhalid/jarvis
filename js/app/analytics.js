@@ -1,5 +1,10 @@
 // Funnel instrumentation — the activation path GTM cares about:
-//   load → place → wire → upload → drive
+//   load → place → connect_ok → circuit_ok → run_enter   (+ share)
+//
+// CIRCUIT_OK is the activation metric ("first working circuit"): the first time
+// the solver reports a valid circuit with real current flowing through a load.
+// It's the moment the product's whole premise pays off, and unlike "reached RUN"
+// it can't be hit by mashing buttons.
 //
 // Privacy-safe by construction: no PII, no external network calls today. Events
 // go to a no-op sink (console in dev + an in-page ring buffer at window.__gyroFunnel).
@@ -10,10 +15,13 @@
 export const EVENTS = Object.freeze({
   LOAD: 'load',
   PLACE: 'place',
-  WIRE: 'wire',
-  UPLOAD: 'upload',
-  DRIVE: 'drive',
-  SHARE: 'share',   // virality signal — user copied a shareable build link
+  CONNECT_OK: 'connect_ok',       // a wire the API accepted
+  CONNECT_FAIL: 'connect_fail',   // a rejected pin pair — where users get stuck
+  CIRCUIT_OK: 'circuit_ok',       // ★ activation: first solved circuit with current
+  RUN_ENTER: 'run_enter',         // entered the RUN physics sim
+  JARVIS_MSG: 'jarvis_msg',       // user sent the assistant a message
+  JARVIS_TOOL: 'jarvis_tool',     // the assistant mutated the build
+  SHARE: 'share',                 // virality signal — copied a shareable build link
 });
 
 const buffer = [];

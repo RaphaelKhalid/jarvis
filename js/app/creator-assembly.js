@@ -13,13 +13,13 @@ import * as THREE from 'three';
 import { LIBRARY, pinsFor, baseType } from '../model/library.js';
 import { makeBattery, makeMotor } from '../parts.js';
 import { makeFlatLabel } from '../labels.js';
-import { loadRapier } from '../sim.js';
+import { loadRapier } from '../sim/rapier.js';
 import { pinInfo } from '../glossary.js';
 import { audio } from '../audio.js';
 import { state, subscribe } from './state.js';
 import { initProps } from './props.js';
 import { KIND_LABEL } from './hud.js';
-import { track, trackOnce } from './analytics.js';
+import { track, trackOnce, EVENTS } from './analytics.js';
 
 // tray metadata (name/desc/help) per library type — the human-facing card copy.
 const CARD = {
@@ -654,7 +654,7 @@ export function initCreatorAssembly({ canvas, scene, camera, controls, api, hud 
     // bench under gravity, colliding with whatever's already there.
     const pos = dropPoint(e) || [0, 1, 0];
     const res = api.place_component({ type, transform: { pos, rot: [0, 0, 0] } });
-    if (res.ok) { audio.place(); trackOnce('place', { type }); }
+    if (res.ok) { audio.place(); trackOnce(EVENTS.PLACE, { type }); }
     sync();
     hud.setStatus(api.get_document().components.length >= 2
       ? 'Click a pin, then its target pin, to wire them'
@@ -1005,8 +1005,14 @@ export function initCreatorAssembly({ canvas, scene, camera, controls, api, hud 
     if (pending === id) { highlightPin(id, false); pending = null; return; }
     const from = pending; highlightPin(from, false); pending = null;
     const res = api.connect({ from, to: id });
-    if (res.ok && res.changed) { hud.flash(`✓ ${from} → ${id}`, 'ok'); audio.connect(); }
-    else if (!res.ok) { hud.flash(res.errors[0] || 'invalid connection', 'bad'); audio.error(); track('wire_wrong_pin'); }
+    if (res.ok && res.changed) {
+      hud.flash(`✓ ${from} → ${id}`, 'ok'); audio.connect();
+      track(EVENTS.CONNECT_OK, { nets: api.get_document().nets.length });
+    } else if (!res.ok) {
+      hud.flash(res.errors[0] || 'invalid connection', 'bad'); audio.error();
+      // the rejection reason is where users get stuck — worth the cardinality
+      track(EVENTS.CONNECT_FAIL, { reason: res.errors[0] || 'unknown' });
+    }
     sync(); hud.refreshChecklist();
   });
 

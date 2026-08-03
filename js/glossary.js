@@ -177,10 +177,3 @@ function baseId(id) {
 
 export function pinInfo(id) { return PINS[id] || PINS[baseId(id)] || null; }
 export function compInfo(type) { return COMPONENTS[type] || COMPONENTS[baseType(type)] || null; }
-
-// Explain a required connection (used on wire hover).
-export function connectionBlurb(req) {
-  const a = pinInfo(req.a), b = pinInfo(req.b);
-  if (!a || !b) return '';
-  return `${a.title} → ${b.title}`;
-}

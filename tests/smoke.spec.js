@@ -143,7 +143,11 @@ test('the inspector renders the live document + solved current in the DOM', asyn
 
 test('place → connect → run spins the motor from the solved circuit', async ({ page }) => {
   await openApp(page);
-  await page.evaluate(() => {
+  // run_sim resolves only once Rapier's WASM is loaded and the body is built, so
+  // awaiting it removes the race this test used to have: previously it fired and
+  // forgot, and a failed start was swallowed — the test then polled a sim that
+  // was never going to spin and died on a 30s timeout with no diagnostic.
+  const started = await page.evaluate(async () => {
     const api = window.__api;
     api.loadDocument({ v: 2, robotId: 'self-balancer', name: 't', components: [], nets: [],
       code: null, sim: { gravity: -9.81, seed: 42 }, meta: { revision: 0 } });
@@ -151,9 +155,37 @@ test('place → connect → run spins the motor from the solved circuit', async 
     api.place_component({ type: 'motor', id: 'motor1' });
     api.connect({ from: 'bat1.+', to: 'motor1.A' });
     api.connect({ from: 'bat1.-', to: 'motor1.B' });
-    api.run_sim();
+    return api.run_sim();
   });
-  await page.waitForFunction(() => window.__sim && Math.abs(window.__sim.omega('motor1')) > 1,
-    null, { timeout: 30_000 });
+  expect(started).toMatchObject({ ok: true, running: true });
+
+  // now it's genuinely running, so ω climbing is a physics question, not a
+  // loading one — the wait is short and any failure is a real regression.
+  await page.waitForFunction(() => Math.abs(window.__sim.omega('motor1')) > 1,
+    null, { timeout: 15_000 });
   expect(await page.evaluate(() => Math.abs(window.__sim.omega('motor1')))).toBeGreaterThan(1);
+});
+
+test('the activation funnel fires circuit_ok exactly once, on the first working circuit', async ({ page }) => {
+  await openApp(page);
+  const events = await page.evaluate(() => {
+    const api = window.__api;
+    const names = () => (window.__gyroFunnel || []).map(e => e.event);
+    api.loadDocument({ v: 2, robotId: 'self-balancer', name: 't', components: [], nets: [],
+      code: null, sim: { gravity: -9.81, seed: 42 }, meta: { revision: 0 } });
+    api.place_component({ type: 'battery', id: 'bat1' });
+    api.place_component({ type: 'motor', id: 'motor1' });
+    api.connect({ from: 'bat1.+', to: 'motor1.A' });
+    const beforeLoop = names().filter(n => n === 'circuit_ok').length;
+    api.connect({ from: 'bat1.-', to: 'motor1.B' });   // closes the loop
+    const afterLoop = names().filter(n => n === 'circuit_ok').length;
+    // a second working circuit must not re-fire it (it's a once-per-session metric)
+    api.place_component({ type: 'led', id: 'led1' });
+    api.connect({ from: 'bat1.+', to: 'led1.A' });
+    api.connect({ from: 'bat1.-', to: 'led1.K' });
+    return { beforeLoop, afterLoop, total: names().filter(n => n === 'circuit_ok').length };
+  });
+  expect(events.beforeLoop).toBe(0);   // an unclosed circuit is not activation
+  expect(events.afterLoop).toBe(1);
+  expect(events.total).toBe(1);
 });

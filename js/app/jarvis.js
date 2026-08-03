@@ -13,6 +13,7 @@
 // (profiles.tier) are uncapped. The gate is client-side (localStorage) — good
 // enough to protect the free key; server-side enforcement lands with real auth.
 import { runTool } from '../api/tools.js';
+import { track, EVENTS } from './analytics.js';
 
 const ENDPOINT = '/api/jarvis';
 const MAX_STEPS = 8;          // model turns per user message (tool loops)
@@ -138,6 +139,9 @@ export function initJarvis({ api, onFlash, getTier, onUpgrade } = {}) {
     bubble('user', text);
     contents.push({ role: 'user', parts: [{ text }] });
     bumpUsage();   // one user message = one unit, regardless of tool round-trips
+    // funnel: how many users actually reach for the assistant, and does using it
+    // change their odds of a working circuit? (the split that justifies the bet)
+    track(EVENTS.JARVIS_MSG, { turn: contents.length });
 
     try {
       for (let step = 0; step < MAX_STEPS; step++) {
@@ -158,7 +162,10 @@ export function initJarvis({ api, onFlash, getTier, onUpgrade } = {}) {
         for (const p of calls) {
           const { name, args } = p.functionCall;
           toolNote(name, args);
-          const result = runTool(api, name, args || {});
+          // some tools (run_sim) are async — await unconditionally so a promise
+          // is never stringified into the model's function response as `{}`.
+          const result = await runTool(api, name, args || {});
+          track(EVENTS.JARVIS_TOOL, { tool: name, ok: !!result?.ok });
           responseParts.push({ functionResponse: { name, response: wrap(result) } });
         }
         contents.push({ role: 'user', parts: responseParts });

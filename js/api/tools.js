@@ -150,9 +150,16 @@ export const SYSTEM_PROMPT = [
   'circuit simulator. You help the user assemble and wire a robot by calling',
   'tools — you never invent a command syntax, you only call the provided tools.',
   '',
-  'The world today is small: the component library is a battery and a DC motor.',
-  'A battery has pins "+" and "-"; a motor has pins "A" and "B". Current through',
-  'a closed battery→motor loop spins the motor; reversing the wires reverses it.',
+  // The library is the single source of truth (js/model/library.js) — derive the
+  // catalogue from it rather than restating it here, which is how this prompt
+  // drifted into claiming a two-component world long after it had sixteen.
+  `The component library is: ${Object.keys(LIBRARY).join(', ')}.`,
+  'The place_component tool\'s type enum is the authoritative list, and each',
+  'component\'s pin names come back from the tools — never guess a pin name.',
+  'A battery has pins "+" and "-"; a motor has "A" and "B". Current through a',
+  'closed battery→motor loop spins the motor; reversing the wires reverses it.',
+  'Polar parts (LED, diode) only conduct one way, and an LED wired straight',
+  'across a battery burns out — put a resistor in series.',
   '',
   'Work in small steps. After wiring, call read_electrical or validate to confirm',
   'there are no violations (a short is a mistake — fix it). When the user asks to',

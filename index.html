@@ -44,12 +44,6 @@
 <script src="https://unpkg.com/lucide@0.462.0" defer></script>
 <link rel="stylesheet" href="css/tokens.css">
 <link rel="stylesheet" href="css/style.css">
-<!-- CodeMirror (Arduino code editor) -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/material-darker.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/clike/clike.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/selection/active-line.min.js"></script>
 <script type="importmap">
 {
   "imports": {
@@ -133,19 +127,15 @@
     </div>
   </main>
 
-  <!-- RIGHT: run panel (M1: the firmware editor is inert — no MCU in the
-       battery→motor world — so it's hidden; this panel is just Run + Serial) -->
+  <!-- RIGHT: run panel. The CodeMirror firmware editor and Serial Monitor that
+       used to live here were pre-pivot: the sketch was never executed (the
+       controller was JS), so they showed code that did nothing. Gone. -->
   <aside id="right-panel">
     <header class="panel-header">
       <span class="dot dot-green"></span> SIMULATE — <span id="firmware-file">battery → motor</span>
       <button class="panel-min" data-panel="right-panel" aria-label="Minimize panel" title="Minimize">▾</button>
     </header>
     <div id="run-hint">Place a <b>battery</b> and a <b>motor</b>, wire <span class="mono">+→A</span> and <span class="mono">−→B</span>, then hit <b>Run</b> to watch it spin. The Inspector (left) shows the solved current.</div>
-    <div id="editor-container" class="hidden"></div>
-    <div id="serial" class="hidden">
-      <div id="serial-head"><span><i data-lucide="terminal"></i> SERIAL MONITOR</span><span class="baud">115200 baud</span></div>
-      <div id="serial-log"><div class="ser-line dim">// Serial output appears here after Upload.</div></div>
-    </div>
     <button id="upload-btn"><i data-lucide="play"></i><span>RUN</span></button>
   </aside>
 
@@ -156,15 +146,15 @@
 <div id="overlay" class="hidden">
   <div class="card">
     <div class="ov-mark"><span aria-hidden="true">◐</span> JARVIS</div>
-    <h1>Feel how control systems work</h1>
-    <div class="tagline">Wire up a real robot, tune a live PID loop, and watch it fight to stay upright — no install, right in your browser.</div>
+    <h1>Build electronics that actually work</h1>
+    <div class="tagline">Drag parts onto the bench, wire them pin to pin, and a real circuit solver lights the LEDs, spins the motors and catches your shorts — no install, right in your browser.</div>
     <div class="ov-beats">
-      <div class="ov-beat"><span class="ov-n">01</span><b>Build</b><p>Drag parts onto the chassis and connect the pins.</p></div>
-      <div class="ov-beat"><span class="ov-n">02</span><b>Tune</b><p>Nudge the PID gains and feel the robot respond.</p></div>
-      <div class="ov-beat"><span class="ov-n">03</span><b>Drive</b><p>Upload and take it for a spin with W A S D.</p></div>
+      <div class="ov-beat"><span class="ov-n">01</span><b>Build</b><p>Drag parts onto the bench — they fall, collide and settle.</p></div>
+      <div class="ov-beat"><span class="ov-n">02</span><b>Wire</b><p>Click a pin, then its target. The solver runs as you go.</p></div>
+      <div class="ov-beat"><span class="ov-n">03</span><b>Run</b><p>Hit RUN and watch the current drive real physics.</p></div>
     </div>
     <button class="start" id="overlay-start">Start building →</button>
-    <button class="tour" id="overlay-tour">New here? Follow the guided walkthrough</button>
+    <button class="tour" id="overlay-tour">Or ask Jarvis to build it for you</button>
   </div>
 </div>
 

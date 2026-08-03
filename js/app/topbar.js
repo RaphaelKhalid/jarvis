@@ -1,15 +1,16 @@
 // Top-bar shell — the slim product frame above the three-panel cockpit. Turns
-// "a demo" into "a product": brand mark, the active robot's name, and a
+// "a demo" into "a product": brand mark, the current build's name, and a
 // light/dark theme toggle. Kept deliberately minimal; the workspace keeps its
-// own sound/help/lessons buttons. The current-robot label is a seam for the
-// M3 RobotDef work (it will read state.activeRobot.name once that lands).
+// own sound/help buttons.
+//
+// The chip used to name the active *robot* (the pre-pivot RobotDef registry, one
+// fixed chassis per app boot). In the creator sandbox the unit of work is the
+// RobotDoc, so the chip names the open build and doubles as a rename field.
 import { state, subscribe } from './state.js';
-import { initRobotPicker } from './robotpicker.js';
-import { activeRobot } from '../robots/index.js';
 
 const THEME_KEY = 'sbl-theme';
 
-export function initTopbar() {
+export function initTopbar({ getName, onRename } = {}) {
   const bar = document.getElementById('topbar');
   if (!bar) return null;
 
@@ -19,7 +20,7 @@ export function initTopbar() {
       <span class="tb-name">JARVIS</span>
       <span class="tb-sub">Robotics Creator</span>
     </div>
-    <button class="tb-robot" id="tb-robot" title="Switch robot"><span class="tb-dot"></span><span id="tb-robot-name">Self-Balancer</span><span class="tb-caret">▾</span></button>
+    <button class="tb-robot" id="tb-robot" title="Rename this build"><span class="tb-dot"></span><span id="tb-robot-name">Bench</span></button>
     <div class="tb-actions">
       <button id="tb-theme" class="tb-btn" title="Toggle light / dark" aria-label="Toggle light / dark">
         <i data-lucide="sun-moon"></i>
@@ -40,19 +41,20 @@ export function initTopbar() {
     applyTheme(root.getAttribute('data-theme') === 'light' ? 'dark' : 'light');
   });
 
-  // robot picker popover, anchored to the chip (js/app/robotpicker.js)
-  initRobotPicker({ anchor: bar.querySelector('#tb-robot') });
-
-  // chip reflects the active robot + drive/build state
+  // chip names the open build and reflects build/run state; clicking renames it
   function refreshChip() {
     const chip = bar.querySelector('#tb-robot');
-    const driving = state.mode === 'sim';
-    chip.classList.toggle('driving', driving);
-    bar.querySelector('#tb-robot-name').textContent =
-      activeRobot().name + (driving ? ' — running' : '');
+    const running = state.mode === 'sim';
+    chip.classList.toggle('driving', running);
+    const name = (getName && getName()) || 'Bench';
+    bar.querySelector('#tb-robot-name').textContent = name + (running ? ' — running' : '');
   }
+  bar.querySelector('#tb-robot').addEventListener('click', () => {
+    if (!onRename) return;
+    const next = window.prompt('Name this build:', (getName && getName()) || 'Bench');
+    if (next && next.trim()) { onRename(next.trim()); refreshChip(); }
+  });
   subscribe('mode', refreshChip);
-  subscribe('activeRobotId', refreshChip);
   refreshChip();
 
   try { window.lucide?.createIcons(); } catch { /* icons are best-effort */ }

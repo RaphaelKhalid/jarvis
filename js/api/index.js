@@ -110,7 +110,15 @@ export function createApi({ doc, hooks = {} } = {}) {
   function redo() { const changed = history.redo(); return ok(changed); }
 
   // ── sim control (delegated to the physics binding) ─────────────
-  function run_sim() { hooks.sim?.run?.(); return ok(true, { running: !!hooks.sim?.running?.() }); }
+  // Async: starting the sim loads Rapier's WASM and builds bodies. Awaiting the
+  // hook means a caller (a test, Jarvis, a script) that does `await run_sim()`
+  // is guaranteed the sim is actually running when it resolves, instead of
+  // polling and hoping. Callers that ignore the promise behave as before.
+  async function run_sim() {
+    try { await hooks.sim?.run?.(); }
+    catch (e) { return { ok: false, changed: false, errors: [String(e?.message || e)] }; }
+    return ok(true, { running: !!hooks.sim?.running?.() });
+  }
   function stop_sim() { hooks.sim?.stop?.(); return ok(true, { running: !!hooks.sim?.running?.() }); }
   function reset_sim() { hooks.sim?.reset?.(); simState = {}; return ok(); }
 

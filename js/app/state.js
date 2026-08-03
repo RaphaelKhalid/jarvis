@@ -2,11 +2,12 @@
 // Read via `state.<key>`, write via `set(key, value)` so subscribers fire.
 const subs = new Map();
 
+// `mode` is the only cross-module state left: the pre-pivot store also carried
+// PID `gains` (no PID any more), a `booting` lockout for the balance-sim boot
+// sequence, and `activeRobotId` for the RobotDef registry — the document is the
+// unit of work now, and the API owns it.
 export const state = {
   mode: 'assembly',      // 'assembly' | 'sim'
-  booting: false,        // sim boot sequence lockout (drive keys ignored)
-  gains: { Kp: 15, Ki: 140, Kd: 0.9 },
-  activeRobotId: 'self-balancer',  // key into js/robots registry (M3 seam)
 };
 
 export function set(key, value) {

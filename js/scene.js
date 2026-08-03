@@ -15,7 +15,6 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
-import { activeRobot } from './robots/index.js';
 import { isLowQuality } from './app/quality.js';
 
 // Vertical lift applied to the assembly rig (chassis deck, parts, slot ghosts)
@@ -296,21 +295,10 @@ export function createScene(canvas) {
     new THREE.ShaderMaterial({ ...cloneShader(gradShader), side: THREE.BackSide, depthWrite: false, fog: false }));
   scene.add(sky);
 
-  // ── slot ghosts (highlighted during drag) ──
+  // Slot ghosts are gone with the pre-pivot fixed-chassis robot: the creator
+  // bench has no fixed mount points, parts land wherever they're dropped. The
+  // empty map is kept so consumers destructuring the scene stay valid.
   const slotMeshes = {};
-  for (const slot of activeRobot().slots) {
-    const g = new THREE.Mesh(
-      new THREE.PlaneGeometry(slot.w, slot.d),
-      new THREE.MeshBasicMaterial({
-        color: COL.accent, transparent: true, opacity: 0, side: THREE.DoubleSide,
-      })
-    );
-    g.rotation.x = -Math.PI / 2;
-    g.position.set(slot.x, 0.06 + ASSEMBLY_LIFT, slot.z);
-    g.userData.slot = slot;
-    scene.add(g);
-    slotMeshes[slot.id] = g;
-  }
 
   // assembly-only scenery — hidden while the sim's arena is on screen
   const assemblyDecor = [floor, shadowCatcher, chassis, sky];

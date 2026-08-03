@@ -6,7 +6,7 @@
 // Open circuit ⇒ τ≈0 ⇒ ω→0. Reversed polarity ⇒ i<0 ⇒ reverse spin. Short ⇒ the
 // solver flags ok:false ⇒ motorTorque returns 0 ⇒ no spin.
 import * as THREE from 'three';
-import { loadRapier } from '../sim.js';
+import { loadRapier } from './rapier.js';
 import { solveCircuit, motorTorque } from './circuit.js';
 import { baseType } from '../model/library.js';
 

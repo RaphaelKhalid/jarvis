@@ -13,6 +13,9 @@
 export const DOC_VERSION = 2;
 
 // ── construction ────────────────────────────────────────────────
+// `robotId` is vestigial: it identified which pre-pivot RobotDef a build
+// belonged to, and that registry is gone. It stays in the schema (and keeps its
+// old default) only so documents saved by earlier versions round-trip unchanged.
 export function emptyDoc(robotId = 'self-balancer', name = 'Untitled build') {
   return {
     v: DOC_VERSION,

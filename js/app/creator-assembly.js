@@ -20,6 +20,7 @@ import { state, subscribe } from './state.js';
 import { initProps } from './props.js';
 import { KIND_LABEL } from './hud.js';
 import { track, trackOnce, EVENTS } from './analytics.js';
+import { partMat } from './part-materials.js';
 
 // tray metadata (name/desc/help) per library type — the human-facing card copy.
 const CARD = {
@@ -92,7 +93,7 @@ function makeMotorAB() {
 function addLeadPin(g, name, x, y, z) {
   const pin = new THREE.Mesh(
     new THREE.CylinderGeometry(0.09, 0.09, 0.5, 8),
-    new THREE.MeshStandardMaterial({ color: 0xd4af37, metalness: 0.8, roughness: 0.35 }));
+    partMat({ color: 0xd4af37, metalness: 0.8, roughness: 0.35 }));
   pin.position.set(x, y + 0.25, z);
   g.userData.pins.push({ name, obj: pin });
   g.add(pin);
@@ -105,13 +106,13 @@ function makeResistorMesh() {
   g.userData = { type: 'resistor', pins: [] };
   const body = new THREE.Mesh(
     new THREE.CylinderGeometry(0.6, 0.6, 2.6, 16),
-    new THREE.MeshStandardMaterial({ color: 0xd8c9a0, roughness: 0.6 }));
+    partMat({ color: 0xd8c9a0, roughness: 0.6 }));
   body.rotation.z = Math.PI / 2; body.position.y = 1.2; body.castShadow = true;
   g.add(body);
   [0x8b4513, 0x111111, 0xaa2222, 0xc8a000].forEach((c, i) => {
     const band = new THREE.Mesh(
       new THREE.CylinderGeometry(0.63, 0.63, 0.22, 16),
-      new THREE.MeshStandardMaterial({ color: c, roughness: 0.5 }));
+      partMat({ color: c, roughness: 0.5 }));
     band.rotation.z = Math.PI / 2; band.position.set(-0.7 + i * 0.42, 1.2, 0);
     g.add(band);
   });
@@ -127,18 +128,18 @@ function makeSwitchMesh() {
   g.userData = { type: 'switch', pins: [] };
   const base = new THREE.Mesh(
     new THREE.BoxGeometry(2.6, 0.9, 1.8),
-    new THREE.MeshStandardMaterial({ color: 0x2a2f3a, roughness: 0.7, metalness: 0.2 }));
+    partMat({ color: 0x2a2f3a, roughness: 0.7, metalness: 0.2 }));
   base.position.y = 0.45; base.castShadow = true;
   g.add(base);
   const lever = new THREE.Mesh(
     new THREE.BoxGeometry(1.5, 0.35, 0.6),
-    new THREE.MeshStandardMaterial({ color: 0xb0b4bc, metalness: 0.6, roughness: 0.4 }));
+    partMat({ color: 0xb0b4bc, metalness: 0.6, roughness: 0.4 }));
   lever.position.set(0, 1.05, 0); lever.rotation.z = 0.4;
   lever.userData.role = 'sw-lever';
   g.add(lever);
   const ind = new THREE.Mesh(
     new THREE.SphereGeometry(0.22, 12, 12),
-    new THREE.MeshStandardMaterial({ color: 0x333a33, emissive: 0x000000, emissiveIntensity: 1 }));
+    partMat({ color: 0x333a33, emissive: 0x000000, emissiveIntensity: 1 }));
   ind.position.set(0.95, 0.95, 0.95); ind.userData.role = 'sw-ind';
   g.add(ind);
   addLeadPin(g, 'A', -1.7, 0.9, 0);
@@ -161,14 +162,14 @@ function makeLedMesh() {
   g.userData = { type: 'led', pins: [] };
   const lens = new THREE.Mesh(
     new THREE.SphereGeometry(0.8, 20, 16, 0, Math.PI * 2, 0, Math.PI * 0.62),
-    new THREE.MeshStandardMaterial({ color: 0xff5566, emissive: 0xff2233,
+    partMat({ color: 0xff5566, emissive: 0xff2233,
       emissiveIntensity: 0, roughness: 0.25, metalness: 0.1,
       transparent: true, opacity: 0.9 }));
   lens.position.y = 1.5; lens.userData.role = 'led-lens'; lens.castShadow = true;
   g.add(lens);
   const collar = new THREE.Mesh(
     new THREE.CylinderGeometry(0.82, 0.82, 0.5, 20),
-    new THREE.MeshStandardMaterial({ color: 0xcc3344, roughness: 0.4 }));
+    partMat({ color: 0xcc3344, roughness: 0.4 }));
   collar.position.y = 1.05; g.add(collar);
   addLeadPin(g, 'A', -0.4, 0.0, 0);   // long leg = anode
   addLeadPin(g, 'K', 0.4, 0.0, 0);    // short leg = cathode
@@ -190,16 +191,16 @@ function makePotMesh() {
   g.userData = { type: 'potentiometer', pins: [] };
   const body = new THREE.Mesh(
     new THREE.BoxGeometry(2.2, 0.9, 2.2),
-    new THREE.MeshStandardMaterial({ color: 0x2a3550, roughness: 0.7, metalness: 0.2 }));
+    partMat({ color: 0x2a3550, roughness: 0.7, metalness: 0.2 }));
   body.position.y = 0.45; body.castShadow = true;
   g.add(body);
   const knob = new THREE.Mesh(
     new THREE.CylinderGeometry(0.8, 0.8, 0.8, 20),
-    new THREE.MeshStandardMaterial({ color: 0x8fb3ff, roughness: 0.4, metalness: 0.3 }));
+    partMat({ color: 0x8fb3ff, roughness: 0.4, metalness: 0.3 }));
   knob.position.y = 1.2; knob.userData.role = 'pot-knob'; knob.castShadow = true;
   const notch = new THREE.Mesh(
     new THREE.BoxGeometry(0.16, 0.2, 0.7),
-    new THREE.MeshStandardMaterial({ color: 0x0a0f1a, roughness: 0.5 }));
+    partMat({ color: 0x0a0f1a, roughness: 0.5 }));
   notch.position.set(0, 0.5, 0.35);
   knob.add(notch);
   g.add(knob);
@@ -217,9 +218,9 @@ function updatePotVisual(group, frac) {
 // ── new catalog geometry (data-driven pins) ───────────────────────
 // Shared instrument-look materials so the growing catalog reads as one family.
 const MAT = {
-  darkCase: () => new THREE.MeshStandardMaterial({ color: 0x2a2f3a, roughness: 0.62, metalness: 0.25 }),
-  metal: () => new THREE.MeshStandardMaterial({ color: 0xc6ccd6, roughness: 0.32, metalness: 0.85 }),
-  glass: (c = 0xbfe4ff) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.08, metalness: 0, transparent: true, opacity: 0.35 }),
+  darkCase: () => partMat({ color: 0x2a2f3a, roughness: 0.62, metalness: 0.25 }),
+  metal: () => partMat({ color: 0xc6ccd6, roughness: 0.32, metalness: 0.85 }),
+  glass: (c = 0xbfe4ff) => partMat({ color: c, roughness: 0.08, metalness: 0, transparent: true, opacity: 0.35 }),
 };
 
 // Attach lead pins whose names/count come straight from the library, so wiring
@@ -245,7 +246,7 @@ function makeButtonMesh() {
   base.position.y = 0.35; base.castShadow = true; g.add(base);
   const cap = new THREE.Mesh(
     new THREE.CylinderGeometry(0.62, 0.7, 0.55, 20),
-    new THREE.MeshStandardMaterial({ color: 0x7bd88f, roughness: 0.45, metalness: 0.15 }));
+    partMat({ color: 0x7bd88f, roughness: 0.45, metalness: 0.15 }));
   cap.position.y = 0.95; cap.userData.role = 'btn-cap'; cap.castShadow = true; g.add(cap);
   attachLibraryPins(g, 'push_button', { y: 0.7, spread: 3.0 });
   return g;
@@ -265,13 +266,13 @@ function makeLampMesh() {
   g.userData = { type: 'lamp', pins: [] };
   const baseM = new THREE.Mesh(
     new THREE.CylinderGeometry(0.62, 0.62, 0.9, 16),
-    new THREE.MeshStandardMaterial({ color: 0xb8860b, roughness: 0.4, metalness: 0.7 }));
+    partMat({ color: 0xb8860b, roughness: 0.4, metalness: 0.7 }));
   baseM.position.y = 0.9; g.add(baseM);
   const glass = new THREE.Mesh(new THREE.SphereGeometry(1.0, 22, 18),
-    new THREE.MeshStandardMaterial({ color: 0xfff4d0, roughness: 0.12, metalness: 0, transparent: true, opacity: 0.4 }));
+    partMat({ color: 0xfff4d0, roughness: 0.12, metalness: 0, transparent: true, opacity: 0.4 }));
   glass.position.y = 2.2; glass.castShadow = true; g.add(glass);
   const fil = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.06, 8, 16),
-    new THREE.MeshStandardMaterial({ color: 0xffcf6b, emissive: 0xffaa22, emissiveIntensity: 0 }));
+    partMat({ color: 0xffcf6b, emissive: 0xffaa22, emissiveIntensity: 0 }));
   fil.position.y = 2.1; fil.userData.role = 'lamp-fil'; g.add(fil);
   attachLibraryPins(g, 'lamp', { y: 0.35, spread: 1.6 });
   return g;
@@ -290,7 +291,7 @@ function makeBuzzerMesh() {
   const can = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 1.5, 24), MAT.darkCase());
   can.position.y = 0.75; can.castShadow = true; g.add(can);
   const port = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.1, 16),
-    new THREE.MeshStandardMaterial({ color: 0x0a0d12, roughness: 0.8 }));
+    partMat({ color: 0x0a0d12, roughness: 0.8 }));
   port.position.y = 1.51; g.add(port);
   attachLibraryPins(g, 'buzzer', { y: 0.0, spread: 1.2 });
   return g;
@@ -301,10 +302,10 @@ function makeDiodeMesh() {
   const g = new THREE.Group();
   g.userData = { type: 'diode', pins: [] };
   const body = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 2.0, 16),
-    new THREE.MeshStandardMaterial({ color: 0x2b2b30, roughness: 0.35, metalness: 0.4 }));
+    partMat({ color: 0x2b2b30, roughness: 0.35, metalness: 0.4 }));
   body.rotation.z = Math.PI / 2; body.position.y = 1.0; body.castShadow = true; g.add(body);
   const band = new THREE.Mesh(new THREE.CylinderGeometry(0.53, 0.53, 0.28, 16),
-    new THREE.MeshStandardMaterial({ color: 0xd8dde5, roughness: 0.5 }));
+    partMat({ color: 0xd8dde5, roughness: 0.5 }));
   band.rotation.z = Math.PI / 2; band.position.set(0.6, 1.0, 0); g.add(band);   // toward cathode (K)
   attachLibraryPins(g, 'diode', { y: 1.0, spread: 3.2 });
   return g;
@@ -315,11 +316,11 @@ function makePhotoresistorMesh() {
   const g = new THREE.Group();
   g.userData = { type: 'photoresistor', pins: [] };
   const face = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, 0.4, 24),
-    new THREE.MeshStandardMaterial({ color: 0xc9b063, roughness: 0.5, metalness: 0.2 }));
+    partMat({ color: 0xc9b063, roughness: 0.5, metalness: 0.2 }));
   face.position.y = 0.9; face.rotation.x = Math.PI / 2; face.castShadow = true; g.add(face);
   for (let i = 0; i < 4; i++) {
     const trk = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.06, 0.14),
-      new THREE.MeshStandardMaterial({ color: 0x5a4a1a, roughness: 0.6 }));
+      partMat({ color: 0x5a4a1a, roughness: 0.6 }));
     trk.position.set(0, 1.12, -0.5 + i * 0.33); g.add(trk);
   }
   attachLibraryPins(g, 'photoresistor', { y: 0.0, spread: 1.4 });
@@ -331,7 +332,7 @@ function makeThermistorMesh() {
   const g = new THREE.Group();
   g.userData = { type: 'thermistor', pins: [] };
   const bead = new THREE.Mesh(new THREE.SphereGeometry(0.7, 18, 14),
-    new THREE.MeshStandardMaterial({ color: 0xc86b4a, roughness: 0.5, metalness: 0.1 }));
+    partMat({ color: 0xc86b4a, roughness: 0.5, metalness: 0.1 }));
   bead.position.y = 1.4; bead.scale.set(1, 1.15, 0.7); bead.castShadow = true; g.add(bead);
   attachLibraryPins(g, 'thermistor', { y: 0.0, spread: 1.2 });
   return g;
@@ -348,7 +349,7 @@ function makeFuseMesh() {
     cap.rotation.z = Math.PI / 2; cap.position.set(x, 1.0, 0); cap.castShadow = true; g.add(cap);
   }
   const fil = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.05, 0.05),
-    new THREE.MeshStandardMaterial({ color: 0x9a9aa2, roughness: 0.4, metalness: 0.7 }));
+    partMat({ color: 0x9a9aa2, roughness: 0.4, metalness: 0.7 }));
   fil.position.y = 1.0; g.add(fil);
   attachLibraryPins(g, 'fuse', { y: 1.0, spread: 3.0 });
   return g;
@@ -359,14 +360,14 @@ function makeCapacitorMesh() {
   const g = new THREE.Group();
   g.userData = { type: 'capacitor', pins: [] };
   const can = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 2.6, 24),
-    new THREE.MeshStandardMaterial({ color: 0x2a8f8f, roughness: 0.4, metalness: 0.35 }));
+    partMat({ color: 0x2a8f8f, roughness: 0.4, metalness: 0.35 }));
   can.position.y = 1.55; can.castShadow = true; g.add(can);
   const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.24, 2.2, 0.02),
-    new THREE.MeshStandardMaterial({ color: 0xe8eef5, roughness: 0.6 }));
+    partMat({ color: 0xe8eef5, roughness: 0.6 }));
   stripe.position.set(0, 1.55, 0.9); g.add(stripe);
   // vent cross on the top
   const vent = new THREE.Mesh(new THREE.CylinderGeometry(0.82, 0.82, 0.06, 24),
-    new THREE.MeshStandardMaterial({ color: 0x1c1f26, roughness: 0.7 }));
+    partMat({ color: 0x1c1f26, roughness: 0.7 }));
   vent.position.y = 2.86; g.add(vent);
   attachLibraryPins(g, 'capacitor', { y: 0.0, spread: 1.2 });
   return g;
@@ -377,18 +378,18 @@ function makeServoMesh() {
   const g = new THREE.Group();
   g.userData = { type: 'servo', pins: [] };
   const body = new THREE.Mesh(new THREE.BoxGeometry(3.6, 2.6, 1.8),
-    new THREE.MeshStandardMaterial({ color: 0x2f5fc0, roughness: 0.5, metalness: 0.2 }));
+    partMat({ color: 0x2f5fc0, roughness: 0.5, metalness: 0.2 }));
   body.position.y = 1.3; body.castShadow = true; g.add(body);
   const boss = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.7, 18),
-    new THREE.MeshStandardMaterial({ color: 0x1c1f26, roughness: 0.6 }));
+    partMat({ color: 0x1c1f26, roughness: 0.6 }));
   boss.position.set(1.0, 2.85, 0); g.add(boss);
   const horn = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.18, 0.34),
-    new THREE.MeshStandardMaterial({ color: 0xe8eef5, roughness: 0.5 }));
+    partMat({ color: 0xe8eef5, roughness: 0.5 }));
   horn.position.set(1.0, 3.25, 0); horn.userData.role = 'servo-horn'; g.add(horn);
   // mounting tabs
   for (const x of [-2.2, 2.2]) {
     const tab = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.3, 1.8),
-      new THREE.MeshStandardMaterial({ color: 0x2f5fc0, roughness: 0.5 }));
+      partMat({ color: 0x2f5fc0, roughness: 0.5 }));
     tab.position.set(x, 1.9, 0); g.add(tab);
   }
   attachLibraryPins(g, 'servo', { y: 0.9, z: -0.9, spread: 2.4 });
@@ -400,13 +401,13 @@ function makeRelayMesh() {
   const g = new THREE.Group();
   g.userData = { type: 'relay', pins: [] };
   const shell = new THREE.Mesh(new THREE.BoxGeometry(3.0, 2.8, 2.4),
-    new THREE.MeshStandardMaterial({ color: 0x3a6bd0, roughness: 0.3, metalness: 0.1, transparent: true, opacity: 0.55 }));
+    partMat({ color: 0x3a6bd0, roughness: 0.3, metalness: 0.1, transparent: true, opacity: 0.55 }));
   shell.position.y = 1.4; shell.castShadow = true; g.add(shell);
   const coil = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 1.6, 16),
-    new THREE.MeshStandardMaterial({ color: 0xb8860b, roughness: 0.5, metalness: 0.6 }));
+    partMat({ color: 0xb8860b, roughness: 0.5, metalness: 0.6 }));
   coil.position.set(-0.7, 1.2, 0); g.add(coil);
   const arm = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.4, 0.5),
-    new THREE.MeshStandardMaterial({ color: 0xc6ccd6, roughness: 0.35, metalness: 0.8 }));
+    partMat({ color: 0xc6ccd6, roughness: 0.35, metalness: 0.8 }));
   arm.position.set(0.7, 1.3, 0); g.add(arm);
   attachLibraryPins(g, 'relay', { y: 0.0, spread: null });
   return g;
@@ -769,7 +770,7 @@ export function initCreatorAssembly({ canvas, scene, camera, controls, api, hud 
     const curve = curveFor(pA, pB);
     const geo = new THREE.TubeGeometry(curve, 24, 0.14, 8, false);
     const hex = color ? new THREE.Color(color).getHex() : (KIND_COLOR[kind] ?? 0xffd166);
-    const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: hex, roughness: 0.4, metalness: 0.2 }));
+    const mesh = new THREE.Mesh(geo, partMat({ color: hex, roughness: 0.4, metalness: 0.2 }));
     mesh.userData.ids = [idA, idB];
     wireGroup.add(mesh);
     wires.push({ mesh, ids: [idA, idB] });

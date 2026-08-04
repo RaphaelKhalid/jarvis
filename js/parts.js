@@ -9,16 +9,17 @@
 // it — the creator bench has no fixed mount points and no microcontroller.
 import * as THREE from 'three';
 import { makeFlatLabel } from './labels.js';
+import { partMat } from './app/part-materials.js';
 
 const PIN_RADIUS = 0.09;
 const PIN_HEIGHT = 0.28;
 
 const mat = (color, opts = {}) =>
-  new THREE.MeshStandardMaterial({ color, roughness: 0.65, metalness: 0.1, ...opts });
+  partMat({ color, roughness: 0.65, metalness: 0.1, ...opts });
 
-const goldMat = new THREE.MeshStandardMaterial({ color: 0xd4af37, roughness: 0.35, metalness: 0.8 });
+const goldMat = partMat({ color: 0xd4af37, roughness: 0.35, metalness: 0.8 });
 const blackMat = mat(0x1a1a1a);
-const silverMat = new THREE.MeshStandardMaterial({ color: 0xb0b4bc, roughness: 0.45, metalness: 0.7 });
+const silverMat = partMat({ color: 0xb0b4bc, roughness: 0.45, metalness: 0.7 });
 
 function addPin(group, name, x, y, z, labelSide = 1) {
   const pin = new THREE.Mesh(
@@ -65,7 +66,9 @@ export function makeMotor(side = 1) {
   g.add(shaft);
 
   // wheel: tire + hub
-  const tire = new THREE.Mesh(new THREE.CylinderGeometry(3.3, 3.3, 1.3, 28), mat(0x22252c, { roughness: 0.9 }));
+  // rubber is genuinely matte — opt out of the gloss clamp, keep the env map
+  const tire = new THREE.Mesh(new THREE.CylinderGeometry(3.3, 3.3, 1.3, 28),
+    mat(0x22252c, { roughness: 0.9, finish: 'rough' }));
   tire.rotation.z = Math.PI / 2;
   tire.position.set(side * 3.1, 1.0, -0.6);
   g.add(tire);

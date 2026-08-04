@@ -181,13 +181,19 @@ export const COMPONENT_ELECTRICAL = {
 function num(v, d) { return (typeof v === 'number' && isFinite(v)) ? v : d; }
 
 // ── dense linear solve (Gaussian elimination w/ partial pivot) ───
+// Returns the solution vector with a `singular` flag: a column with no usable
+// pivot means the system is ill-posed (a floating subcircuit, a degenerate
+// element) and the numbers that come back are not a solution. Callers MUST
+// surface that rather than render it — silently returning garbage that looks
+// like a solve is the worst failure mode this file can have.
 function solveLinear(A, b) {
   const n = b.length;
   const M = A.map((row, i) => [...row, b[i]]);
+  let singular = false;
   for (let col = 0; col < n; col++) {
     let piv = col;
     for (let r = col + 1; r < n; r++) if (Math.abs(M[r][col]) > Math.abs(M[piv][col])) piv = r;
-    if (Math.abs(M[piv][col]) < 1e-12) continue; // singular column; leave as-is
+    if (Math.abs(M[piv][col]) < 1e-12) { singular = true; continue; }
     [M[col], M[piv]] = [M[piv], M[col]];
     const d = M[col][col];
     for (let j = col; j <= n; j++) M[col][j] /= d;
@@ -198,7 +204,9 @@ function solveLinear(A, b) {
       for (let j = col; j <= n; j++) M[r][j] -= f * M[col][j];
     }
   }
-  return M.map(row => row[n]);
+  const x = M.map(row => row[n]);
+  x.singular = singular;
+  return x;
 }
 
 // ── build node map from nets ─────────────────────────────────────
@@ -302,7 +310,7 @@ export function solveCircuit(doc, stateOf = {}) {
     const nodeV = new Array(n).fill(0);
     const cur = {};
     const diodeI = new Array(diodes.length).fill(0);
-    if (size === 0) return { nodeV, cur, diodeI };
+    if (size === 0) return { nodeV, cur, diodeI, singular: false };
 
     const A = Array.from({ length: size }, () => new Array(size).fill(0));
     const rhs = new Array(size).fill(0);
@@ -335,18 +343,35 @@ export function solveCircuit(doc, stateOf = {}) {
   // re-solve until stable. Converges in a couple of passes for simple circuits.
   const diodeOn = diodes.map(() => true);
   let result = assemble(diodeOn);
-  for (let iter = 0; iter < 2 * diodes.length + 2 && diodes.length; iter++) {
-    let changed = false;
-    diodes.forEach((d, i) => {
-      if (diodeOn[i]) {
-        if (result.diodeI[i] < -1e-9) { diodeOn[i] = false; changed = true; }
-      } else {
-        const vd = (result.nodeV[d.a] || 0) - (result.nodeV[d.b] || 0);
-        if (vd > d.vf + 1e-9) { diodeOn[i] = true; changed = true; }
-      }
-    });
-    if (!changed) break;
-    result = assemble(diodeOn);
+  let converged = true;
+  if (diodes.length) {
+    const maxIter = 2 * diodes.length + 2;
+    let iter = 0;
+    converged = false;
+    for (; iter < maxIter; iter++) {
+      let changed = false;
+      diodes.forEach((d, i) => {
+        if (diodeOn[i]) {
+          if (result.diodeI[i] < -1e-9) { diodeOn[i] = false; changed = true; }
+        } else {
+          const vd = (result.nodeV[d.a] || 0) - (result.nodeV[d.b] || 0);
+          if (vd > d.vf + 1e-9) { diodeOn[i] = true; changed = true; }
+        }
+      });
+      // stable state = every diode agrees with its own bias: that's the solution
+      if (!changed) { converged = true; break; }
+      result = assemble(diodeOn);
+    }
+  }
+  // A diode set that never settles (oscillating states) means the last solve is
+  // an arbitrary iterate, not an answer. Say so instead of drawing it.
+  if (!converged) {
+    violations.push({ level: 'error', code: 'unsolvable',
+      message: 'This circuit has no steady state the solver can settle on — check for conflicting sources or a component wired against itself.' });
+  }
+  if (result.singular) {
+    violations.push({ level: 'error', code: 'unsolvable',
+      message: 'This circuit is ill-posed (a floating or degenerate loop) — the solver can\'t give a meaningful answer for it.' });
   }
   const nodeV = result.nodeV;
   Object.assign(current, result.cur);

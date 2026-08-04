@@ -26,6 +26,8 @@ The second diagnosis: **we are the only product in the category with 3D + mechan
 
 ## B. Asset pipeline — 52 MB → ~12 MB
 
+*Update 2026-08-04: the 3.9 MB photogrammetry capture is no longer part of the first visit — `bench-scan` is gated behind `?scan` and is not constructed otherwise.*
+
 The measured first-visit payload today is roughly **42 MB** of room assets: 17.5 MB of PBR texture sets, 23 MB of glTF props, 1.6 MB HDRI. It is deferred behind `whenIdle()`, which is the right instinct, but on shared school wifi (~5 Mbps) it is still minutes. **This is a hard dependency of the "does it survive a school network" kill-criterion in `YC_APPLICATION.md`.**
 
 | # | Action | Tool | Hrs |

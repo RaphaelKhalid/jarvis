@@ -79,13 +79,25 @@ window.__view = { camera, controls }; // dev hook: inspect/position the assembly
 // lands its detected countertop on y = 0 (the plane parts rest on) — so BOTH the
 // modeled decor and the procedural marble slab hide; only the lights are shared.
 // The scan group rides in assemblyDecor so RUN hides it too.
-const benchScan = initBenchScan({ scene });
-assemblyDecor.push(benchScan.group);
+//
+// Hidden on the live site: the modeled room won on quality, and the capture is a
+// 3.9 MB glTF that every first-time visitor was downloading for a toggle they
+// were not meant to find — which is exactly the payload the school-network
+// kill-criterion turns on. It is still one query param away for authoring work
+// (?scan to look at it, ?scanfit for the re-bake flow bench-scan.js documents),
+// and when it's off we never construct it, so the download doesn't happen.
+const SCAN_ENABLED = /[?&]scan(fit)?\b/.test(window.location.search);
+const benchScan = SCAN_ENABLED
+  ? initBenchScan({ scene })
+  : { group: null, show() {}, hide() {}, isLoaded: () => false };
+if (benchScan.group) assemblyDecor.push(benchScan.group);
 // The modeled room is the default now that it's a PBR reconstruction (real
 // materials, glTF props, HDRI lighting) rather than the flat procedural stand-in
 // the capture used to beat; the toggle still swaps to the captured mesh.
 const ROOM_KEY = 'jarvis-room-mode';
-let roomIsScan = localStorage.getItem(ROOM_KEY) === 'scan';
+// a stale 'scan' choice from before it was hidden must not leave a visitor on a
+// room that will never load — the persisted preference only counts when enabled.
+let roomIsScan = SCAN_ENABLED && localStorage.getItem(ROOM_KEY) === 'scan';
 function setRoomMode(scan) {
   roomIsScan = scan;
   try { localStorage.setItem(ROOM_KEY, scan ? 'scan' : 'modeled'); } catch { /* private mode */ }
@@ -96,6 +108,7 @@ function setRoomMode(scan) {
   if (btn) btn.querySelector('span:last-child').textContent = scan ? 'Scan' : 'Modeled';
 }
 (function mountRoomToggle() {
+  if (!SCAN_ENABLED) { setRoomMode(false); return; }   // nothing to swap to
   const ws = document.getElementById('workspace');
   if (!ws) return;
   const btn = document.createElement('button');
